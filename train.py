@@ -152,15 +152,16 @@ def now_to_str():
 
 def setup_wandb(args, config):
     if not args.no_wandb:
-        wandb.init(project='cifar')
-#        run_name = now_to_str() if args.run_name is None else args.run_name
-#        run_obj = wandb.init(
-#            project=args.project_name, name=run_name,
-#            group=args.group_name, entity=args.entity_name, reinit=True)
-#        config['wandb_url'] = run_obj.get_url()
-#        config['run_name'] = run_name
-#        config['group_name'] = group_name
-#        config['entity_name'] = entity_name
+        wandb.init(project='cifar')  
+        run_name = now_to_str() if args.run_name is None else args.run_name
+        print(args.project_name, run_name, args.group_name, args.entity_name)
+        run_obj = wandb.init(
+            project=args.project_name, name=run_name,
+            group=args.group_name, entity=args.entity_name)
+        config['wandb_url'] = run_obj.get_url()
+        config['run_name'] = run_name
+        config['group_name'] = args.group_name
+        config['entity_name'] = args.entity_name
         config['wandb'] = True
         wandb.config.update(config)
     else:
@@ -184,7 +185,8 @@ if __name__ == "__main__":
     parser.add_argument('--log_dir', type=str, metavar='ld',
                         help='Log directory', required=True)
     parser.add_argument('--no_wandb', action='store_true', help='disable W&B')
-    parser.add_argument('--project_name', default=None, help='Name of the wandb project')
+    parser.add_argument('--project_name', type=str,
+                        help='Name of the wandb project', required=True)
     parser.add_argument('--group_name', default=None, help='Name of the wandb group (a group of runs)')
     parser.add_argument('--run_name', default=None, help='Name of the wandb run')
     parser.add_argument('--entity_name', default='p-lambda', help='Name of the team')

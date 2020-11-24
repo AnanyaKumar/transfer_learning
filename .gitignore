@@ -1,0 +1,5 @@
+*.pyc
+*.swp
+logs/*
+wandb/*
+.ipynb_checkpoints/*
