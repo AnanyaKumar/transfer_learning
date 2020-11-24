@@ -1,0 +1,31 @@
+log_interval: 100
+use_cuda: True
+save_freq: 25
+epochs: &epochs 200
+batch_size: 128
+num_workers: 8
+lr_init: 0.1
+
+train_dataset:
+    classname: torchvision.datasets.CIFAR10
+    args:
+        train: True
+        download: False
+        root: '/u/scr/ananya/cifar10_dataset'
+    transforms:
+        - classname: torchvision.transforms.RandomCrop
+          args:
+              size: 32
+              padding: 4
+        - classname: torchvision.transforms.RandomHorizontalFlip
+        - classname: torchvision.transforms.ToTensor
+
+test_dataset:
+    classname: torchvision.datasets.CIFAR10
+    args:
+        train: False
+        download: False
+        root: '/u/scr/ananya/cifar10_dataset'
+    transforms:
+        - classname: torchvision.transforms.ToTensor
+
