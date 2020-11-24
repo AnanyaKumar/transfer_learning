@@ -4,31 +4,50 @@ save_freq: 25
 epochs: &epochs 200
 batch_size: 128
 num_workers: 8
-lr_init: 0.1
 save_all_checkpoints: False
 
+optimizer:
+  classname: torch.optim.SGD
+  args:
+    lr: &lr 0.1
+    momentum: 0.9
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    lr: *lr
+    T_max: *epochs
+
+model:
+  classname: resnet.resnet18
+
 train_dataset:
-    classname: cifar10_resized.CIFAR10Resized
-    args:
-        train_len: 4000
-        train: True
-        download: False
-        root: '/u/scr/ananya/cifar10_dataset'
-    transforms:
-        - classname: torchvision.transforms.RandomCrop
-          args:
-              size: 32
-              padding: 4
-        - classname: torchvision.transforms.RandomHorizontalFlip
-        - classname: torchvision.transforms.ToTensor
+  classname: cifar10_resized.CIFAR10Resized
+  args:
+    train_len: &train_len 4000
+    train: True
+    download: False
+    root: '/u/scr/ananya/cifar10_dataset'
+  transforms:
+    - classname: torchvision.transforms.RandomCrop
+      args:
+        size: 32
+        padding: 4
+    - classname: torchvision.transforms.RandomHorizontalFlip
+    - classname: torchvision.transforms.ToTensor
 
 test_dataset:
-    classname: cifar10_resized.CIFAR10Resized
-    args:
-        train_len: 4000
-        train: False
-        download: False
-        root: '/u/scr/ananya/cifar10_dataset'
-    transforms:
-        - classname: torchvision.transforms.ToTensor
+  classname: cifar10_resized.CIFAR10Resized
+  args:
+    train_len: *train_len
+    train: False
+    download: False
+    root: '/u/scr/ananya/cifar10_dataset'
+  transforms:
+    - classname: torchvision.transforms.ToTensor
+
+criterion:
+  classname: torch.nn.CrossEntropyLoss
+  args:
+    reduction: mean
 

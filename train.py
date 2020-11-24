@@ -27,9 +27,6 @@ log_level = logging.DEBUG
 
 
 def main(config, log_dir, checkpoints_dir):
-    transform_train = transforms.Compose([transforms.RandomCrop(32, padding=4),
-                                          transforms.RandomHorizontalFlip(),
-                                          transforms.ToTensor()])
     # Set up datasets and loaders.
     train_data = utils.init_dataset(config['train_dataset'])
     test_data = utils.init_dataset(config['test_dataset'])
@@ -38,19 +35,20 @@ def main(config, log_dir, checkpoints_dir):
         shuffle=True, num_workers=config['num_workers'])
     test_loader = torch.utils.data.DataLoader(
         test_data, batch_size=config['batch_size'],
-        shuffle=True, num_workers=config['num_workers'])
+        shuffle=False, num_workers=config['num_workers'])
     # Use CUDA if desired.
     logging.info(f'cuda device count: {torch.cuda.device_count()}') 
-    net = resnet.resnet18()
+    net = utils.initialize(config['model'])
     if config['use_cuda']:
         device = "cuda"
         net.cuda()
     logging.info('Using cuda? %d', next(net.parameters()).is_cuda)
     # Loss, optimizer, scheduler.
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=config['lr_init'], momentum=0.9)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, config['epochs'])
+    criterion = utils.initialize(config['criterion'])
+    optimizer = utils.initialize(
+            config['optimizer'], update_args={'params': net.parameters()})
+    scheduler = utils.initialize(
+            config['scheduler'], update_args={'optimizer': optimizer})
     # Training loop.
     best_acc = 0.0
     prev_ckp_path = None
