@@ -26,6 +26,24 @@ import utils.utils as utils
 log_level = logging.DEBUG
 
 
+def get_test_stats(config, net, test_loader, criterion, device):
+    # Evaluate accuracy and loss on validation.
+    val_loss = Accumulator()
+    val_acc = Accumulator()
+    net.eval()
+    with torch.no_grad():
+        for data in test_loader:
+            if config['use_cuda']:
+                data = utils.to_device(data, device)
+            images, labels = data
+            outputs = net(images)
+            _, predicted = torch.max(outputs.data, 1)
+            val_acc.add_values((predicted == labels).tolist())
+            loss = criterion(outputs, labels)
+            val_loss.add_value(loss.tolist())
+    return val_loss, val_acc
+
+
 def main(config, log_dir, checkpoints_dir):
     # Set up datasets and loaders.
     train_data = utils.init_dataset(config['train_dataset'])
@@ -44,7 +62,11 @@ def main(config, log_dir, checkpoints_dir):
         net.cuda()
     logging.info('Using cuda? %d', next(net.parameters()).is_cuda)
     # Loss, optimizer, scheduler.
+    # Can use a custom loss that takes in a model, inputs, labels, and gets an array of values.
+    # Or a criterion, which takes in model_outputs, labels, outputs a loss.
     criterion = utils.initialize(config['criterion'])
+    if 'model_loss' in config:
+        model_loss = utils.initialize(config['model_loss'])
     optimizer = utils.initialize(
             config['optimizer'], update_args={'params': net.parameters()})
     scheduler = utils.initialize(
@@ -63,6 +85,8 @@ def main(config, log_dir, checkpoints_dir):
         # Train model.
         net.train()
         logging.info("\nEpoch #{}".format(epoch))
+        if 'model_loss' in config:
+            train_model_loss = Accumulator()
         train_loss = Accumulator()
         train_acc = Accumulator()
         for i, data in enumerate(train_loader, 0):
@@ -73,7 +97,12 @@ def main(config, log_dir, checkpoints_dir):
             optimizer.zero_grad()
             outputs = net(inputs)
             loss = criterion(outputs, labels)
-            loss.backward()
+            if 'model_loss' in config:
+                opt_loss = model_loss(net, inputs, labels)
+                opt_loss.backward()
+                train_model_loss.add_value(opt_loss.tolist())
+            else:
+                loss.backward()
             optimizer.step() 
             train_loss.add_value(loss.tolist())
             _, train_preds = torch.max(outputs.data, 1)
@@ -84,20 +113,8 @@ def main(config, log_dir, checkpoints_dir):
                 logging.info('[%d, %5d] train_acc: %.3f' %
                         (epoch + 1, i + 1, train_acc.get_mean()))
         scheduler.step()
-        # Evaluate accuracy and loss on validation.
-        val_loss = Accumulator()
-        val_acc = Accumulator()
-        net.eval()
-        with torch.no_grad():
-            for data in test_loader:
-                if config['use_cuda']:
-                    data = utils.to_device(data, device)
-                images, labels = data
-                outputs = net(images)
-                _, predicted = torch.max(outputs.data, 1)
-                val_acc.add_values((predicted == labels).tolist())
-                loss = criterion(outputs, labels)
-                val_loss.add_value(loss.tolist())
+        val_loss, val_acc = get_test_stats(
+            config, net, test_loader, criterion, device)
         # Save train and val stats to wandb and file.
         stats = {
             'epoch': epoch,
@@ -106,6 +123,8 @@ def main(config, log_dir, checkpoints_dir):
             'val_loss': val_loss.get_mean(),
             'val_acc': val_acc.get_mean(),
         }
+        if 'model_loss' in config:
+            stats['model_loss'] = train_model_loss.get_mean()
         if config['wandb']:
             wandb.log(stats)
         utils.save_json(log_dir + '/current.json', stats)
@@ -150,7 +169,6 @@ def now_to_str():
 
 def setup_wandb(args, config):
     if not args.no_wandb:
-        wandb.init(project='cifar')  
         run_name = now_to_str() if args.run_name is None else args.run_name
         print(args.project_name, run_name, args.group_name, args.entity_name)
         run_obj = wandb.init(

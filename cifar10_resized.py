@@ -8,9 +8,12 @@ class CIFAR10Resized(CIFAR10):
             root=root, train=train, transform=transform, target_transform=target_transform,
             download=download)
         cifar_len = super().__len__()
-        assert train_len <= cifar_len
-        rng = np.random.default_rng(seed=seed)
-        self._indices = rng.choice(cifar_len, train_len)
+        if train:
+            assert train_len <= cifar_len
+            rng = np.random.default_rng(seed=seed)
+            self._indices = rng.choice(cifar_len, train_len)
+        else:
+            self._indices = np.arange(cifar_len)
 
     def __getitem__(self, i):
         super_index = self._indices[i]

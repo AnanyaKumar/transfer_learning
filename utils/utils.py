@@ -18,11 +18,10 @@ def initialize_obj(classname, args_dict=None):
     Class = getattr(importlib.import_module(module_name), class_name)
     # filter by argnames
     if args_dict is not None:
-        argspec = inspect.getargspec(Class.__init__)
+        argspec = inspect.getfullargspec(Class.__init__)
         argnames = argspec.args
         args_dict = {k: v for k, v in args_dict.items()
-                     if k in argnames or argspec.keywords is not None}
-
+                     if k in argnames}
         defaults = argspec.defaults
         # add defaults
         if defaults is not None:
