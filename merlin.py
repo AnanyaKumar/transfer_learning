@@ -20,8 +20,8 @@ def model_loss():
         class_num = int(logits.shape[1])
         target_label1, target_test_pred = merlin_linear(
             None, features, labels, train_num, val_num, class_num)
-        return (torch.nn.CrossEntropyLoss()(target_test_pred, target_label1)) # +
-               #  torch.nn.CrossEntropyLoss()(logits, labels))
+        return (torch.nn.CrossEntropyLoss()(target_test_pred, target_label1) +
+                torch.nn.CrossEntropyLoss()(logits, labels))
     return loss_func
     
 
