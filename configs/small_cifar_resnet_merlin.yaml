@@ -1,25 +1,22 @@
 log_interval: 10
 use_cuda: True
 save_freq: 25
-epochs: &epochs 200
+epochs: &epochs 2000
 batch_size: 512
 num_workers: 8
 save_all_checkpoints: False
 
 optimizer:
-  classname: torch.optim.Adam
+  classname: torch.optim.SGD
   args:
-    lr: &lr 0.001
-    # momentum: 0.9
+    lr: &lr 0.1
+    momentum: 0.9
 
 scheduler:
-  classname: torch.optim.lr_scheduler.StepLR
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
   args:
-    step_size: *epochs
-  #classname: torch.optim.lr_scheduler.CosineAnnealingLR
-  #args:
-  #  lr: *lr
-  #  T_max: *epochs
+    lr: *lr
+    T_max: *epochs
 
 model:
   classname: resnet.resnet18
