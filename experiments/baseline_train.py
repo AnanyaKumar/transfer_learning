@@ -18,7 +18,7 @@ import torch.nn.functional as F
 import wandb
 import yaml
 
-import resnet
+from models import resnet
 from utils.accumulator import Accumulator 
 import utils.utils as utils
 
@@ -85,10 +85,12 @@ def main(config, log_dir, checkpoints_dir):
         # Train model.
         net.train()
         logging.info("\nEpoch #{}".format(epoch))
+        loss_dict = {
+            'train_loss': Accumulator(),
+            'train_acc': Accumulator(),
+        }
         if 'model_loss' in config:
-            train_model_loss = Accumulator()
-        train_loss = Accumulator()
-        train_acc = Accumulator()
+            loss_dict['train_model_loss'] = Accumulator()
         for i, data in enumerate(train_loader, 0):
             # get the inputs; data is a list of [inputs, labels]
             if config['use_cuda']:
@@ -100,31 +102,29 @@ def main(config, log_dir, checkpoints_dir):
             if 'model_loss' in config:
                 opt_loss = model_loss(net, inputs, labels)
                 opt_loss.backward()
-                train_model_loss.add_value(opt_loss.tolist())
+                loss_dict['train_model_loss'].add_value(opt_loss.tolist())
             else:
                 loss.backward()
             optimizer.step() 
-            train_loss.add_value(loss.tolist())
+            loss_dict['train_loss'].add_value(loss.tolist())
             _, train_preds = torch.max(outputs.data, 1)
-            train_acc.add_values((train_preds == labels).tolist())
+            loss_dict['train_acc'].add_values((train_preds == labels).tolist())
             if i % config['log_interval'] == 0 and i != 0:
-                logging.info('[%d, %5d] train_loss: %.3f' %
-                        (epoch + 1, i + 1, train_loss.get_mean()))
-                logging.info('[%d, %5d] train_acc: %.3f' %
-                        (epoch + 1, i + 1, train_acc.get_mean()))
+                for k in loss_dict:
+                    logging.info(
+                        '[%d, %5d] %s: %.3f' %
+                        (epoch + 1, i + 1, k, loss_dict[k].get_mean()))
         scheduler.step()
         val_loss, val_acc = get_test_stats(
             config, net, test_loader, criterion, device)
         # Save train and val stats to wandb and file.
         stats = {
             'epoch': epoch,
-            'train_loss': train_loss.get_mean(),
-            'train_acc': train_acc.get_mean(),
             'val_loss': val_loss.get_mean(),
             'val_acc': val_acc.get_mean(),
         }
-        if 'model_loss' in config:
-            stats['model_loss'] = train_model_loss.get_mean()
+        for k in loss_dict:
+            stats[k] = loss_dict[k].get_mean()
         if config['wandb']:
             wandb.log(stats)
         utils.save_json(log_dir + '/current.json', stats)
@@ -192,9 +192,10 @@ def save_command_line_args(log_dir):
     logging.info('Command: ' + command)
     with open(log_dir+'/command.txt', 'w') as f:
         f.write(command)
+        f.write('\n')
 
 
-if __name__ == "__main__":
+def setup():
     parser = argparse.ArgumentParser(
         description='Run model')
     parser.add_argument('--config', type=str, metavar='c',
@@ -229,6 +230,10 @@ if __name__ == "__main__":
         json.dump(config, f)
     # Save command line arguments.
     save_command_line_args(log_dir)
-    # Main loop.
+    return config, log_dir, checkpoints_dir
+
+
+if __name__ == "__main__":
+    config, log_dir, checkpoints_dir = setup()
     main(config, log_dir, checkpoints_dir)
 

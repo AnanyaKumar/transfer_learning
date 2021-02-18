@@ -9,7 +9,7 @@ save_all_checkpoints: False
 optimizer:
   classname: torch.optim.SGD
   args:
-    lr: &lr 0.1
+    lr: &lr 0.01
     momentum: 0.9
 
 scheduler:
@@ -20,6 +20,8 @@ scheduler:
 
 model:
   classname: models.resnet.resnet18
+  args:
+    pretrained: True
 
 train_dataset:
     classname: torchvision.datasets.CIFAR10

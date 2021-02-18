@@ -1,8 +1,8 @@
 log_interval: 10
 use_cuda: True
 save_freq: 25
-epochs: &epochs 200
-batch_size: 128
+epochs: &epochs 2000
+batch_size: 512
 num_workers: 8
 save_all_checkpoints: False
 
@@ -19,10 +19,10 @@ scheduler:
     T_max: *epochs
 
 model:
-  classname: models.resnet.resnet18
+  classname: resnet.resnet18
 
 train_dataset:
-  classname: datasets.cifar10_resized.CIFAR10Resized
+  classname: cifar10_resized.CIFAR10Resized
   args:
     train_len: &train_len 4000
     train: True
@@ -37,7 +37,7 @@ train_dataset:
     - classname: torchvision.transforms.ToTensor
 
 test_dataset:
-  classname: datasets.cifar10_resized.CIFAR10Resized
+  classname: cifar10_resized.CIFAR10Resized
   args:
     train_len: *train_len
     train: False
@@ -45,6 +45,9 @@ test_dataset:
     root: '/u/scr/ananya/cifar10_dataset'
   transforms:
     - classname: torchvision.transforms.ToTensor
+
+model_loss:
+  classname: merlin.freeze_feature_loss
 
 criterion:
   classname: torch.nn.CrossEntropyLoss

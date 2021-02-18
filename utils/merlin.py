@@ -11,6 +11,14 @@ def one_hot(n_class, index):
     return tmp
 
 
+def freeze_feature_loss():
+    def loss_func(model, inputs, labels):
+        logits, features = model.forward(
+            inputs, return_features_also=True, stop_linear_grad=True)
+        return torch.nn.CrossEntropyLoss()(logits, labels)
+    return loss_func
+
+
 def model_loss():
     def loss_func(model, inputs, labels):
         logits, features = model.forward(
