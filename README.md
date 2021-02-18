@@ -20,3 +20,5 @@ Setup:
 To fine-tune an ImageNet model on CIFAR, run:
 python experiments/baseline_train.py --config=configs/imnet_finetune_cifar_resnet_baseline.yaml --log_dir=logs/inet_ft_run_0 --project_name=cifar group_name=inet_ft --run_name=run_0
 
+On jag:
+jag "export PYTHONPATH="."; ../env/bin/python experiments/baseline_train.py --config=configs/imnet_finetune_cifar_resnet_baseline.yaml --log_dir=logs/inet_ft_run_2 --project_name=cifar group_name=inet_ft --run_name=run_2"
