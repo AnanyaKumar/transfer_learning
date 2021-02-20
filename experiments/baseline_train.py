@@ -37,7 +37,7 @@ def get_test_stats(config, net, test_loader, criterion, device):
                 data = utils.to_device(data, device)
             images, labels = data
             outputs = net(images)
-            _, predicted = torch.max(outputs.data, 1)
+            _, predicted = torch.max(outputs.data, dim=1)
             val_acc.add_values((predicted == labels).tolist())
             loss = criterion(outputs, labels)
             val_loss.add_value(loss.tolist())
@@ -54,9 +54,15 @@ def main(config, log_dir, checkpoints_dir):
     test_loader = torch.utils.data.DataLoader(
         test_data, batch_size=config['batch_size'],
         shuffle=False, num_workers=config['num_workers'])
-    # Use CUDA if desired.
+    
+    # Create model.
     logging.info(f'cuda device count: {torch.cuda.device_count()}') 
     net = utils.initialize(config['model'])
+    # If fine-tune, re-initialize the last layer.
+    if config['finetune']:
+        logging.info('Fine Tuning.')
+        net.new_last_layer(config['num_classes'])
+    # Use CUDA if desired. 
     if config['use_cuda']:
         device = "cuda"
         net.cuda()

@@ -16,10 +16,15 @@ def save_json(save_path, save_dict):
 def initialize_obj(classname, args_dict=None):
     module_name, class_name = classname.rsplit(".", 1)
     Class = getattr(importlib.import_module(module_name), class_name)
+    if not inspect.isclass(Class):
+        raise ValueError("Can only initialize classes, are you passing in a function?")
     # filter by argnames
     if args_dict is not None:
         argspec = inspect.getfullargspec(Class.__init__)
         argnames = argspec.args
+        for k, v in args_dict.items():
+            if k not in argnames:
+                raise ValueError(f"{k}, {v} not found in {Class}")
         args_dict = {k: v for k, v in args_dict.items()
                      if k in argnames}
         defaults = argspec.defaults
@@ -29,6 +34,7 @@ def initialize_obj(classname, args_dict=None):
                 if argname not in args_dict:
                     args_dict[argname] = default
         class_instance = Class(**args_dict)
+        print(Class, args_dict)
     else:
         class_instance = Class()
     return class_instance
