@@ -2,7 +2,7 @@ log_interval: 10
 use_cuda: True
 save_freq: 25
 epochs: &epochs 100
-batch_size: 128
+batch_size: 32
 num_workers: 8
 save_all_checkpoints: False
 
@@ -17,13 +17,13 @@ optimizer:
     momentum: 0.9
 
 scheduler:
-  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  classname: torch.optim.lr_scheduler.StepLR
   args:
-    lr: *lr
-    T_max: *epochs
+    step_size: 1
+    gamma: 0.975
 
 model:
-  classname: torchvision.models.resnet50
+  classname: models.imnet_resnet.ResNet50
   args:
     pretrained: True
 
@@ -34,11 +34,6 @@ train_dataset:
         download: False
         root: '/u/scr/ananya/cifar10_dataset'
     transforms:
-        - classname: torchvision.transforms.RandomCrop
-          args:
-              size: 32
-              padding: 4
-        - classname: torchvision.transforms.RandomHorizontalFlip
         - classname: torchvision.transforms.Resize
           args:
               size: 224
