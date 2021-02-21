@@ -47,14 +47,26 @@ def get_test_stats(config, net, test_loader, criterion, device):
 def main(config, log_dir, checkpoints_dir):
     # Set up datasets and loaders.
     train_data = utils.init_dataset(config['train_dataset'])
-    test_data = utils.init_dataset(config['test_dataset'])
     train_loader = torch.utils.data.DataLoader(
         train_data, batch_size=config['batch_size'],
         shuffle=True, num_workers=config['num_workers'])
-    test_loader = torch.utils.data.DataLoader(
-        test_data, batch_size=config['batch_size'],
-        shuffle=False, num_workers=config['num_workers'])
-    
+    # Set up test loaders.
+    logging.info('Found %d testing datasets.', len(config['test_datasets']))
+    test_loaders = {}
+    for test_dataset_config in config['test_datasets']:
+        logging.info('test dataset config: ' + str(test_dataset_config))
+        if 'transforms' not in test_dataset_config:
+            if config['default_test_transforms'] is None:
+                raise ValueError('Must either specify default_test_transforms or a transform for each test dataset')
+            test_dataset_config['transforms'] = config['default_test_transforms']
+        test_data = utils.init_dataset(test_dataset_config)
+        test_loader = torch.utils.data.DataLoader(
+            test_data, batch_size=config['batch_size'],
+            shuffle=False, num_workers=config['num_workers'])
+        test_loaders[test_dataset_config['name']] = test_loader
+        logging.info('test loader name: ' + test_dataset_config['name'])
+        logging.info('test loader: ' + str(test_loader))
+        logging.info('test transform: ' + str(test_dataset_config['transforms']))
     # Create model.
     logging.info(f'cuda device count: {torch.cuda.device_count()}') 
     net = utils.initialize(config['model'])
