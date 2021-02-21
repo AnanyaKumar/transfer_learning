@@ -34,7 +34,6 @@ def initialize_obj(classname, args_dict=None):
                 if argname not in args_dict:
                     args_dict[argname] = default
         class_instance = Class(**args_dict)
-        print(Class, args_dict)
     else:
         class_instance = Class()
     return class_instance
