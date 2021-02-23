@@ -1,29 +1,27 @@
 log_interval: 10
 use_cuda: True
 save_freq: 25
-epochs: &epochs 100
+epochs: &epochs 25
 batch_size: 128
 num_workers: 8
 save_all_checkpoints: False
 
 finetune: True
 num_classes: 10
-last_layer_name: 'fc'
 
 optimizer:
   classname: torch.optim.SGD
   args:
-    lr: &lr 0.01
+    lr: 0.01
     momentum: 0.9
 
 scheduler:
   classname: torch.optim.lr_scheduler.CosineAnnealingLR
   args:
-    lr: *lr
     T_max: *epochs
 
 model:
-  classname: torchvision.models.resnet50
+  classname: models.imnet_resnet.ResNet50
   args:
     pretrained: True
 
@@ -48,21 +46,95 @@ train_dataset:
               mean: [0.485, 0.456, 0.406]
               std: [0.229, 0.224, 0.225]
 
-test_dataset:
-    classname: torchvision.datasets.CIFAR10
-    args:
-        train: False
-        download: False
-        root: '/u/scr/ananya/cifar10_dataset'
-    transforms:
-        - classname: torchvision.transforms.Resize
-          args:
-              size: 224
-        - classname: torchvision.transforms.ToTensor
-        - classname: torchvision.transforms.Normalize
-          args:
-              mean: [0.485, 0.456, 0.406]
-              std: [0.229, 0.224, 0.225]
+default_test_transforms:
+    - classname: torchvision.transforms.Resize
+      args:
+          size: 224
+    - classname: torchvision.transforms.ToTensor
+    - classname: torchvision.transforms.Normalize
+      args:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+
+test_datasets:
+    - name: 'cifar10-test'
+      classname: torchvision.datasets.CIFAR10
+      args:
+          train: False
+          download: False
+          root: '/u/scr/ananya/cifar10_dataset'
+    - name: 'fog-cifar-2'
+      classname: datasets.cifar10c.CIFAR10C
+      args:
+          root: '/juice/scr/ananya/CIFAR-10-C/'
+          corruption: 'fog'
+          severity: 2
+    - name: 'fog-cifar-4'
+      classname: datasets.cifar10c.CIFAR10C
+      args:
+          root: '/juice/scr/ananya/CIFAR-10-C/'
+          corruption: 'fog'
+          severity: 4
+    - name: 'zoom-blur-cifar-2'
+      classname: datasets.cifar10c.CIFAR10C
+      args:
+          root: '/juice/scr/ananya/CIFAR-10-C/'
+          corruption: 'zoom_blur'
+          severity: 2
+    - name: 'zoom-blur-cifar-4'
+      classname: datasets.cifar10c.CIFAR10C
+      args:
+          root: '/juice/scr/ananya/CIFAR-10-C/'
+          corruption: 'zoom_blur'
+          severity: 4
+    - name: 'gaussian-cifar-2'
+      classname: datasets.cifar10c.CIFAR10C
+      args:
+          root: '/juice/scr/ananya/CIFAR-10-C/'
+          corruption: 'gaussian_noise'
+          severity: 2
+    - name: 'gaussian-cifar-4'
+      classname: datasets.cifar10c.CIFAR10C
+      args:
+          root: '/juice/scr/ananya/CIFAR-10-C/'
+          corruption: 'gaussian_noise'
+          severity: 4
+    - name: 'pixelate-cifar-2'
+      classname: datasets.cifar10c.CIFAR10C
+      args:
+          root: '/juice/scr/ananya/CIFAR-10-C/'
+          corruption: 'pixelate'
+          severity: 2
+    - name: 'pixelate-cifar-4'
+      classname: datasets.cifar10c.CIFAR10C
+      args:
+          root: '/juice/scr/ananya/CIFAR-10-C/'
+          corruption: 'pixelate'
+          severity: 4
+    - name: 'shotnoise-cifar-2'
+      classname: datasets.cifar10c.CIFAR10C
+      args:
+          root: '/juice/scr/ananya/CIFAR-10-C/'
+          corruption: 'shot_noise'
+          severity: 2
+    - name: 'shotnoise-cifar-4'
+      classname: datasets.cifar10c.CIFAR10C
+      args:
+          root: '/juice/scr/ananya/CIFAR-10-C/'
+          corruption: 'shot_noise'
+          severity: 4
+    - name: 'glassblur-cifar-2'
+      classname: datasets.cifar10c.CIFAR10C
+      args:
+          root: '/juice/scr/ananya/CIFAR-10-C/'
+          corruption: 'glass_blur'
+          severity: 2
+    - name: 'glassblur-cifar-4'
+      classname: datasets.cifar10c.CIFAR10C
+      args:
+          root: '/juice/scr/ananya/CIFAR-10-C/'
+          corruption: 'glass_blur'
+          severity: 4
 
 criterion:
   classname: torch.nn.CrossEntropyLoss

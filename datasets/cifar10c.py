@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 import numpy as np
+from PIL import Image
 
 CORRUPTIONS = [
     'gaussian_noise', 'shot_noise', 'impulse_noise', 'defocus_blur',
@@ -27,6 +28,7 @@ class CIFAR10C(Dataset):
 
     def __getitem__(self, i):
         x, y = self._xs[i], self._ys[i]
+        x = Image.fromarray(np.uint8(x))
         if self._transform is not None:
             x = self._transform(x)
         return x, y

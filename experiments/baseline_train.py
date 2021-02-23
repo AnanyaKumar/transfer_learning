@@ -133,14 +133,14 @@ def main(config, log_dir, checkpoints_dir):
                         '[%d, %5d] %s: %.3f' %
                         (epoch + 1, i + 1, k, loss_dict[k].get_mean()))
         scheduler.step()
-        val_loss, val_acc = get_test_stats(
-            config, net, test_loader, criterion, device)
-        # Save train and val stats to wandb and file.
-        stats = {
-            'epoch': epoch,
-            'val_loss': val_loss.get_mean(),
-            'val_acc': val_acc.get_mean(),
-        }
+        # Get loss for each test set
+        stats = {}
+        for name, test_loader in test_loaders.items():
+            logging.info(' getting stats ' + name)
+            val_loss, val_acc = get_test_stats(
+                config, net, test_loader, criterion, device)
+            stats[name + '_loss'] = val_loss.get_mean()
+            stats[name + '_acc'] = val_acc.get_mean()
         for k in loss_dict:
             stats[k] = loss_dict[k].get_mean()
         if config['wandb']:
