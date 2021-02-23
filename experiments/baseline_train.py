@@ -26,11 +26,13 @@ import utils.utils as utils
 log_level = logging.DEBUG
 
 
-def get_test_stats(config, net, test_loader, criterion, device):
+def get_test_stats(config, net, test_loader, criterion, device, max_examples=float('infinity')):
     # Evaluate accuracy and loss on validation.
+    # Returns right after we've seen at least max_examples examples (not batches).
     val_loss = Accumulator()
     val_acc = Accumulator()
     net.eval()
+    num_examples = 0
     with torch.no_grad():
         for data in test_loader:
             if config['use_cuda']:
@@ -41,6 +43,9 @@ def get_test_stats(config, net, test_loader, criterion, device):
             val_acc.add_values((predicted == labels).tolist())
             loss = criterion(outputs, labels)
             val_loss.add_value(loss.tolist())
+            num_examples += len(images)
+            if num_examples >= max_examples:
+                break
     return val_loss, val_acc
 
 
@@ -62,7 +67,7 @@ def main(config, log_dir, checkpoints_dir):
         test_data = utils.init_dataset(test_dataset_config)
         test_loader = torch.utils.data.DataLoader(
             test_data, batch_size=config['batch_size'],
-            shuffle=False, num_workers=config['num_workers'])
+            shuffle=True, num_workers=config['num_workers'])
         test_loaders[test_dataset_config['name']] = test_loader
         logging.info('test loader name: ' + test_dataset_config['name'])
         logging.info('test loader: ' + str(test_loader))
@@ -71,7 +76,11 @@ def main(config, log_dir, checkpoints_dir):
     logging.info(f'cuda device count: {torch.cuda.device_count()}') 
     net = utils.initialize(config['model'])
     # If fine-tune, re-initialize the last layer.
-    if config['finetune']:
+    finetune = 'finetune' in config and config['finetune']
+    linear_probe = 'linear_probe' in config and config['linear_probe']
+    if finetune or linear_probe:
+        if linear_probe:
+            net.set_requires_grad(False)
         logging.info('Fine Tuning.')
         net.new_last_layer(config['num_classes'])
     # Use CUDA if desired. 

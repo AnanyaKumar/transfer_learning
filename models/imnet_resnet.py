@@ -12,6 +12,10 @@ class ResNet50(nn.Module):
     def forward(self, x):
         return self._model(x)
 
+    def set_requires_grad(val):
+        for param in self._model.parameters():
+                param.requires_grad = val
+
     def new_last_layer(self, num_classes):
         num_in_features = self._model.fc.in_features
         self._model.fc = nn.Linear(num_in_features, num_classes)
