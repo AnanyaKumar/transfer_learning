@@ -1,4 +1,4 @@
-log_interval: 10
+log_interval: 5000
 use_cuda: True
 save_freq: 25
 epochs: &epochs 25
