@@ -153,6 +153,7 @@ def main(config, log_dir, checkpoints_dir):
             _, train_preds = torch.max(outputs.data, 1)
             loss_dict['train/acc'].add_values((train_preds == labels).tolist())
             num_examples += len(labels)
+            print(num_examples, loss_dict['train/loss'].get_mean())
             def should_log(log_interval):
                 return num_examples // log_interval > (num_examples - len(labels)) // log_interval
             if should_log(config['log_interval']):
