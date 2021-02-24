@@ -58,17 +58,26 @@ def main(config, log_dir, checkpoints_dir):
     # Set up test loaders.
     logging.info('Found %d testing datasets.', len(config['test_datasets']))
     test_loaders = {}
+    max_test_examples = {}
     for test_dataset_config in config['test_datasets']:
         logging.info('test dataset config: ' + str(test_dataset_config))
+        # Use default test transform if test dataset doesn't specify a transform.
         if 'transforms' not in test_dataset_config:
             if config['default_test_transforms'] is None:
-                raise ValueError('Must either specify default_test_transforms or a transform for each test dataset')
+                raise ValueError('Must either specify default_test_transforms '
+                                 'or a transform for each test dataset')
             test_dataset_config['transforms'] = config['default_test_transforms']
+        # Initialize dataset and data loader.
+        # Shuffle is True in case we only test part of the test set.
         test_data = utils.init_dataset(test_dataset_config)
         test_loader = torch.utils.data.DataLoader(
             test_data, batch_size=config['batch_size'],
             shuffle=True, num_workers=config['num_workers'])
-        test_loaders[test_dataset_config['name']] = test_loader
+        test_config_name = test_dataset_config['name']
+        test_loaders[test_config_name] = test_loader
+        # Some test datasets like CINIC are huge so we only test part of the dataset.
+        if 'max_test_examples' in test_dataset_config:
+            max_test_examples[test_config_name] = test_dataset_config['max_test_examples']
         logging.info('test loader name: ' + test_dataset_config['name'])
         logging.info('test loader: ' + str(test_loader))
         logging.info('test transform: ' + str(test_dataset_config['transforms']))
@@ -78,11 +87,17 @@ def main(config, log_dir, checkpoints_dir):
     # If fine-tune, re-initialize the last layer.
     finetune = 'finetune' in config and config['finetune']
     linear_probe = 'linear_probe' in config and config['linear_probe']
+    def count_parameters(model, trainable):
+        return sum(p.numel() for p in model.parameters() if p.requires_grad == trainable)
     if finetune or linear_probe:
         if linear_probe:
+            logging.info('linear probing, freezing bottom layers.')
             net.set_requires_grad(False)
-        logging.info('Fine Tuning.')
         net.new_last_layer(config['num_classes'])
+        num_trainable_params = count_parameters(net, True)
+        num_params = count_parameters(net, False) + num_trainable_params
+        logging.info(f'Fine Tuning {num_trainable_params} of {num_params} parameters.')
+ 
     # Use CUDA if desired. 
     if config['use_cuda']:
         device = "cuda"
@@ -113,11 +128,12 @@ def main(config, log_dir, checkpoints_dir):
         net.train()
         logging.info("\nEpoch #{}".format(epoch))
         loss_dict = {
-            'train_loss': Accumulator(),
-            'train_acc': Accumulator(),
+            'train/loss': Accumulator(),
+            'train/acc': Accumulator(),
         }
         if 'model_loss' in config:
-            loss_dict['train_model_loss'] = Accumulator()
+            loss_dict['train/model_loss'] = Accumulator()
+        num_examples = 0
         for i, data in enumerate(train_loader, 0):
             # get the inputs; data is a list of [inputs, labels]
             if config['use_cuda']:
@@ -129,27 +145,48 @@ def main(config, log_dir, checkpoints_dir):
             if 'model_loss' in config:
                 opt_loss = model_loss(net, inputs, labels)
                 opt_loss.backward()
-                loss_dict['train_model_loss'].add_value(opt_loss.tolist())
+                loss_dict['train/model_loss'].add_value(opt_loss.tolist())
             else:
                 loss.backward()
             optimizer.step() 
-            loss_dict['train_loss'].add_value(loss.tolist())
+            loss_dict['train/loss'].add_value(loss.tolist())
             _, train_preds = torch.max(outputs.data, 1)
-            loss_dict['train_acc'].add_values((train_preds == labels).tolist())
-            if i % config['log_interval'] == 0 and i != 0:
+            loss_dict['train/acc'].add_values((train_preds == labels).tolist())
+            num_examples += len(labels)
+            def should_log(log_interval):
+                return num_examples // log_interval > (num_examples - len(labels)) // log_interval
+            if should_log(config['log_interval']):
                 for k in loss_dict:
                     logging.info(
                         '[%d, %5d] %s: %.3f' %
-                        (epoch + 1, i + 1, k, loss_dict[k].get_mean()))
+                        (epoch + 1, num_examples, k, loss_dict[k].get_mean()))
+            stats = {}
+            if 'test_interval' in config and should_log(config['test_interval']):
+                for name, test_loader in test_loaders.items():
+                    max_examples = float('infinity')
+                    if name in max_test_examples:
+                        max_examples = max_test_examples[name]
+                        logging.info(f'{name} test set processing max examples {max_examples}')
+                    val_loss, val_acc = get_test_stats(
+                        config, net, test_loader, criterion, device,
+                        max_examples=max_examples)
+                    stats['inter_ood_loss/' + name] = val_loss.get_mean()
+                    stats['inter_ood_acc/' + name] = val_acc.get_mean()
+                wandb.log(stats)
+        
         scheduler.step()
         # Get loss for each test set
         stats = {}
-        for name, test_loader in test_loaders.items():
-            logging.info(' getting stats ' + name)
-            val_loss, val_acc = get_test_stats(
-                config, net, test_loader, criterion, device)
-            stats[name + '_loss'] = val_loss.get_mean()
-            stats[name + '_acc'] = val_acc.get_mean()
+        if 'test_interval' not in config:
+            for name, test_loader in test_loaders.items():
+                max_examples = float('infinity')
+                if name in max_test_examples:
+                    max_examples = max_test_examples[name]
+                val_loss, val_acc = get_test_stats(
+                    config, net, test_loader, criterion, device,
+                    max_examples=max_examples)
+                stats['ood_loss/' + name] = val_loss.get_mean()
+                stats['ood_acc/' + name] = val_acc.get_mean()
         for k in loss_dict:
             stats[k] = loss_dict[k].get_mean()
         if config['wandb']:

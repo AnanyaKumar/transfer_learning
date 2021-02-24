@@ -12,7 +12,7 @@ class ResNet50(nn.Module):
     def forward(self, x):
         return self._model(x)
 
-    def set_requires_grad(val):
+    def set_requires_grad(self, val):
         for param in self._model.parameters():
                 param.requires_grad = val
 
