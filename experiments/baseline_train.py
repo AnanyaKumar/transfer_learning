@@ -23,7 +23,14 @@ from utils.accumulator import Accumulator
 import utils.utils as utils
 
 
-log_level = logging.DEBUG
+log_level = logging.INFO
+
+
+def reset_state(model, training):
+    if training:
+        model.train()
+    else:
+        model.eval()
 
 
 def get_test_stats(config, net, test_loader, criterion, device, max_examples=float('infinity')):
@@ -31,6 +38,7 @@ def get_test_stats(config, net, test_loader, criterion, device, max_examples=flo
     # Returns right after we've seen at least max_examples examples (not batches).
     val_loss = Accumulator()
     val_acc = Accumulator()
+    training_state = net.training
     net.eval()
     num_examples = 0
     with torch.no_grad():
@@ -46,6 +54,7 @@ def get_test_stats(config, net, test_loader, criterion, device, max_examples=flo
             num_examples += len(images)
             if num_examples >= max_examples:
                 break
+    reset_state(net, training_state)
     return val_loss, val_acc
 
 
@@ -92,8 +101,15 @@ def main(config, log_dir, checkpoints_dir):
     if finetune or linear_probe:
         if linear_probe:
             logging.info('linear probing, freezing bottom layers.')
+            if 'use_net_val_mode' not in config:
+                config['use_net_val_mode'] = True
+                logging.warning('Linear probing, so setting unspecified use_net_val_mode to True')
             net.set_requires_grad(False)
-        net.new_last_layer(config['num_classes'])
+        if 'probe_net' in config:
+            probe_net = utils.initialize(config['probe_net'])
+            net.add_probe(probe_net)
+        else:
+            net.new_last_layer(config['num_classes'])
         num_trainable_params = count_parameters(net, True)
         num_params = count_parameters(net, False) + num_trainable_params
         logging.info(f'Fine Tuning {num_trainable_params} of {num_params} parameters.')
@@ -125,7 +141,6 @@ def main(config, log_dir, checkpoints_dir):
                 os.remove(prev_ckp_path)
             prev_ckp_path = checkpoints_dir / cur_ckp_filename
         # Train model.
-        net.train()
         logging.info("\nEpoch #{}".format(epoch))
         loss_dict = {
             'train/loss': Accumulator(),
@@ -135,6 +150,10 @@ def main(config, log_dir, checkpoints_dir):
             loss_dict['train/model_loss'] = Accumulator()
         num_examples = 0
         for i, data in enumerate(train_loader, 0):
+            if 'use_net_val_mode' in config and config['use_net_val_mode']:
+                net.eval()
+            else:
+                net.train()
             # get the inputs; data is a list of [inputs, labels]
             if config['use_cuda']:
                 data = utils.to_device(data, device)
@@ -153,7 +172,6 @@ def main(config, log_dir, checkpoints_dir):
             _, train_preds = torch.max(outputs.data, 1)
             loss_dict['train/acc'].add_values((train_preds == labels).tolist())
             num_examples += len(labels)
-            print(num_examples, loss_dict['train/loss'].get_mean())
             def should_log(log_interval):
                 return num_examples // log_interval > (num_examples - len(labels)) // log_interval
             if should_log(config['log_interval']):

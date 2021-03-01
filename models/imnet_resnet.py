@@ -20,3 +20,6 @@ class ResNet50(nn.Module):
         num_in_features = self._model.fc.in_features
         self._model.fc = nn.Linear(num_in_features, num_classes)
 
+    def add_probe(self, probe):
+        self._model.fc = probe
+
