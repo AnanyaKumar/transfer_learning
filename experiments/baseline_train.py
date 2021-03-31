@@ -17,6 +17,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import wandb
 import yaml
+import quinine
 
 from models import resnet
 from utils.accumulator import Accumulator 
@@ -56,6 +57,18 @@ def get_test_stats(config, net, test_loader, criterion, device, max_examples=flo
                 break
     reset_state(net, training_state)
     return val_loss, val_acc
+
+
+def update_best_stats(stats, best_stats):
+    for k, v in stats.items():
+        best_k = 'best_' + k
+        if best_k in best_stats:
+            cmb = max
+            if k.find('loss') != -1 and k.find('acc') == -1:
+                cmb = min
+            best_stats[best_k] = cmb(best_stats[best_k], v)
+        else:
+            best_stats[best_k] = v
 
 
 def main(config, log_dir, checkpoints_dir):
@@ -130,7 +143,7 @@ def main(config, log_dir, checkpoints_dir):
     scheduler = utils.initialize(
             config['scheduler'], update_args={'optimizer': optimizer})
     # Training loop.
-    best_acc = 0.0
+    best_stats = {}
     prev_ckp_path = None
     for epoch in range(config['epochs']):
         # Save checkpoint once in a while.
@@ -172,6 +185,7 @@ def main(config, log_dir, checkpoints_dir):
             _, train_preds = torch.max(outputs.data, 1)
             loss_dict['train/acc'].add_values((train_preds == labels).tolist())
             num_examples += len(labels)
+            outputs, loss, train_preds = None, None, None  # Try to force garbage collection.
             def should_log(log_interval):
                 return num_examples // log_interval > (num_examples - len(labels)) // log_interval
             if should_log(config['log_interval']):
@@ -191,7 +205,9 @@ def main(config, log_dir, checkpoints_dir):
                         max_examples=max_examples)
                     stats['inter_ood_loss/' + name] = val_loss.get_mean()
                     stats['inter_ood_acc/' + name] = val_acc.get_mean()
-                wandb.log(stats)
+                if config['wandb']:
+                    wandb.log(stats)
+                update_best_stats(stats, best_stats)
         
         scheduler.step()
         # Get loss for each test set
@@ -208,17 +224,19 @@ def main(config, log_dir, checkpoints_dir):
                 stats['ood_acc/' + name] = val_acc.get_mean()
         for k in loss_dict:
             stats[k] = loss_dict[k].get_mean()
+        update_best_stats(stats, best_stats)
         if config['wandb']:
             wandb.log(stats)
+            wandb.log(best_stats)
         utils.save_json(log_dir + '/current.json', stats)
-        # Save checkpoint of best model.
-        if val_acc.get_mean() > best_acc:
-            best_acc = val_acc.get_mean()
-            utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, 'ckp_best')
-        logging.info('Accuracy of the network on the 10000 test images: %.2f %%' %
-                     (100.0 * val_acc.get_mean()))
+        # # Save checkpoint of best model.
+        # if val_acc.get_mean() > best_acc:
+        #     best_acc = val_acc.get_mean()
+        #     utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, 'ckp_best')
+        # logging.info('Accuracy of the network on the 10000 test images: %.2f %%' %
+        #              (100.0 * val_acc.get_mean()))
     utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, 'ckp_last')
-    utils.save_json(log_dir + '/best.json', {'val_acc': best_acc})
+    utils.save_json(log_dir + '/best.json', best_stats)
 
 
 def make_new_dir(new_dir):
@@ -301,8 +319,9 @@ def setup():
     # Setup logging.
     utils.setup_logging(log_dir, log_level)
     # Open config, update with command line args.
-    with open(args.config, 'r') as f:
-        config = yaml.safe_load(f)
+    # with open(args.config, 'r') as f:
+    #     config = yaml.safe_load(f)
+    config = quinine.Quinfig(args.config)
     utils.update_config(unparsed, config)
     shutil.copy(args.config, log_dir+'/original_config.yaml')
     # Setup wandb.
