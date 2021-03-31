@@ -1,0 +1,38 @@
+
+inherit: datasets_cifar_test_all.yaml
+
+log_interval: 5000
+use_cuda: True
+save_freq: 26
+epochs: &epochs 25
+batch_size: 128
+num_workers: 8
+save_all_checkpoints: False
+
+test_interval: 10000
+finetune: True
+num_classes: 10
+linear_probe: False
+use_net_val_mode: False
+
+optimizer:
+  classname: torch.optim.SGD
+  args:
+    lr: 0.01
+    momentum: 0.9
+
+scheduler:
+  classname: torch.optim.lr_scheduler.StepLR
+  args:
+    step_size: *epochs
+
+model:
+  classname: models.imnet_resnet.ResNet50
+  args:
+    pretrained: True
+
+criterion:
+  classname: torch.nn.CrossEntropyLoss
+  args:
+    reduction: mean
+
