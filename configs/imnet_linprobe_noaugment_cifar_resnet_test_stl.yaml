@@ -1,16 +1,15 @@
 log_interval: 5000
 use_cuda: True
 save_freq: 25
-epochs: &epochs 25
+epochs: &epochs 100
 batch_size: 128
 num_workers: 8
 save_all_checkpoints: False
 
-test_interval: 5000
 finetune: True
 num_classes: 10
-linear_probe: False
-use_net_val_mode: False
+linear_probe: True
+use_net_val_mode: True
 
 # probe_net:
 #   classname: models.mlp.MLP
@@ -24,10 +23,15 @@ optimizer:
     lr: 0.1
     momentum: 0.9
 
+# scheduler:
+#   classname: torch.optim.lr_scheduler.StepLR
+#   args:
+#     step_size: *epochs
+
 scheduler:
-  classname: torch.optim.lr_scheduler.StepLR
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
   args:
-    step_size: *epochs
+    T_max: *epochs
 
 model:
   classname: models.imnet_resnet.ResNet50
@@ -41,11 +45,6 @@ train_dataset:
         download: False
         root: '/u/scr/ananya/cifar10_dataset'
     transforms:
-        - classname: torchvision.transforms.RandomCrop
-          args:
-              size: 32
-              padding: 4
-        - classname: torchvision.transforms.RandomHorizontalFlip
         - classname: torchvision.transforms.Resize
           args:
               size: 224
