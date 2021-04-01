@@ -1,3 +1,5 @@
+import sys
+import os
 import torch
 from torch.utils.data import Dataset
 import numpy as np
@@ -87,6 +89,7 @@ class Breeds(Dataset):
     def __getitem__(self, i):
         path, y = self._image_paths_by_class[i]
         x = Image.open(path)
+        x = x.convert('RGB')
         if self._transform is not None:
             x = self._transform(x)
         return x, y

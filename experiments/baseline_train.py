@@ -73,6 +73,7 @@ def update_best_stats(stats, best_stats):
 
 def main(config, log_dir, checkpoints_dir):
     # Set up datasets and loaders.
+    logging.info("Entering main.")
     train_data = utils.init_dataset(config['train_dataset'])
     train_loader = torch.utils.data.DataLoader(
         train_data, batch_size=config['batch_size'],
