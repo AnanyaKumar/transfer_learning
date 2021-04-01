@@ -1,9 +1,9 @@
 
 inherit:
-    - datasets_cifar_test_all.yaml
+    - datasets_breeds_living.yaml 
     - resnet50_transfer.yaml
 
-num_classes: 10
+num_classes: 17
 linear_probe: True
 finetune: True
 use_net_val_mode: True
