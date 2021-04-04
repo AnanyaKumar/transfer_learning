@@ -1,0 +1,17 @@
+
+inherit:
+    - datasets_breeds_entity30.yaml
+    - resnet50_transfer.yaml
+
+epochs: &epochs 25
+
+finetune: True
+num_classes: 30
+linear_probe: False
+use_net_val_mode: False
+
+scheduler:
+  classname: torch.optim.lr_scheduler.StepLR
+  args:
+    step_size: *epochs
+

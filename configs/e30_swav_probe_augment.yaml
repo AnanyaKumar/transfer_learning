@@ -1,0 +1,47 @@
+
+inherit:
+  - breeds_living_moco_probe.yaml 
+  - datasets_breeds_entity30.yaml
+
+num_classes: 30
+
+model:
+  classname: models.imnet_resnet.ResNet50
+  args:
+    pretrained: True
+    pretrain_style: 'swav'
+    checkpoint_path: '/u/scr/ananya/simclr_weights/swav_800ep_pretrain.pth.tar'
+
+# Add augmentations, and change normalization a bit.
+train_dataset:
+    classname: datasets.breeds.Breeds
+    args:
+        source: True
+        split: 'train'
+        breeds_name: 'entity30'
+        root: '/u/scr/nlp/imagenet/'
+    transforms:
+        - classname: torchvision.transforms.RandomResizedCrop
+          args:
+              size: 224
+        - classname: torchvision.transforms.RandomHorizontalFlip
+        - classname: torchvision.transforms.ToTensor
+        - classname: torchvision.transforms.Normalize
+          args:
+              mean: [0.485, 0.456, 0.406]
+              std: [0.228, 0.224, 0.225]
+
+# Change transform (e.g. centercrop), and change normalization a bit.
+default_test_transforms:
+    - classname: torchvision.transforms.Resize
+      args:
+          size: 256
+    - classname: torchvision.transforms.CenterCrop
+      args:
+          size: 224
+    - classname: torchvision.transforms.ToTensor
+    - classname: torchvision.transforms.Normalize
+      args:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.228, 0.224, 0.225]
+

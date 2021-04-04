@@ -2,7 +2,7 @@
 log_interval: 5000
 use_cuda: True
 save_freq: 101
-epochs: &epochs 100
+epochs: &epochs 25
 batch_size: 128
 num_workers: 8
 save_all_checkpoints: False
