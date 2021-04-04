@@ -165,7 +165,7 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
                     (epoch + 1, num_examples, k, loss_dict[k].get_mean()))
         # Sometimes we want to log the test loss more often to track things better.
         if 'test_interval' in config and should_log(config['test_interval']):
-            stats = get_test_stats(
+            stats = get_all_test_stats(
                 test_loaders, max_test_examples, config, net, criterion, device,
                 loss_name_prefix='inter_test_loss/', acc_name_prefix='inter_test_acc/')
             if config['wandb']:
@@ -177,7 +177,7 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
     return train_stats
 
 
-def get_test_stats(epoch, test_loaders, max_test_examples, config, net, criterion, device,
+def get_all_test_stats(epoch, test_loaders, max_test_examples, config, net, criterion, device,
                    loss_name_prefix, acc_name_prefix):
     stats = {'epoch': epoch}
     for name, test_loader in test_loaders.items():
@@ -244,7 +244,7 @@ def main(config, log_dir, checkpoints_dir):
             test_loaders, max_test_examples)      
         scheduler.step()
         # Get test stats across all test sets.
-        test_stats = get_test_stats(
+        test_stats = get_all_test_stats(
             epoch, test_loaders, max_test_examples, config, net, criterion, device,
             loss_name_prefix='test_loss/', acc_name_prefix='test_acc/')
         # Keep track of the best stats.
@@ -269,6 +269,7 @@ def main(config, log_dir, checkpoints_dir):
         # model according to in-domain validation metrics, but as an oracle, save
         # the best according to ood validation metrics (or a proxy ood metric).
         if 'early_stop_dataset_names' in config:
+            logging.info(f"Early stopping using datasets {config['early_stop_dataset_names']}")
             for name in config['early_stop_dataset_names']:
                 if name not in test_loaders:
                     raise ValueError(f"{name} is not the name of a test dataset.")
