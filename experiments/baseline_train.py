@@ -170,11 +170,11 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
                 loss_name_prefix='inter_test_loss/', acc_name_prefix='inter_test_acc/')
             if config['wandb']:
                 wandb.log(stats)
-     reset_state(net, training_state)
-     train_stats = {'epoch': epoch}
-     for key in loss_dict:
-         train_stats[key] = loss_dict[key].get_mean()
-     return train_stats
+    reset_state(net, training_state)
+    train_stats = {'epoch': epoch}
+    for key in loss_dict:
+        train_stats[key] = loss_dict[key].get_mean()
+    return train_stats
 
 
 def get_test_stats(epoch, test_loaders, max_test_examples, config, net, criterion, device,
