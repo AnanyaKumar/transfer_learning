@@ -17,7 +17,7 @@ IMG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif']
 
 SPLITS = ['train', 'val']
 
-MIN_NUM_TRAIN_PER_CLASS = 1000
+MIN_NUM_TRAIN_PER_CLASS = 100
 
 NUM_VAL_PER_CLASS = 50
 
