@@ -71,25 +71,12 @@ def update_best_stats(stats, best_stats):
             best_stats[best_k] = v
 
 
-def main(config, log_dir, checkpoints_dir):
-    # Set up datasets and loaders.
-    logging.info("Entering main.")
-    train_data = utils.init_dataset(config['train_dataset'])
-    train_loader = torch.utils.data.DataLoader(
-        train_data, batch_size=config['batch_size'],
-        shuffle=True, num_workers=config['num_workers'])
-    # Set up test loaders.
-    logging.info('Found %d testing datasets.', len(config['test_datasets']))
+def get_test_loaders(config):
     test_loaders = {}
     max_test_examples = {}
+    logging.info('Found %d testing datasets.', len(config['test_datasets']))
     for test_dataset_config in config['test_datasets']:
         logging.info('test dataset config: ' + str(test_dataset_config))
-        # Use default test transform if test dataset doesn't specify a transform.
-        if 'transforms' not in test_dataset_config:
-            if config['default_test_transforms'] is None:
-                raise ValueError('Must either specify default_test_transforms '
-                                 'or a transform for each test dataset')
-            test_dataset_config['transforms'] = config['default_test_transforms']
         # Initialize dataset and data loader.
         # Shuffle is True in case we only test part of the test set.
         test_data = utils.init_dataset(test_dataset_config)
@@ -104,8 +91,10 @@ def main(config, log_dir, checkpoints_dir):
         logging.info('test loader name: ' + test_dataset_config['name'])
         logging.info('test loader: ' + str(test_loader))
         logging.info('test transform: ' + str(test_dataset_config['transforms']))
-    # Create model.
-    logging.info(f'cuda device count: {torch.cuda.device_count()}') 
+    return test_loaders, max_test_examples
+
+
+def build_model(config):
     net = utils.initialize(config['model'])
     # If fine-tune, re-initialize the last layer.
     finetune = 'finetune' in config and config['finetune']
@@ -127,8 +116,22 @@ def main(config, log_dir, checkpoints_dir):
         num_trainable_params = count_parameters(net, True)
         num_params = count_parameters(net, False) + num_trainable_params
         logging.info(f'Fine Tuning {num_trainable_params} of {num_params} parameters.')
- 
+    return net
+
+
+def main(config, log_dir, checkpoints_dir):
+    # Set up datasets and loaders.
+    logging.info("Entering main.")
+    train_data = utils.init_dataset(config['train_dataset'])
+    train_loader = torch.utils.data.DataLoader(
+        train_data, batch_size=config['batch_size'],
+        shuffle=True, num_workers=config['num_workers'])
+    # Set up test loaders.
+    test_loaders, max_test_examples = get_test_loaders(config)
+    # Create model.
+    net = build_model(config)
     # Use CUDA if desired. 
+    logging.info(f'cuda device count: {torch.cuda.device_count()}') 
     if config['use_cuda']:
         device = "cuda"
         net.cuda()
@@ -145,6 +148,7 @@ def main(config, log_dir, checkpoints_dir):
             config['scheduler'], update_args={'optimizer': optimizer})
     # Training loop.
     best_stats = {}
+    best_accs = {}  # Used to save checkpoints of best models on some datasets.
     prev_ckp_path = None
     for epoch in range(config['epochs']):
         # Save checkpoint once in a while.
@@ -175,6 +179,9 @@ def main(config, log_dir, checkpoints_dir):
             optimizer.zero_grad()
             outputs = net(inputs)
             loss = criterion(outputs, labels)
+            _, train_preds = torch.max(outputs.data, 1)
+            loss_dict['train/loss'].add_value(loss.tolist())
+            loss_dict['train/acc'].add_values((train_preds == labels).tolist())
             if 'model_loss' in config:
                 opt_loss = model_loss(net, inputs, labels)
                 opt_loss.backward()
@@ -182,9 +189,6 @@ def main(config, log_dir, checkpoints_dir):
             else:
                 loss.backward()
             optimizer.step() 
-            loss_dict['train/loss'].add_value(loss.tolist())
-            _, train_preds = torch.max(outputs.data, 1)
-            loss_dict['train/acc'].add_values((train_preds == labels).tolist())
             num_examples += len(labels)
             outputs, loss, train_preds = None, None, None  # Try to force garbage collection.
             def should_log(log_interval):
@@ -196,33 +200,18 @@ def main(config, log_dir, checkpoints_dir):
                         (epoch + 1, num_examples, k, loss_dict[k].get_mean()))
             stats = {}
             if 'test_interval' in config and should_log(config['test_interval']):
-                for name, test_loader in test_loaders.items():
-                    max_examples = float('infinity')
-                    if name in max_test_examples:
-                        max_examples = max_test_examples[name]
-                        logging.info(f'{name} test set processing max examples {max_examples}')
-                    val_loss, val_acc = get_test_stats(
-                        config, net, test_loader, criterion, device,
-                        max_examples=max_examples)
-                    stats['inter_ood_loss/' + name] = val_loss.get_mean()
-                    stats['inter_ood_acc/' + name] = val_acc.get_mean()
+                stats = get_test_stats(
+                    test_loaders, max_test_examples, config, net, criterion, device,
+                    loss_name_prefix='inter_test_loss/', acc_name_prefix='inter_test_acc/')
                 if config['wandb']:
                     wandb.log(stats)
                 update_best_stats(stats, best_stats)
         
         scheduler.step()
         # Get loss for each test set
-        stats = {}
-        if 'test_interval' not in config:
-            for name, test_loader in test_loaders.items():
-                max_examples = float('infinity')
-                if name in max_test_examples:
-                    max_examples = max_test_examples[name]
-                val_loss, val_acc = get_test_stats(
-                    config, net, test_loader, criterion, device,
-                    max_examples=max_examples)
-                stats['ood_loss/' + name] = val_loss.get_mean()
-                stats['ood_acc/' + name] = val_acc.get_mean()
+        stats = get_test_stats(
+            test_loaders, max_test_examples, config, net, criterion, device,
+            loss_name_prefix='test_loss/', acc_name_prefix='test_acc/')
         for k in loss_dict:
             stats[k] = loss_dict[k].get_mean()
         update_best_stats(stats, best_stats)
@@ -230,14 +219,34 @@ def main(config, log_dir, checkpoints_dir):
             wandb.log(stats)
             wandb.log(best_stats)
         utils.save_json(log_dir + '/current.json', stats)
-        # # Save checkpoint of best model.
-        # if val_acc.get_mean() > best_acc:
-        #     best_acc = val_acc.get_mean()
-        #     utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, 'ckp_best')
-        # logging.info('Accuracy of the network on the 10000 test images: %.2f %%' %
-        #              (100.0 * val_acc.get_mean()))
+        # Save checkpoint of best model.
+        if 'early_stop_dataset_names' in config:
+            for name in config['early_stop_dataset_names']:
+                if name not in test_configs:
+                    raise ValueError(f"{name} is not the name of a test dataset.")
+                metric_name = 'test_acc/' + name
+                assert(metric_name in stats)
+                if metric_name not in best_acc or stats[metric_name] > best_acc[metric_name]:
+                    best_acc[metric_name] = stats[metric_name]
+                    checkpoint_name = 'ckp_best_' + name
+                    utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, checkpoint_name)
     utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, 'ckp_last')
     utils.save_json(log_dir + '/best.json', best_stats)
+
+
+def get_test_stats(test_loaders, max_test_examples, config, net, criterion, device,
+                   loss_name_prefix, acc_name_prefix):
+    stats = {}
+    for name, test_loader in test_loaders.items():
+        max_examples = float('infinity')
+        if name in max_test_examples:
+            max_examples = max_test_examples[name]
+            val_loss, val_acc = get_test_stats(
+                config, net, test_loader, criterion, device,
+                max_examples=max_examples)
+            stats[loss_name_prefix + name] = val_loss.get_mean()
+            stats[acc_name_prefix + name] = val_acc.get_mean()
+    return stats
 
 
 def make_new_dir(new_dir):
@@ -254,9 +263,8 @@ def make_checkpoints_dir(log_dir):
 
 
 def copy_folders(log_dir):
-    copy_folders = ['code', 'scripts', 'lib', 'configs', 'models',
-                    'experiments', 'utils', 'examples', 'src',
-                    'datasets']
+    copy_folders = ['code', 'configs', 'scripts', 'lib', 'configs', 'models',
+                    'experiments', 'utils', 'examples', 'src', 'datasets']
     for copy_folder in copy_folders:
         if os.path.isdir('./' + copy_folder):
             shutil.copytree('./' + copy_folder, log_dir + '/' + copy_folder)
@@ -297,6 +305,26 @@ def save_command_line_args(log_dir):
         f.write('\n')
 
 
+def update_test_transform_configs(config):
+    # Use default test transform for test datasets that don't specify a transform.
+    for test_dataset_config in config['test_datasets']:
+        if 'transforms' not in test_dataset_config:
+            if config['default_test_transforms'] is None:
+                raise ValueError('Must either specify default_test_transforms '
+                                 'or a transform for each test dataset')
+            test_dataset_config['transforms'] = config['default_test_transforms']
+
+
+def update_net_eval_mode(config):
+    # If linear probing, then by default we want to turn off batchnorm while training.
+    # In other words we want to use validation mode while training unless otherwise specified.
+    linear_probe = 'linear_probe' in config and config['linear_probe']
+    if linear_probe:
+        if 'use_net_val_mode' not in config:
+            config['use_net_val_mode'] = True
+            logging.warning('Linear probing, so setting unspecified use_net_val_mode to True')
+
+
 def setup():
     parser = argparse.ArgumentParser(
         description='Run model')
@@ -305,6 +333,8 @@ def setup():
     parser.add_argument('--log_dir', type=str, metavar='ld',
                         help='Log directory', required=True)
     parser.add_argument('--no_wandb', action='store_true', help='disable W&B')
+    parser.add_argument('--copy_all_folders', action='store_true',
+                        help='Copy all folders (e.g. code, utils) for reproducibility.')
     parser.add_argument('--project_name', type=str,
                         help='Name of the wandb project', required=True)
     parser.add_argument('--group_name', default=None, help='Name of the wandb group (a group of runs)')
@@ -316,14 +346,17 @@ def setup():
     # Make log and checkpoint directories.
     make_new_dir(log_dir)
     checkpoints_dir = make_checkpoints_dir(log_dir)
-    # copy_folders(args.log_dir)
+    # If you want to copy folders to get the whole state of code
+    # while running. For more reproducibility.
+    if args.copy_all_folders:
+        copy_folders(args.log_dir)
     # Setup logging.
     utils.setup_logging(log_dir, log_level)
     # Open config, update with command line args.
-    # with open(args.config, 'r') as f:
-    #     config = yaml.safe_load(f)
     config = quinine.Quinfig(args.config)
     utils.update_config(unparsed, config)
+    update_test_transform_configs(config)
+    update_net_eval_mode(config)
     shutil.copy(args.config, log_dir+'/original_config.yaml')
     # Setup wandb.
     setup_wandb(args, config)
