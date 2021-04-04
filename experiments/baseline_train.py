@@ -177,6 +177,21 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
      return train_stats
 
 
+def get_test_stats(epoch, test_loaders, max_test_examples, config, net, criterion, device,
+                   loss_name_prefix, acc_name_prefix):
+    stats = {'epoch': epoch}
+    for name, test_loader in test_loaders.items():
+        max_examples = float('infinity')
+        if name in max_test_examples:
+            max_examples = max_test_examples[name]
+            val_loss, val_acc = get_test_stats(
+                config, net, test_loader, criterion, device,
+                max_examples=max_examples)
+            stats[loss_name_prefix + name] = val_loss.get_mean()
+            stats[acc_name_prefix + name] = val_acc.get_mean()
+    return stats
+
+
 def main(config, log_dir, checkpoints_dir):
     # Set up datasets and loaders.
     logging.info("Entering main.")
@@ -191,6 +206,7 @@ def main(config, log_dir, checkpoints_dir):
     # Use CUDA if desired. 
     logging.info(f'cuda device count: {torch.cuda.device_count()}') 
     if config['use_cuda']:
+        # Often makes things faster, by benchmarking and figuring out how to optimize.
         cudnn.benchmark = True
         device = "cuda"
         net.cuda()
@@ -238,46 +254,31 @@ def main(config, log_dir, checkpoints_dir):
         train_metrics.append(train_stats)
         test_metrics.append(test_stats)
         train_df = pd.DataFrame(train_metrics)
-        eval_df = pd.DataFrame(eval_metrics)
+        test_df = pd.DataFrame(test_metrics)
         train_df.to_csv(log_dir + '/stats_train.tsv', sep='\t')
-        eval_df.to_csv(log_dir + 'stats_eval.tsv', sep='\t')
+        test_df.to_csv(log_dir + '/stats_test.tsv', sep='\t')
         if config['wandb']:
             wandb.log(train_stats)
             wandb.log(test_stats)
             wandb.log(best_stats)
         utils.save_json(log_dir + '/current_train.json', train_stats)
         utils.save_json(log_dir + '/current_test.json', test_stats)
+        utils.save_json(log_dir + '/best.json', best_stats)
         # Save checkpoint of best model. We save the 'best' for each of a list
         # of specified valid datasets. For example, we might want to save the best
         # model according to in-domain validation metrics, but as an oracle, save
         # the best according to ood validation metrics (or a proxy ood metric).
         if 'early_stop_dataset_names' in config:
             for name in config['early_stop_dataset_names']:
-                if name not in test_configs:
+                if name not in test_loaders:
                     raise ValueError(f"{name} is not the name of a test dataset.")
                 metric_name = 'test_acc/' + name
-                assert(metric_name in stats)
-                if metric_name not in best_acc or stats[metric_name] > best_acc[metric_name]:
-                    best_acc[metric_name] = stats[metric_name]
+                assert(metric_name in test_stats)
+                if metric_name not in best_accs or test_stats[metric_name] > best_accs[metric_name]:
+                    best_accs[metric_name] = test_stats[metric_name]
                     checkpoint_name = 'ckp_best_' + name
                     utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, checkpoint_name)
     utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, 'ckp_last')
-    utils.save_json(log_dir + '/best.json', best_stats)
-
-
-def get_test_stats(epoch, test_loaders, max_test_examples, config, net, criterion, device,
-                   loss_name_prefix, acc_name_prefix):
-    stats = {'epoch': epoch}
-    for name, test_loader in test_loaders.items():
-        max_examples = float('infinity')
-        if name in max_test_examples:
-            max_examples = max_test_examples[name]
-            val_loss, val_acc = get_test_stats(
-                config, net, test_loader, criterion, device,
-                max_examples=max_examples)
-            stats[loss_name_prefix + name] = val_loss.get_mean()
-            stats[acc_name_prefix + name] = val_acc.get_mean()
-    return stats
 
 
 def make_new_dir(new_dir):
@@ -386,8 +387,12 @@ def setup():
     # Open config, update with command line args.
     config = quinine.Quinfig(args.config)
     utils.update_config(unparsed, config)
+    # We make specifying some things more convenient - we don't need to specify
+    # a transform for each test, but can specify a default transform.
     update_test_transform_configs(config)
+    # If linear probing, by default we turn batch-norm off while training, if unspecified.
     update_net_eval_mode(config)
+    # Note: copying config over is not that useful anymore with Quinine, so use json below.
     shutil.copy(args.config, log_dir+'/original_config.yaml')
     # Setup wandb.
     setup_wandb(args, config)
