@@ -12,6 +12,7 @@ import sys
 import torch
 import torchvision
 from torchvision import transforms
+import torch.backends.cudnn as cudnn
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
@@ -119,6 +120,63 @@ def build_model(config):
     return net
 
 
+def train(epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
+          test_loaders, max_test_examples):
+    # Train model.
+    training_state = net.training
+    logging.info("\nEpoch #{}".format(epoch))
+    loss_dict = {
+        'train/loss': Accumulator(),
+        'train/acc': Accumulator(),
+    }
+    if 'model_loss' in config:
+        loss_dict['train/model_loss'] = Accumulator()
+    num_examples = 0
+    for i, data in enumerate(train_loader, 0):
+        if 'use_net_val_mode' in config and config['use_net_val_mode']:
+            net.eval()
+        else:
+            net.train()
+        # get the inputs; data is a list of [inputs, labels]
+        if config['use_cuda']:
+            data = utils.to_device(data, device)
+        inputs, labels = data
+        optimizer.zero_grad()
+        outputs = net(inputs)
+        loss = criterion(outputs, labels)
+        _, train_preds = torch.max(outputs.data, axis=1)
+        loss_dict['train/loss'].add_value(loss.tolist())
+        loss_dict['train/acc'].add_values((train_preds == labels).tolist())
+        if 'model_loss' in config:
+            opt_loss = model_loss(net, inputs, labels)
+            opt_loss.backward()
+            loss_dict['train/model_loss'].add_value(opt_loss.tolist())
+        else:
+            loss.backward()
+        optimizer.step() 
+        num_examples += len(labels)
+        outputs, loss, train_preds = None, None, None  # Try to force garbage collection.
+        def should_log(log_interval):
+            return num_examples // log_interval > (num_examples - len(labels)) // log_interval
+        if should_log(config['log_interval']):
+            for k in loss_dict:
+                logging.info(
+                    '[%d, %5d] %s: %.3f' %
+                    (epoch + 1, num_examples, k, loss_dict[k].get_mean()))
+        # Sometimes we want to log the test loss more often to track things better.
+        if 'test_interval' in config and should_log(config['test_interval']):
+            stats = get_test_stats(
+                test_loaders, max_test_examples, config, net, criterion, device,
+                loss_name_prefix='inter_test_loss/', acc_name_prefix='inter_test_acc/')
+            if config['wandb']:
+                wandb.log(stats)
+     reset_state(net, training_state)
+     train_stats = {'epoch': epoch}
+     for key in loss_dict:
+         train_stats[key] = loss_dict[key].get_mean()
+     return train_stats
+
+
 def main(config, log_dir, checkpoints_dir):
     # Set up datasets and loaders.
     logging.info("Entering main.")
@@ -133,13 +191,17 @@ def main(config, log_dir, checkpoints_dir):
     # Use CUDA if desired. 
     logging.info(f'cuda device count: {torch.cuda.device_count()}') 
     if config['use_cuda']:
+        cudnn.benchmark = True
         device = "cuda"
         net.cuda()
     logging.info('Using cuda? %d', next(net.parameters()).is_cuda)
     # Loss, optimizer, scheduler.
     # Can use a custom loss that takes in a model, inputs, labels, and gets an array of values.
-    # Or a criterion, which takes in model_outputs, labels, outputs a loss.
+    # For example if you want to regularize weights in some special way.
+    # More commonly, we use a criterion, which takes in model_outputs, labels, and outputs a loss.
+    # criterion must be specified anyway, since that's the loss we evaluate on test sets.
     criterion = utils.initialize(config['criterion'])
+    model_loss = None
     if 'model_loss' in config:
         model_loss = utils.initialize(config['model_loss'])
     optimizer = utils.initialize(
@@ -149,6 +211,8 @@ def main(config, log_dir, checkpoints_dir):
     # Training loop.
     best_stats = {}
     best_accs = {}  # Used to save checkpoints of best models on some datasets.
+    train_metrics = []
+    test_metrics = []
     prev_ckp_path = None
     for epoch in range(config['epochs']):
         # Save checkpoint once in a while.
@@ -158,68 +222,35 @@ def main(config, log_dir, checkpoints_dir):
             if (prev_ckp_path is not None and not(config['save_all_checkpoints'])):
                 os.remove(prev_ckp_path)
             prev_ckp_path = checkpoints_dir / cur_ckp_filename
-        # Train model.
-        logging.info("\nEpoch #{}".format(epoch))
-        loss_dict = {
-            'train/loss': Accumulator(),
-            'train/acc': Accumulator(),
-        }
-        if 'model_loss' in config:
-            loss_dict['train/model_loss'] = Accumulator()
-        num_examples = 0
-        for i, data in enumerate(train_loader, 0):
-            if 'use_net_val_mode' in config and config['use_net_val_mode']:
-                net.eval()
-            else:
-                net.train()
-            # get the inputs; data is a list of [inputs, labels]
-            if config['use_cuda']:
-                data = utils.to_device(data, device)
-            inputs, labels = data
-            optimizer.zero_grad()
-            outputs = net(inputs)
-            loss = criterion(outputs, labels)
-            _, train_preds = torch.max(outputs.data, 1)
-            loss_dict['train/loss'].add_value(loss.tolist())
-            loss_dict['train/acc'].add_values((train_preds == labels).tolist())
-            if 'model_loss' in config:
-                opt_loss = model_loss(net, inputs, labels)
-                opt_loss.backward()
-                loss_dict['train/model_loss'].add_value(opt_loss.tolist())
-            else:
-                loss.backward()
-            optimizer.step() 
-            num_examples += len(labels)
-            outputs, loss, train_preds = None, None, None  # Try to force garbage collection.
-            def should_log(log_interval):
-                return num_examples // log_interval > (num_examples - len(labels)) // log_interval
-            if should_log(config['log_interval']):
-                for k in loss_dict:
-                    logging.info(
-                        '[%d, %5d] %s: %.3f' %
-                        (epoch + 1, num_examples, k, loss_dict[k].get_mean()))
-            stats = {}
-            if 'test_interval' in config and should_log(config['test_interval']):
-                stats = get_test_stats(
-                    test_loaders, max_test_examples, config, net, criterion, device,
-                    loss_name_prefix='inter_test_loss/', acc_name_prefix='inter_test_acc/')
-                if config['wandb']:
-                    wandb.log(stats)
-                update_best_stats(stats, best_stats)
-        
+        # One epoch of model training.
+        train_stats = train(
+            epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
+            test_loaders, max_test_examples)      
         scheduler.step()
-        # Get loss for each test set
-        stats = get_test_stats(
-            test_loaders, max_test_examples, config, net, criterion, device,
+        # Get test stats across all test sets.
+        test_stats = get_test_stats(
+            epoch, test_loaders, max_test_examples, config, net, criterion, device,
             loss_name_prefix='test_loss/', acc_name_prefix='test_acc/')
-        for k in loss_dict:
-            stats[k] = loss_dict[k].get_mean()
-        update_best_stats(stats, best_stats)
+        # Keep track of the best stats.
+        update_best_stats(train_stats, best_stats)
+        update_best_stats(test_stats, best_stats)
+        # Log and save stats.
+        train_metrics.append(train_stats)
+        test_metrics.append(test_stats)
+        train_df = pd.DataFrame(train_metrics)
+        eval_df = pd.DataFrame(eval_metrics)
+        train_df.to_csv(log_dir + '/stats_train.tsv', sep='\t')
+        eval_df.to_csv(log_dir + 'stats_eval.tsv', sep='\t')
         if config['wandb']:
-            wandb.log(stats)
+            wandb.log(train_stats)
+            wandb.log(test_stats)
             wandb.log(best_stats)
-        utils.save_json(log_dir + '/current.json', stats)
-        # Save checkpoint of best model.
+        utils.save_json(log_dir + '/current_train.json', train_stats)
+        utils.save_json(log_dir + '/current_test.json', test_stats)
+        # Save checkpoint of best model. We save the 'best' for each of a list
+        # of specified valid datasets. For example, we might want to save the best
+        # model according to in-domain validation metrics, but as an oracle, save
+        # the best according to ood validation metrics (or a proxy ood metric).
         if 'early_stop_dataset_names' in config:
             for name in config['early_stop_dataset_names']:
                 if name not in test_configs:
@@ -234,9 +265,9 @@ def main(config, log_dir, checkpoints_dir):
     utils.save_json(log_dir + '/best.json', best_stats)
 
 
-def get_test_stats(test_loaders, max_test_examples, config, net, criterion, device,
+def get_test_stats(epoch, test_loaders, max_test_examples, config, net, criterion, device,
                    loss_name_prefix, acc_name_prefix):
-    stats = {}
+    stats = {'epoch': epoch}
     for name, test_loader in test_loaders.items():
         max_examples = float('infinity')
         if name in max_test_examples:
