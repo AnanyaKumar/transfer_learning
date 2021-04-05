@@ -39,7 +39,8 @@ args to keep in mind:
 - linear_probe: If only training the last linear layer (freeze lower layers), set True, for full fine-tuning set False
 - use_net_val_mode: True if you want to keep the network in "val" mode while training. This should usually be True for linear probing, to turn off batchnorm.
 - num_classes: Specifies the number of classes in the new task you're fine-tuning on.
-Here, we inherit datasets_breeds_living.yaml, where we have:
+
+Notice that we inherit datasets_breeds_living.yaml, where we have:
 - A train dataset, which we initialize using args, including a transform
 - We specify a list of transforms, which are applied top to bottom
 - We have a list of test_datasets, and we evaluate performance on all of these.
