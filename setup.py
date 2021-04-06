@@ -22,5 +22,6 @@ setup(name='',
         'scikit-learn',
         'scipy',
         'cdsapi',
+        'quinine',
         'uncertainty-calibration',
         ])
