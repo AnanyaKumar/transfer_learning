@@ -11,6 +11,8 @@ VALID_DOMAINS = [
     'sketch'
 ]
 
+VALID_SPLITS = ['train', 'val']
+
 def load_dataset(data_dir, domain, split):
     idx_file = os.path.join(data_dir, f'{domain}_{split}.txt')
     with open(idx_file, 'r') as f:
@@ -23,6 +25,8 @@ class DomainNet(Dataset):
         super().__init__()
         if domain not in VALID_DOMAINS:
             raise ValueError(f'domain must be in {VALID_DOMAINS} but was {domain}')
+        if split not in VALID_SPLITS:
+            raise ValueError(f'split must be in {VALID_SPLITS} but was {split}')
         self._root_data_dir = root
         self._domain = domain
         self._split = split
