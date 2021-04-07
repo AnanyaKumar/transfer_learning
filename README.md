@@ -49,6 +49,11 @@ Notice that we inherit datasets_breeds_living.yaml, where we have:
 - You can also add "transforms" as a separate field for a test dataset, and we'll use that instead of default_test_transform
 - We specify early_stop_dataset_names. We don't literally stop the experiment. But we save the best model checkpoint according to the accuracy on these datasets. If multiple datasets are specified, we save the best checkpoint according to each of these. E.g. you can have one where you early stop on in-domain validation, and an oracle model where you early stop on the OOD validation.
 
+We also inherit resnet50_transfer.yaml which specifies the scheduler, learning rate, loss criterion, and a few other things that should be self-explanatory. Some things of note:
+- log_interval is after how many training examples we log the training loss. This is cheap since we keep track of a rolling average in the epoch and output that.
+- save_freq is how often we should save checkpoints besides the best checkpoint. For these experiments, the config sets this to a high number so we don't save checkpoints besides the initial, final, and best (saving disk space)
+- model.args.pretrained is True, indicating that we initialize from a supervised Resnet50 model (pre-trained on ImageNet labels)
+
 ## Example run
 
 ```
