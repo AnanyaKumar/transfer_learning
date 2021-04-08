@@ -1,4 +1,3 @@
-
 import argparse
 import datetime
 import json
@@ -20,9 +19,9 @@ import wandb
 import yaml
 import quinine
 
-from models import resnet
-from utils.accumulator import Accumulator 
-import utils.utils as utils
+from unlabeled_extrapolation.models import resnet
+from unlabeled_extrapolation.utils.accumulator import Accumulator
+import unlabeled_extrapolation.utils.utils as utils
 
 
 log_level = logging.INFO
