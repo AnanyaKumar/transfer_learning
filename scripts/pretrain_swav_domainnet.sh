@@ -6,8 +6,7 @@ mkdir -p $CHKPT_SCR
 mkdir -p $SCR/logs
 partition=tiger
 gpus=4
-accum_steps=2
-mem=32G
+mem=64G
 cpus=16
 
 sbatch --partition $partition --gres=gpu:${gpus} --mem $mem -c $cpus --output $SCR/logs/swav_domainnet_all /u/scr/eix/run_sbatch.sh \
