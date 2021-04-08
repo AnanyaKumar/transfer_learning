@@ -24,4 +24,8 @@ setup(name='unlabeled_extrapolation',
         'cdsapi',
         'quinine',
         'uncertainty-calibration',
+        'lightning-bolts',
+        'gym',
+        'tensorboard',
+        'opencv-python'
         ])
