@@ -8,6 +8,7 @@ from argparse import ArgumentParser
 
 import math
 import os
+from pathlib import Path
 from typing import Callable, Optional
 
 import numpy as np
@@ -37,7 +38,10 @@ def cli_main():
     # model args
     parser = SwAV.add_model_specific_args(parser)
     # see https://github.com/PyTorchLightning/lightning-bolts/blob/master/pl_bolts/models/self_supervised/swav/swav_module.py
+    parser.add_argument('--checkpoint_dir', type=str, default='.', help="directory to save checkpoints")
     args = parser.parse_args()
+
+    Path(args.checkpoint_dir).mkdir(exist_ok=True, parents=True)
 
     if args.dataset == 'stl10':
         dm = STL10DataModule(data_dir=args.data_dir, batch_size=args.batch_size, num_workers=args.num_workers)
@@ -168,6 +172,7 @@ def cli_main():
     callbacks = [model_checkpoint, online_evaluator] if args.online_ft else [model_checkpoint]
 
     trainer = pl.Trainer(
+        default_root_dir=args.checkpoint_dir,
         max_epochs=args.max_epochs,
         max_steps=None if args.max_steps == -1 else args.max_steps,
         gpus=args.gpus,

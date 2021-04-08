@@ -135,7 +135,7 @@ class DomainNetDataModule(LightningDataModule):  # pragma: no cover
 
     @property
     def num_classes(self) -> int:
-        return 17
+        return 345
 
     def prepare_data(self) -> None:
         """
