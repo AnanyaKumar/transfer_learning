@@ -39,6 +39,7 @@ def cli_main():
     parser = SwAV.add_model_specific_args(parser)
     # see https://github.com/PyTorchLightning/lightning-bolts/blob/master/pl_bolts/models/self_supervised/swav/swav_module.py
     parser.add_argument('--checkpoint_dir', type=str, default='.', help="directory to save checkpoints")
+    parser.add_argument('--domain', type=str, default='.', help="domain string")
     args = parser.parse_args()
 
     Path(args.checkpoint_dir).mkdir(exist_ok=True, parents=True)
@@ -116,7 +117,7 @@ def cli_main():
         # args.batch_size = 256
         # args.gpus = 4  # per-node
         args.num_nodes = 1
-        args.max_epochs = 800
+        # args.max_epochs = 100
 
         args.optimizer = 'sgd'
         args.lars_wrapper = True
@@ -127,7 +128,7 @@ def cli_main():
         args.nmb_prototypes = 3000
         args.online_ft = True
 
-        dm = DomainNetDataModule(batch_size=args.batch_size, num_workers=args.num_workers)
+        dm = DomainNetDataModule(batch_size=args.batch_size, num_workers=args.num_workers, train_domain=args.domain, test_domain=args.domain)
         args.num_samples = dm.num_unlabeled_samples
         args.input_height = dm.size()[-1]
 
