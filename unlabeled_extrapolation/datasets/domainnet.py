@@ -268,3 +268,24 @@ class DomainNetDataModule(LightningDataModule):  # pragma: no cover
         data_transforms = transform_lib.Compose([
             transform_lib.Resize(224), transform_lib.ToTensor()])
         return data_transforms
+
+def verify_class_mapping(root='/u/scr/nlp/domainnet'):
+    mapping = {}
+    with open(os.path.join(root, VALID_DOMAINS[0] + '_train.txt'), 'r') as f:
+        for line in f:
+            class_name = line.split('/')[1]
+            class_idx = line.split()[-1]
+            mapping[class_name] = class_idx
+    for domain in VALID_DOMAINS:
+        train_file = os.path.join(root, f'{domain}_train.txt')
+        test_file = os.path.join(root, f'{domain}_test.txt')
+        with open(train_file, 'r') as f:
+            for line in f:
+                class_name = line.split('/')[1]
+                class_idx = line.split()[-1]
+                if class_name not in mapping or mapping[class_name] != class_idx:
+                    raise ValueError(f'existing map is {class_name} --> {mapping[class_name]} but encountered {class_idx}')
+    print('All mappings are valid')
+
+if __name__ == '__main__':
+    verify_class_mapping()
