@@ -142,3 +142,4 @@ dmypy.json
 cython_debug/.ipynb_checkpoints/*
 
 logs/
+checkpoints/

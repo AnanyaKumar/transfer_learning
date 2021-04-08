@@ -128,7 +128,7 @@ def cli_main():
         args.nmb_prototypes = 3000
         args.online_ft = True
 
-        dm = DomainNetDataModule(batch_size=args.batch_size, num_workers=args.num_workers, train_domain=args.domain, test_domain=args.domain)
+        dm = DomainNetDataModule(batch_size=args.batch_size, num_workers=args.num_workers, train_domain=args.domain, test_domain=args.domain, data_dir=args.data_dir)
         args.num_samples = dm.num_unlabeled_samples
         args.input_height = dm.size()[-1]
 
