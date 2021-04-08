@@ -25,23 +25,6 @@ from pl_bolts.transforms.dataset_normalizations import (
                     )
 
 
-def pretrain_swav(dm, batch_size, dataset_name):
-    # data
-    dm.train_dataloader = dm.train_dataloader_mixed
-    dm.val_dataloader = dm.val_dataloader_mixed
-
-    # model
-    model = SwAV(
-        gpus=1,
-        num_samples=dm.num_unlabeled_samples,
-        dataset='domainnet',
-        batch_size=batch_size
-    )
-
-    # fit
-    trainer = pl.Trainer(precision=16)
-    trainer.fit(model)
-
 
 def cli_main():
     from pl_bolts.callbacks.ssl_online import SSLOnlineEvaluator
@@ -53,6 +36,7 @@ def cli_main():
 
     # model args
     parser = SwAV.add_model_specific_args(parser)
+    # see https://github.com/PyTorchLightning/lightning-bolts/blob/master/pl_bolts/models/self_supervised/swav/swav_module.py
     args = parser.parse_args()
 
     if args.dataset == 'stl10':
@@ -125,9 +109,9 @@ def cli_main():
         args.gaussian_blur = True
         args.jitter_strength = 1.
 
-        args.batch_size = 256
+        # args.batch_size = 256
+        # args.gpus = 4  # per-node
         args.num_nodes = 1
-        args.gpus = 4  # per-node
         args.max_epochs = 800
 
         args.optimizer = 'sgd'
@@ -140,9 +124,8 @@ def cli_main():
         args.online_ft = True
 
         dm = DomainNetDataModule(batch_size=args.batch_size, num_workers=args.num_workers)
-    else:
-        raise ValueError('dataset not implemented')
-
+        args.num_samples = dm.num_unlabeled_samples
+        args.input_height = dm.size()[-1]
 
     else:
         raise NotImplementedError("other datasets have not been implemented till now")

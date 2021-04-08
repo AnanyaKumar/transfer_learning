@@ -30,8 +30,8 @@ VALID_SPLITS = ['train', 'test']
 
 ROOT = '/u/scr/nlp/domainnet'
 
-def load_dataset(data_dir, domain, split):
-    if len(domain) == 1 and domain[0] == 'all':
+def load_dataset(data_dir, domains, split):
+    if len(domains) == 1 and domains[0] == 'all':
         domains = VALID_DOMAINS
 
     data = []
@@ -57,7 +57,7 @@ class DomainNet(Dataset):
         self._split = split
         self._transform = transform
         self._unlabeled = unlabeled
-        self.data = load_dataset(root, domain, split)
+        self.data = load_dataset(root, domain_list, split)
 
     def __len__(self):
         return len(self.data)
@@ -68,10 +68,10 @@ class DomainNet(Dataset):
         x = x.convert('RGB')
         if self._transform is not None:
             x = self._transform(x)
-        if unlabeled:
-            return x, -1
-        else:
-            return x, int(y)
+        # if self._unlabeled:
+        #     return x, -1
+        # else:
+        return x, int(y)
 
 
 class DomainNetDataModule(LightningDataModule):  # pragma: no cover
@@ -229,7 +229,7 @@ class DomainNetDataModule(LightningDataModule):  # pragma: no cover
     def train_dataloader_labeled(self) -> DataLoader:
         transforms = self._default_transforms() if self.val_transforms is None else self.val_transforms
 
-        dataset = DomainNet(domain=self.train_domain, split='train', transform=transforms, unlabeled=False, root=self.data_dir, root=self.data_dir)
+        dataset = DomainNet(domain=self.train_domain, split='train', transform=transforms, unlabeled=False, root=self.data_dir)
         train_length = len(dataset)
         dataset_train, _ = random_split(
             dataset, [train_length - self.train_val_split, self.train_val_split],
