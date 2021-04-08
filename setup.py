@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-setup(name='',
+setup(name='unlabeled_extrapolation',
       version='0.0.1',
       description='unlabeled_extrapolation',
       url='https://github.com/p-lambda/unlabeled_extrapolation',
@@ -10,8 +10,8 @@ setup(name='',
       install_requires=[
         'matplotlib',
         'numpy',
-        'torch==1.4.0',
-        'torchvision==0.5.0',
+        'torch==1.8.0',
+        'torchvision==0.9.0',
         'tqdm',
         'pyyaml',
         'requests',
