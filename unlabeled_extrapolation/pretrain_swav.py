@@ -121,9 +121,9 @@ def cli_main():
 
         args.optimizer = 'sgd'
         args.lars_wrapper = True
-        args.learning_rate = 4.8
-        args.final_lr = 0.0048
-        args.start_lr = 0.3
+        # args.learning_rate = 4.8
+        # args.final_lr = 0.0048
+        # args.start_lr = 0.3
 
         args.nmb_prototypes = 3000
         args.online_ft = True

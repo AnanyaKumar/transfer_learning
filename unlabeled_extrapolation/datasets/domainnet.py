@@ -56,6 +56,12 @@ class DomainNet(Dataset):
         self._domain = domain
         self._split = split
         self._transform = transform
+        if transform is None:
+            self._transform = transform_lib.Compose([
+                transform_lib.Resize(224),
+                transform_lib.ToTensor(),
+                transform_lib.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
         self._unlabeled = unlabeled
         self.data = load_dataset(root, domain_list, split)
 
@@ -120,7 +126,7 @@ class DomainNetDataModule(LightningDataModule):  # pragma: no cover
         super().__init__(*args, **kwargs)
 
         self.dims = (3, 224, 224)
-        self.data_dir = data_dir if data_dir is not None else os.getcwd()
+        self.data_dir = data_dir
         self.unlabeled_val_split = unlabeled_val_split
         self.train_val_split = train_val_split
         self.num_workers = num_workers
@@ -131,7 +137,9 @@ class DomainNetDataModule(LightningDataModule):  # pragma: no cover
         self.drop_last = drop_last
         self.train_domain = train_domain
         self.test_domain = test_domain
-        self.num_unlabeled_samples = 409832 - unlabeled_val_split
+        # a default value
+        self.num_unlabeled_samples = \
+            len(DomainNet(domain=self.train_domain, split='train', transform=transforms, unlabeled=True, root=self.data_dir)) - unlabeled_val_split
 
     @property
     def num_classes(self) -> int:
@@ -265,9 +273,7 @@ class DomainNetDataModule(LightningDataModule):  # pragma: no cover
         return loader
 
     def _default_transforms(self) -> Callable:
-        data_transforms = transform_lib.Compose([
-            transform_lib.Resize(224), transform_lib.ToTensor()])
-        return data_transforms
+        return None
 
 def verify_class_mapping(root='/u/scr/nlp/domainnet'):
     mapping = {}
