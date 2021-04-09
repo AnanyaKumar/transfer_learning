@@ -20,7 +20,8 @@ DOMAINNET_ZIP=/u/scr/nlp/domainnet/domainnet.zip
 if [ ! -f "${LOCALDIR}/domainnet" ]; then
   echo "copying file"
   cp "${DOMAINNET_ZIP}" "${LOCALDIR}"
-  unzip ${LOCALDIR}/${DOMAINNET_ZIP}
+  mkdir -p ${LOCALDIR}/domainnet
+  unzip ${LOCALDIR}/domainnet.zip -d ${LOCALDIR}/domainnet
 fi
 
 

@@ -12,7 +12,7 @@ mem=64G
 cpus=16
 
 batch_size=128
-max_epochs=100
+max_epochs=200
 domain=all
 conda_env=eix-ue
 

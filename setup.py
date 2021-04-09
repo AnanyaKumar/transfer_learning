@@ -10,8 +10,8 @@ setup(name='unlabeled_extrapolation',
       install_requires=[
         'matplotlib',
         'numpy',
-        'torch==1.8.0',
-        'torchvision==0.9.0',
+        'torch==1.8.1',
+        'torchvision==0.9.1',
         'tqdm',
         'pyyaml',
         'requests',
@@ -25,7 +25,6 @@ setup(name='unlabeled_extrapolation',
         'quinine',
         'uncertainty-calibration',
         'lightning-bolts',
-        'gym',
         'tensorboard',
         'opencv-python'
         ])
