@@ -139,7 +139,7 @@ class DomainNetDataModule(LightningDataModule):  # pragma: no cover
         self.test_domain = test_domain
         # a default value
         self.num_unlabeled_samples = \
-            len(DomainNet(domain=self.train_domain, split='train', transform=transforms, unlabeled=True, root=self.data_dir)) - unlabeled_val_split
+            len(DomainNet(domain=self.train_domain, split='train', transform=None, unlabeled=True, root=self.data_dir)) - unlabeled_val_split
 
     @property
     def num_classes(self) -> int:
