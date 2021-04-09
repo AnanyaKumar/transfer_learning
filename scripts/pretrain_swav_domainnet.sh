@@ -10,7 +10,6 @@ max_epochs=$5
 domain=$6
 gpus=$7
 cpus=$8
-conda_env=$9
 
 
 mkdir -p $LOCALDIR
@@ -25,8 +24,6 @@ if [ ! -d "${LOCALDIR}/domainnet" ]; then
 fi
 
 
-source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh && \
-conda activate ${conda_env} && \
 python ${SCR}/unlabeled_extrapolation/pretrain_swav.py  \
     --gpus $gpus \
     --num_workers $cpus \
