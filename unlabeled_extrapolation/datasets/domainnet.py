@@ -56,11 +56,6 @@ class DomainNet(Dataset):
         self._domain = domain
         self._split = split
         self._transform = transform
-        if transform is None:
-            self._transform = transform_lib.Compose([
-                transform_lib.Resize(224),
-                transform_lib.ToTensor(),
-                transform_lib.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
         self._unlabeled = unlabeled
         self.data = load_dataset(root, domain_list, split)
@@ -273,7 +268,9 @@ class DomainNetDataModule(LightningDataModule):  # pragma: no cover
         return loader
 
     def _default_transforms(self) -> Callable:
-        return None
+        return transform_lib.Compose([
+                transform_lib.Resize(224),
+                transform_lib.ToTensor(),])
 
 def verify_class_mapping(root='/u/scr/nlp/domainnet'):
     mapping = {}
