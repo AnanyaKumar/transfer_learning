@@ -43,7 +43,7 @@ def load_dataset(data_dir, domains, split):
 
 class DomainNet(Dataset):
     def __init__(self, domain, split='train', root=ROOT,
-                 transform=None, unlabeled=False):
+                 transform=None, unlabeled=False, verbose=False):
         super().__init__()
 
         domain_list = domain.split(',')
@@ -53,7 +53,7 @@ class DomainNet(Dataset):
         if split not in VALID_SPLITS:
             raise ValueError(f'split must be in {VALID_SPLITS} but was {split}')
         self._root_data_dir = root
-        self._domain = domain
+        self._domain_list = domain_list
         self._split = split
         self._transform = transform
         if transform is None:
@@ -64,6 +64,9 @@ class DomainNet(Dataset):
 
         self._unlabeled = unlabeled
         self.data = load_dataset(root, domain_list, split)
+        if verbose:
+            print(f'Loaded domains {", ".join(domain_list)}')
+            print(f'Total number of images: {len(self.data)}')
 
     def __len__(self):
         return len(self.data)
