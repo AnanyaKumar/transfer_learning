@@ -1,0 +1,82 @@
+train_dataset:
+    classname: datasets.domainnet.DomainNet
+    args:
+        domain: 'sketch'
+        split: 'train'
+        root: '/scr/scr-with-most-space/eix/domainnet'
+        verbose: True
+    transforms:
+        - classname: torchvision.transforms.Resize
+          args:
+              size: [224, 224]
+        - classname: torchvision.transforms.ToTensor
+        - classname: torchvision.transforms.Normalize
+          args:
+              mean: [0.485, 0.456, 0.406]
+              std: [0.229, 0.224, 0.225]
+
+default_test_transforms:
+    - classname: torchvision.transforms.Resize
+      args:
+          size: [224, 224]
+    - classname: torchvision.transforms.ToTensor
+    - classname: torchvision.transforms.Normalize
+      args:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+
+test_datasets:
+    - name: 'sketch_test'
+      max_test_examples: 20000
+      classname: datasets.domainnet.DomainNet
+      args:
+          domain: 'sketch'
+          split: 'test'
+          root: '/scr/scr-with-most-space/eix/domainnet'
+    - name: 'real_test'
+      max_test_examples: 20000
+      classname: datasets.domainnet.DomainNet
+      args:
+          domain: 'real'
+          split: 'test'
+          root: '/scr/scr-with-most-space/eix/domainnet'
+
+early_stop_dataset_names:
+  - 'sketch_test'
+  - 'real_test'
+
+log_interval: 5000
+use_cuda: True
+save_freq: 50
+epochs: &epochs 150
+batch_size: 128
+num_workers: 2
+save_all_checkpoints: False
+
+num_classes: 345
+
+finetune: True
+linear_probe: False
+use_net_val_mode: False
+
+optimizer:
+  classname: torch.optim.SGD
+  args:
+    lr: 0.01
+    momentum: 0.9
+
+scheduler:
+  classname: torch.optim.lr_scheduler.StepLR
+  args:
+    step_size: *epochs
+
+model:
+  classname: models.imnet_resnet.ResNet50
+  args:
+    pretrained: False
+
+criterion:
+  classname: torch.nn.CrossEntropyLoss
+  args:
+    reduction: mean
+
