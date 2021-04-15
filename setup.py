@@ -26,5 +26,7 @@ setup(name='unlabeled_extrapolation',
         'uncertainty-calibration',
         'lightning-bolts',
         'tensorboard',
-        'opencv-python'
+        'opencv-python',
+        'robustness',
+        'networkx'
         ])
