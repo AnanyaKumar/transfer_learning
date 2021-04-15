@@ -1,43 +1,36 @@
 train_dataset:
     classname: datasets.domainnet.DomainNet
     args:
-        domain: 'sketch'
+        domain: 'painting'
         split: 'train'
         root: '/scr/scr-with-most-space/eix/domainnet'
         verbose: True
     transforms:
         - classname: torchvision.transforms.Resize
           args:
-              size: [256, 256]
-        - classname: torchvision.transforms.RandomHorizontalFlip
-        - classname: torchvision.transforms.RandomCrop
-          args:
-              size: 224
+              size: [224, 224]
         - classname: torchvision.transforms.ToTensor
         - classname: torchvision.transforms.Normalize
           args:
-              mean: &norm_mean [0.485, 0.456, 0.406]
-              std: &norm_std [0.229, 0.224, 0.225]
+              mean: [0.485, 0.456, 0.406]
+              std: [0.229, 0.224, 0.225]
 
 default_test_transforms:
     - classname: torchvision.transforms.Resize
       args:
-          size: [256, 256]
-    - classname: torchvision.transforms.CenterCrop
-      args:
-          size: 224
+          size: [224, 224]
     - classname: torchvision.transforms.ToTensor
     - classname: torchvision.transforms.Normalize
       args:
-          mean: *norm_mean
-          std: *norm_std
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
 
 test_datasets:
-    - name: 'sketch_test'
+    - name: 'painting_test'
       max_test_examples: 1000
       classname: datasets.domainnet.DomainNet
       args:
-          domain: 'sketch'
+          domain: 'painting'
           split: 'test'
           root: '/scr/scr-with-most-space/eix/domainnet'
     - name: 'real_test'
@@ -49,7 +42,7 @@ test_datasets:
           root: '/scr/scr-with-most-space/eix/domainnet'
 
 early_stop_dataset_names:
-  - 'sketch_test'
+  - 'painting_test'
   - 'real_test'
 
 log_interval: 5000
@@ -69,13 +62,13 @@ use_net_val_mode: False
 optimizer:
   classname: torch.optim.SGD
   args:
-    lr: &lr 0.01
+    lr: 0.01
     momentum: 0.9
 
 scheduler:
-  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  classname: torch.optim.lr_scheduler.StepLR
   args:
-    T_max: *epochs
+    step_size: *epochs
 
 model:
   classname: models.imnet_resnet.ResNet50
