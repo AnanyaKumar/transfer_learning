@@ -4,7 +4,7 @@ The first time you run this project, in the current directory, which contains RE
 ```
 python3 -m venv .env
 source .env/bin/activate
-pip install -e .
+pip install -f https://download.pytorch.org/whl/torch_stable.html -e .
 ```
 In subsequent runs you only need to activate the environment:
 ```
