@@ -14,6 +14,7 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
 from unlabeled_extrapolation.datasets.domainnet import DomainNet
+from unlabeled_extrapolation.datasets.breeds import Breeds
 
 logger = getLogger()
 
@@ -30,12 +31,15 @@ class CustomMultiCropDataset(Dataset):
         max_scale_crops,
         size_dataset=-1,
         return_index=False,
+        **dataset_kwargs
     ):
         super().__init__()
 
         # ADD DATASETS HERE
         if dataset_name == 'domainnet':
             self.ds = DomainNet(domains, split='train', root=data_path, transform=None)
+        elif dataset_name == 'breeds':
+            self.ds = Breeds(data_path, **dataset_kwargs)
         else:
             raise ValueError("dataset not supported")
 
@@ -49,8 +53,12 @@ class CustomMultiCropDataset(Dataset):
 
         color_transform = [get_color_distortion(), PILRandomGaussianBlur()]
         # TODO is this normalization ok???
-        mean = [0.5, 0.5, 0.5]
-        std = [0.5, 0.5, 0.5]
+        try:
+            mean = self.ds.means
+            std = self.ds.stds
+        except AttributeError:
+            mean = [0.5, 0.5, 0.5]
+            std = [0.5, 0.5, 0.5]
         trans = []
         for i in range(len(size_crops)):
             randomresizedcrop = transforms.RandomResizedCrop(

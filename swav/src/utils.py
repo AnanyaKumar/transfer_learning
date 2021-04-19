@@ -194,3 +194,22 @@ def accuracy(output, target, topk=(1,)):
             correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
+
+
+# Taken from https://sumit-ghosh.com/articles/parsing-dictionary-key-value-pairs-kwargs-argparse-python/
+class ParseKwargs(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, dict())
+        for value in values:
+            key, value_str = value.split('=')
+            if value_str.replace('-', '').isnumeric():
+                processed_val = int(value_str)
+            elif value_str.replace('-', '').replace('.', '').isnumeric():
+                processed_val = float(value_str)
+            elif value_str in ['True', 'true']:
+                processed_val = True
+            elif value_str in ['False', 'false']:
+                processed_val = False
+            else:
+                processed_val = value_str
+            getattr(namespace, self.dest)[key] = processed_val

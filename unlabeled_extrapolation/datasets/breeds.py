@@ -64,12 +64,15 @@ class Breeds(Dataset):
 
     def __init__(self, root, breeds_name,
                  info_dir='/juice/scr/ananya/cifar_experiments/BREEDS-Benchmarks/imagenet_class_hierarchy/modified',
-                 source=True, split='train', transform=None):
+                 source=True, target=False, split='train', transform=None):
         super().__init__()
         if breeds_name not in BREEDS_SPLITS_TO_FUNC.keys():
             raise ValueError(f'breeds_name must be in {BREEDS_SPLITS_TO_FUNC.keys()} but was {breeds_name}')
         if split not in SPLITS:
             raise ValueError(f'split must be in {SPLITS} but was {split}')
+        if not source and not target:
+            raise ValueError('At least one of "source" and "target" must be True!')
+
         self._breeds_name = breeds_name
         self._source = source
         self._split = split
@@ -79,12 +82,17 @@ class Breeds(Dataset):
         self._idx_to_class_id, self._class_to_idx = get_classes(self._data_dir)
         breeds_func = BREEDS_SPLITS_TO_FUNC[breeds_name]
         self._superclasses, self._subclass_split, self._label_map = breeds_func(self._info_dir, split="rand")
+        self._subclasses = []
         if source:
-            self._subclasses = self._subclass_split[0]
-        else:
-            self._subclasses = self._subclass_split[1]
+            self._subclasses.extend(self._subclass_split[0])
+        if target:
+            self._subclasses.extend(self._subclass_split[1])
+
         self._image_paths_by_class = get_image_paths_by_class(
             self._data_dir, self._idx_to_class_id, self._subclasses, split)
+
+        self.means = [0.485, 0.456, 0.406]
+        self.stds = [0.228, 0.224, 0.225]
 
     def __getitem__(self, i):
         path, y = self._image_paths_by_class[i]

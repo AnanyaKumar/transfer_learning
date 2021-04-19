@@ -29,6 +29,7 @@ from src.utils import (
     fix_random_seeds,
     AverageMeter,
     init_distributed_mode,
+    ParseKwargs
 )
 from src.multicropdataset import MultiCropDataset, CustomMultiCropDataset
 import src.resnet50 as resnet_models
@@ -124,6 +125,7 @@ parser.add_argument("--syncbn_process_group_size", type=int, default=8, help="""
 parser.add_argument("--dump_path", type=str, default=".",
                     help="experiment dump path for checkpoints and log")
 parser.add_argument("--seed", type=int, default=31, help="seed")
+parser.add_argument('--dataset_kwargs', nargs='*', action=ParseKwargs, default={})
 
 
 def main():
@@ -144,6 +146,7 @@ def main():
             args.nmb_crops,
             args.min_scale_crops,
             args.max_scale_crops,
+            **args.dataset_kwargs
         )
     else:
         train_dataset = MultiCropDataset(
