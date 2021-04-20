@@ -11,6 +11,7 @@ breeds_name=$1
 use_source=$2
 use_target=$3
 conda_env=${4:-`whoami`-ue}
+port=${5:-13321}
 
 echo "Running Breeds $1 exp with Source=$use_source and Target=$use_target"
 echo "Using conda environment $conda_env"
@@ -18,7 +19,8 @@ echo "Using conda environment $conda_env"
 master_node=${SLURM_NODELIST:0:9}${SLURM_NODELIST:9:4}
 dist_url="tcp://"
 dist_url+=$master_node
-dist_url+=:40000
+# dist_url+=:40000
+dist_url+=$5
 
 # COPY to local
 LOCAL_IMAGENET_PATH=/scr/scr-with-most-space/imagenet
