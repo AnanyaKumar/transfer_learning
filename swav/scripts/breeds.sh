@@ -20,7 +20,7 @@ master_node=${SLURM_NODELIST:0:9}${SLURM_NODELIST:9:4}
 dist_url="tcp://"
 dist_url+=$master_node
 # dist_url+=:40000
-dist_url+=$5
+dist_url+=$port
 
 # COPY to local
 LOCAL_IMAGENET_PATH=/scr/scr-with-most-space/imagenet
