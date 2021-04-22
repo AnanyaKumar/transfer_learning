@@ -37,8 +37,8 @@ EXPERIMENT_NAME="breeds_${breeds_name}_source_${use_source}_target_${use_target}
 echo "Experiment name: $EXPERIMENT_NAME"
 EXPERIMENT_PATH="checkpoints/$EXPERIMENT_NAME"
 echo "Using checkpoints from $EXPERIMENT_PATH"
-EXPERIMENT_PATH_LINEAR=$EXPERIMENT_PATH/eval_linear
-mkdir -p EXPERIMENT_PATH_LINEAR
+EXPERIMENT_PATH_LINEAR="$EXPERIMENT_PATH/eval_linear"
+mkdir -p $EXPERIMENT_PATH_LINEAR
 echo "Results saved in $EXPERIMENT_PATH_LINEAR"
 
 
