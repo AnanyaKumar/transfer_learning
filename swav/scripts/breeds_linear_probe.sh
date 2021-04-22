@@ -8,7 +8,9 @@
 set -x
 
 breeds_name=$1
-conda_env=${2:-`whoami`-ue}
+use_source=$2
+use_target=$3
+conda_env=${4:-`whoami`-ue}
 
 echo "Running Breeds $1 exp with Source=$use_source and Target=$use_target"
 echo "Using conda environment $conda_env"
@@ -26,8 +28,10 @@ if [ ! -d "$LOCAL_IMAGENET_PATH" ]; then
     tar xzf $f;
   done
 fi
-
 DATASET_PATH=$LOCAL_IMAGENET_PATH
+
+# DATASET_PATH=$GLOBAL_IMAGENET_PATH
+
 echo "Using ImageNet data from $DATASET_PATH"
 EXPERIMENT_NAME="breeds_${breeds_name}_source_${use_source}_target_${use_target}"
 echo "Experiment name: $EXPERIMENT_NAME"
