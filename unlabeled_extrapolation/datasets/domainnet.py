@@ -59,6 +59,8 @@ class DomainNet(Dataset):
 
         self._unlabeled = unlabeled
         self.data = load_dataset(root, domain_list, split)
+        self.means = [0.485, 0.456, 0.406]
+        self.stds = [0.228, 0.224, 0.225]
         if verbose:
             print(f'Loaded domains {", ".join(domain_list)}')
             print(f'Total number of images: {len(self.data)}')
