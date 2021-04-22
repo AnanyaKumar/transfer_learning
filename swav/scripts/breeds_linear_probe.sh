@@ -46,6 +46,7 @@ source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
 conda activate $conda_env
 srun --output=${EXPERIMENT_PATH_LINEAR}/%j.out --error=${EXPERIMENT_PATH_LINEAR}/%j.err --label python -u eval_linear.py \
 --data_path $DATASET_PATH \
+--pretrained $EXPERIMENT_PATH/checkpoints/ckp-199.pth \
 --epochs 100 \
 --batch_size 32 \
 --arch resnet50 \
