@@ -34,6 +34,7 @@ echo "Experiment name: $EXPERIMENT_NAME"
 EXPERIMENT_PATH="checkpoints/$EXPERIMENT_NAME"
 echo "Using checkpoints from $EXPERIMENT_PATH"
 EXPERIMENT_PATH_LINEAR=$EXPERIMENT_PATH/eval_linear
+mkdir -p EXPERIMENT_PATH_LINEAR
 echo "Results saved in $EXPERIMENT_PATH_LINEAR"
 
 
