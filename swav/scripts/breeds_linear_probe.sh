@@ -11,16 +11,16 @@ breeds_name=$1
 use_source=$2
 use_target=$3
 conda_env=${4:-`whoami`-ue}
-# port=${5:-":13321"}
+port=${5:-":13321"}
 
 echo "Running Breeds $1 exp with Source=$use_source and Target=$use_target"
 echo "Using conda environment $conda_env"
 
-# master_node=${SLURM_NODELIST:0:9}${SLURM_NODELIST:9:4}
-# dist_url="tcp://"
-# dist_url+=$master_node
-# # dist_url+=:40000
-# dist_url+=$port
+master_node=${SLURM_NODELIST:0:9}${SLURM_NODELIST:9:4}
+dist_url="tcp://"
+dist_url+=$master_node
+# dist_url+=:40000
+dist_url+=$port
 
 # COPY to local
 LOCAL_IMAGENET_PATH=/scr/scr-with-most-space/imagenet
@@ -64,6 +64,7 @@ srun --output=${EXPERIMENT_PATH_LINEAR}/%j.out --error=${EXPERIMENT_PATH_LINEAR}
 --dump_path $EXPERIMENT_PATH_LINEAR \
 --dataset_name breeds \
 --workers 1 \
+--dist_url $dist_url \
 --dataset_kwargs breeds_name=$breeds_name
 
 # $PYTHON_CMD -m torch.distributed.launch --nproc_per_node=1 eval_linear.py \
