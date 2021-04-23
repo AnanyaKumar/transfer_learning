@@ -131,6 +131,7 @@ parser.add_argument('--dataset_kwargs', nargs='*', action=ParseKwargs, default={
 def main():
     global args
     args = parser.parse_args()
+    args.is_not_slurm_job = False
     init_distributed_mode(args)
     fix_random_seeds(args.seed)
     logger, training_stats = initialize_exp(args, "epoch", "loss")

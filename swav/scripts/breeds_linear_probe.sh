@@ -50,14 +50,20 @@ EXPERIMENT_PATH_LINEAR="$EXPERIMENT_PATH/eval_linear"
 mkdir -p $EXPERIMENT_PATH_LINEAR
 echo "Results saved in $EXPERIMENT_PATH_LINEAR"
 
-
+PRETRAINED=$EXPERIMENT_PATH/checkpoints/ckp-199.pth
+if [ ! -f $PRETRAINED ]; then
 source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
 conda activate $conda_env
-# PYTHON_CMD=/u/scr/eix/unlabeled_extrapolation/swav/.env/bin/python
-PYTHON_CMD=python
+# convert checkpoint
+python convert_checkpoints.py --pretrained $PRETRAINED --arch resnet50
+conda deactivate
+fi
+
+PYTHON_CMD=.env/bin/python
+# $PYTHON_CMD -m torch.distributed.launch --nproc_per_node=1 eval_linear.py \
 srun --output=${EXPERIMENT_PATH_LINEAR}/%j.out --error=${EXPERIMENT_PATH_LINEAR}/%j.err --label $PYTHON_CMD -u eval_linear.py \
 --data_path $DATASET_PATH \
---pretrained $EXPERIMENT_PATH/checkpoints/ckp-199.pth \
+--pretrained $PRETRAINED.oldformat \
 --epochs 100 \
 --batch_size 32 \
 --arch resnet50 \
@@ -66,6 +72,6 @@ srun --output=${EXPERIMENT_PATH_LINEAR}/%j.out --error=${EXPERIMENT_PATH_LINEAR}
 --dist_url $dist_url \
 --dataset_kwargs breeds_name=$breeds_name
 
-# $PYTHON_CMD -m torch.distributed.launch --nproc_per_node=1 eval_linear.py \
 # --is_not_slurm_job True \
+
 

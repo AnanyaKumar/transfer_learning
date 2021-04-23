@@ -156,7 +156,6 @@ def main():
     else:
         raise ValueError("Not implemeneted")
 
-
     sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -236,7 +235,7 @@ def main():
     )
     start_epoch = to_restore["epoch"]
     best_acc = to_restore["best_acc"]
-    cudnn.benchmark = False
+    cudnn.benchmark = True
 
     for epoch in range(start_epoch, args.epochs):
 
@@ -306,8 +305,8 @@ def train(model, optimizer, loader, epoch):
         optimizer.step()
 
         # update stats
-        acc1, acc5 = accuracy(output.clone().detach(), target.clone().detach(), topk=(1, 5))
-        losses.update(loss.detach().item(), inp.size(0))
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        losses.update(loss.item(), inp.size(0))
         top1.update(acc1[0], inp.size(0))
         top5.update(acc5[0], inp.size(0))
 
@@ -362,8 +361,8 @@ def validate_network(val_loader, model):
             output = model(inp)
             loss = criterion(output, target)
 
-            acc1, acc5 = accuracy(output.clone().detach(), target.clone().detach(), topk=(1, 5))
-            losses.update(loss.detach().item(), inp.size(0))
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            losses.update(loss.item(), inp.size(0))
             top1.update(acc1[0], inp.size(0))
             top5.update(acc5[0], inp.size(0))
 

@@ -73,4 +73,7 @@ srun --output=${EXPERIMENT_PATH}/%j.out --error=${EXPERIMENT_PATH}/%j.err --labe
 --sync_bn pytorch \
 --dump_path $EXPERIMENT_PATH \
 --dataset_name breeds \
+--epsilon 0.03 \
 --dataset_kwargs breeds_name=$breeds_name source=$use_source target=$use_target
+
+# epsilon added for living17 target only

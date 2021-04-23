@@ -51,19 +51,26 @@ mkdir -p $EXPERIMENT_PATH_FULL
 echo "Results saved in $EXPERIMENT_PATH_FULL"
 
 
+PRETRAINED=$EXPERIMENT_PATH/checkpoints/ckp-199.pth
+if [ ! -f $PRETRAINED ]; then
 source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
 conda activate $conda_env
-PYTHON_CMD=python
+# convert checkpoint
+python convert_checkpoints.py --pretrained $PRETRAINED --arch resnet50
+conda deactivate
+fi
+
+PYTHON_CMD=.env/bin/python
 srun --output=${EXPERIMENT_PATH_FULL}/%j.out --error=${EXPERIMENT_PATH_FULL}/%j.err --label $PYTHON_CMD -u eval_semisup.py \
 --data_path $DATASET_PATH \
---pretrained $EXPERIMENT_PATH/checkpoints/ckp-199.pth \
+--pretrained $PRETRAINED.oldformat \
 --epochs 100 \
 --batch_size 32 \
 --arch resnet50 \
 --dump_path $EXPERIMENT_PATH_FULL \
 --dataset_name breeds \
 --dist_url $dist_url \
---workers 1 \
+--workers 10 \
 --dataset_kwargs breeds_name=$breeds_name
 
 # for interactive

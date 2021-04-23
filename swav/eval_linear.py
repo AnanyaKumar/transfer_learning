@@ -33,7 +33,6 @@ import src.resnet50 as resnet_models
 
 from unlabeled_extrapolation.datasets.breeds import Breeds
 
-
 logger = getLogger()
 
 
@@ -57,7 +56,6 @@ parser.add_argument("--dataset_name", type=str, default=None,
 parser.add_argument('--dataset_kwargs', nargs='*', action=ParseKwargs, default={})
 parser.add_argument("--is_not_slurm_job", default=False, type=bool_flag,
                     help="optionally add a batchnorm layer before the linear classifier")
-
 
 #########################
 #### model parameters ###
@@ -156,7 +154,6 @@ def main():
     else:
         raise ValueError("Not implemeneted")
 
-
     sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -238,7 +235,7 @@ def main():
     )
     start_epoch = to_restore["epoch"]
     best_acc = to_restore["best_acc"]
-    cudnn.benchmark = False
+    cudnn.benchmark = True
 
     for epoch in range(start_epoch, args.epochs):
 
@@ -330,10 +327,8 @@ def train(model, reglog, optimizer, loader, epoch):
         data_time.update(time.perf_counter() - end)
 
         # move to gpu
-        # inp = inp.cuda(non_blocking=True)
-        # target = target.cuda(non_blocking=True)
-        inp = inp.cuda()
-        target = target.cuda()
+        inp = inp.cuda(non_blocking=True)
+        target = target.cuda(non_blocking=True)
 
         # forward
         with torch.no_grad():
@@ -351,8 +346,8 @@ def train(model, reglog, optimizer, loader, epoch):
         optimizer.step()
 
         # update stats
-        acc1, acc5 = accuracy(output.clone().detach(), target.clone().detach(), topk=(1, 5))
-        losses.update(loss.detach().item(), inp.size(0))
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        losses.update(loss.item(), inp.size(0))
         top1.update(acc1[0], inp.size(0))
         top5.update(acc5[0], inp.size(0))
 
@@ -378,7 +373,7 @@ def train(model, reglog, optimizer, loader, epoch):
                     lr=optimizer.param_groups[0]["lr"],
                 )
             )
-    torch.cuda.empty_cache()
+
     return epoch, losses.avg, top1.avg.item(), top5.avg.item()
 
 
@@ -400,17 +395,15 @@ def validate_network(val_loader, model, linear_classifier):
         for i, (inp, target) in enumerate(val_loader):
 
             # move to gpu
-            # inp = inp.cuda(non_blocking=True)
-            # target = target.cuda(non_blocking=True)
-            inp = inp.cuda()
-            target = target.cuda()
+            inp = inp.cuda(non_blocking=True)
+            target = target.cuda(non_blocking=True)
 
             # compute output
             output = linear_classifier(model(inp))
             loss = criterion(output, target)
 
-            acc1, acc5 = accuracy(output.clone().detach(), target.clone().detach(), topk=(1, 5))
-            losses.update(loss.detach().item(), inp.size(0))
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            losses.update(loss.item(), inp.size(0))
             top1.update(acc1[0], inp.size(0))
             top5.update(acc5[0], inp.size(0))
 
@@ -430,7 +423,6 @@ def validate_network(val_loader, model, linear_classifier):
             "Best Acc@1 so far {acc:.1f}".format(
                 batch_time=batch_time, loss=losses, top1=top1, acc=best_acc))
 
-    torch.cuda.empty_cache()
     return losses.avg, top1.avg.item(), top5.avg.item()
 
 
