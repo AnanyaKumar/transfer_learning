@@ -238,7 +238,7 @@ def main():
     )
     start_epoch = to_restore["epoch"]
     best_acc = to_restore["best_acc"]
-    cudnn.benchmark = True
+    cudnn.benchmark = False
 
     for epoch in range(start_epoch, args.epochs):
 
@@ -330,8 +330,10 @@ def train(model, reglog, optimizer, loader, epoch):
         data_time.update(time.perf_counter() - end)
 
         # move to gpu
-        inp = inp.cuda(non_blocking=True)
-        target = target.cuda(non_blocking=True)
+        # inp = inp.cuda(non_blocking=True)
+        # target = target.cuda(non_blocking=True)
+        inp = inp.cuda()
+        target = target.cuda()
 
         # forward
         with torch.no_grad():
@@ -349,8 +351,8 @@ def train(model, reglog, optimizer, loader, epoch):
         optimizer.step()
 
         # update stats
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        losses.update(loss.item(), inp.size(0))
+        acc1, acc5 = accuracy(output.clone().detach(), target.clone().detach(), topk=(1, 5))
+        losses.update(loss.detach().item(), inp.size(0))
         top1.update(acc1[0], inp.size(0))
         top5.update(acc5[0], inp.size(0))
 
@@ -376,8 +378,8 @@ def train(model, reglog, optimizer, loader, epoch):
                     lr=optimizer.param_groups[0]["lr"],
                 )
             )
-
-    return epoch, losses.avg, top1.avg.item(), top5.avg.item()
+    torch.cuda.empty_cache()
+    return epoch, losses.avg.detach(), top1.avg.detach().item(), top5.avg.detach().item()
 
 
 def validate_network(val_loader, model, linear_classifier):
@@ -398,15 +400,17 @@ def validate_network(val_loader, model, linear_classifier):
         for i, (inp, target) in enumerate(val_loader):
 
             # move to gpu
-            inp = inp.cuda(non_blocking=True)
-            target = target.cuda(non_blocking=True)
+            # inp = inp.cuda(non_blocking=True)
+            # target = target.cuda(non_blocking=True)
+            inp = inp.cuda()
+            target = target.cuda()
 
             # compute output
             output = linear_classifier(model(inp))
             loss = criterion(output, target)
 
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            losses.update(loss.item(), inp.size(0))
+            acc1, acc5 = accuracy(output.clone().detach(), target.clone().detach(), topk=(1, 5))
+            losses.update(loss.detach().item(), inp.size(0))
             top1.update(acc1[0], inp.size(0))
             top5.update(acc5[0], inp.size(0))
 
@@ -426,7 +430,8 @@ def validate_network(val_loader, model, linear_classifier):
             "Best Acc@1 so far {acc:.1f}".format(
                 batch_time=batch_time, loss=losses, top1=top1, acc=best_acc))
 
-    return losses.avg, top1.avg.item(), top5.avg.item()
+    torch.cuda.empty_cache()
+    return losses.avg.detach(), top1.avg.detach().item(), top5.avg.detach().item()
 
 
 if __name__ == "__main__":

@@ -236,7 +236,7 @@ def main():
     )
     start_epoch = to_restore["epoch"]
     best_acc = to_restore["best_acc"]
-    cudnn.benchmark = True
+    cudnn.benchmark = False
 
     for epoch in range(start_epoch, args.epochs):
 
@@ -306,8 +306,8 @@ def train(model, optimizer, loader, epoch):
         optimizer.step()
 
         # update stats
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        losses.update(loss.item(), inp.size(0))
+        acc1, acc5 = accuracy(output.clone().detach(), target.clone().detach(), topk=(1, 5))
+        losses.update(loss.detach().item(), inp.size(0))
         top1.update(acc1[0], inp.size(0))
         top5.update(acc5[0], inp.size(0))
 
@@ -335,7 +335,7 @@ def train(model, optimizer, loader, epoch):
                     lr_W=optimizer.param_groups[1]["lr"],
                 )
             )
-    return epoch, losses.avg, top1.avg.item(), top5.avg.item()
+    return epoch, losses.avg.detach(), top1.avg.detach().item(), top5.avg.detach().item()
 
 
 def validate_network(val_loader, model):
@@ -362,8 +362,8 @@ def validate_network(val_loader, model):
             output = model(inp)
             loss = criterion(output, target)
 
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            losses.update(loss.item(), inp.size(0))
+            acc1, acc5 = accuracy(output.clone().detach(), target.clone().detach(), topk=(1, 5))
+            losses.update(loss.detach().item(), inp.size(0))
             top1.update(acc1[0], inp.size(0))
             top5.update(acc5[0], inp.size(0))
 
@@ -383,7 +383,7 @@ def validate_network(val_loader, model):
             "Best Acc@1 so far {acc:.1f}".format(
                 batch_time=batch_time, loss=losses, top1=top1, acc=best_acc[0]))
 
-    return losses.avg, top1.avg.item(), top5.avg.item()
+    return losses.avg.detach(), top1.avg.detach().item(), top5.avg.detach().item()
 
 
 if __name__ == "__main__":

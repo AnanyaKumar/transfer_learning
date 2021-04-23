@@ -63,7 +63,6 @@ srun --output=${EXPERIMENT_PATH_LINEAR}/%j.out --error=${EXPERIMENT_PATH_LINEAR}
 --arch resnet50 \
 --dump_path $EXPERIMENT_PATH_LINEAR \
 --dataset_name breeds \
---workers 1 \
 --dist_url $dist_url \
 --dataset_kwargs breeds_name=$breeds_name
 
