@@ -46,26 +46,26 @@ EXPERIMENT_NAME="breeds_${breeds_name}_source_${use_source}_target_${use_target}
 echo "Experiment name: $EXPERIMENT_NAME"
 EXPERIMENT_PATH="checkpoints/$EXPERIMENT_NAME"
 echo "Using checkpoints from $EXPERIMENT_PATH"
-EXPERIMENT_PATH_LINEAR="$EXPERIMENT_PATH/eval_linear"
-mkdir -p $EXPERIMENT_PATH_LINEAR
-echo "Results saved in $EXPERIMENT_PATH_LINEAR"
+EXPERIMENT_PATH_FULL="$EXPERIMENT_PATH/eval_fullft"
+mkdir -p $EXPERIMENT_PATH_FULL
+echo "Results saved in $EXPERIMENT_PATH_FULL"
 
 
 source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
 conda activate $conda_env
-# PYTHON_CMD=/u/scr/eix/unlabeled_extrapolation/swav/.env/bin/python
 PYTHON_CMD=python
-srun --output=${EXPERIMENT_PATH_LINEAR}/%j.out --error=${EXPERIMENT_PATH_LINEAR}/%j.err --label $PYTHON_CMD -u eval_linear.py \
+srun --output=${EXPERIMENT_PATH_FULL}/%j.out --error=${EXPERIMENT_PATH_FULL}/%j.err --label $PYTHON_CMD -u eval_semisup.py \
 --data_path $DATASET_PATH \
 --pretrained $EXPERIMENT_PATH/checkpoints/ckp-199.pth \
 --epochs 100 \
 --batch_size 32 \
 --arch resnet50 \
---dump_path $EXPERIMENT_PATH_LINEAR \
+--dump_path $EXPERIMENT_PATH_FULL \
 --dataset_name breeds \
 --workers 1 \
 --dataset_kwargs breeds_name=$breeds_name
 
-# $PYTHON_CMD -m torch.distributed.launch --nproc_per_node=1 eval_linear.py \
+# for interactive
+# $PYTHON_CMD -m torch.distributed.launch --nproc_per_node=1 eval_semisup.py \
 # --is_not_slurm_job True \
 

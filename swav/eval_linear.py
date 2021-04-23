@@ -55,6 +55,8 @@ parser.add_argument("--domains", type=str, default=None,
 parser.add_argument("--dataset_name", type=str, default=None,
                     help="name of the dataset")
 parser.add_argument('--dataset_kwargs', nargs='*', action=ParseKwargs, default={})
+parser.add_argument("--is_not_slurm_job", default=False, type=bool_flag,
+                    help="optionally add a batchnorm layer before the linear classifier")
 
 
 #########################

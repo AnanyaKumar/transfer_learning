@@ -43,7 +43,10 @@ def init_distributed_mode(args):
         - rank
     """
 
-    args.is_slurm_job = "SLURM_JOB_ID" in os.environ
+    if args.is_not_slurm_job:
+        args.is_slurm_job = False
+    else:
+        args.is_slurm_job = "SLURM_JOB_ID" in os.environ
 
     if args.is_slurm_job:
         args.rank = int(os.environ["SLURM_PROCID"])
@@ -191,7 +194,8 @@ def accuracy(output, target, topk=(1,)):
 
         res = []
         for k in topk:
-            correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+            # correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
