@@ -379,7 +379,7 @@ def train(model, reglog, optimizer, loader, epoch):
                 )
             )
     torch.cuda.empty_cache()
-    return epoch, losses.avg.detach(), top1.avg.detach().item(), top5.avg.detach().item()
+    return epoch, losses.avg, top1.avg.item(), top5.avg.item()
 
 
 def validate_network(val_loader, model, linear_classifier):
@@ -431,7 +431,7 @@ def validate_network(val_loader, model, linear_classifier):
                 batch_time=batch_time, loss=losses, top1=top1, acc=best_acc))
 
     torch.cuda.empty_cache()
-    return losses.avg.detach(), top1.avg.detach().item(), top5.avg.detach().item()
+    return losses.avg, top1.avg.item(), top5.avg.item()
 
 
 if __name__ == "__main__":

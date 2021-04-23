@@ -335,7 +335,7 @@ def train(model, optimizer, loader, epoch):
                     lr_W=optimizer.param_groups[1]["lr"],
                 )
             )
-    return epoch, losses.avg.detach(), top1.avg.detach().item(), top5.avg.detach().item()
+    return epoch, losses.avg, top1.avg.item(), top5.avg.item()
 
 
 def validate_network(val_loader, model):
@@ -383,7 +383,7 @@ def validate_network(val_loader, model):
             "Best Acc@1 so far {acc:.1f}".format(
                 batch_time=batch_time, loss=losses, top1=top1, acc=best_acc[0]))
 
-    return losses.avg.detach(), top1.avg.detach().item(), top5.avg.detach().item()
+    return losses.avg, top1.avg.item(), top5.avg.item()
 
 
 if __name__ == "__main__":
