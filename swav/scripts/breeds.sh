@@ -4,16 +4,21 @@
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=96G
+#SBATCH --exclude=jagupard[4-8],jagupard[10-15]
 
 set -x
 
 breeds_name=$1
 use_source=$2
 use_target=$3
-conda_env=${4:-`whoami`-ue}
-port=${5:-":13321"}
+epochs=$4
+nmb_prototypes=$5
+epoch_queue_starts=$6
+conda_env=${7:-`whoami`-ue}
+port=${8:-":13321"}
 
 echo "Running Breeds $1 exp with Source=$use_source and Target=$use_target"
+echo "For $4 epochs, using $5 prototypes, starting queue at $epoch_queue_starts"
 echo "Using conda environment $conda_env"
 
 master_node=${SLURM_NODELIST:0:9}${SLURM_NODELIST:9:4}
@@ -38,7 +43,7 @@ fi
 
 DATASET_PATH=$LOCAL_IMAGENET_PATH
 echo "Using ImageNet data from $DATASET_PATH"
-EXPERIMENT_NAME="breeds_${breeds_name}_source_${use_source}_target_${use_target}"
+EXPERIMENT_NAME="breeds_${breeds_name}_source_${use_source}_target_${use_target}_${epochs}epochs_${nmb_prototypes}protos_${epoch_queue_starts}qstart"
 echo "Experiment name: $EXPERIMENT_NAME"
 EXPERIMENT_PATH="checkpoints/$EXPERIMENT_NAME"
 mkdir -p $EXPERIMENT_PATH
@@ -57,10 +62,10 @@ srun --output=${EXPERIMENT_PATH}/%j.out --error=${EXPERIMENT_PATH}/%j.err --labe
 --epsilon 0.05 \
 --sinkhorn_iterations 3 \
 --feat_dim 128 \
---nmb_prototypes 3000 \
+--nmb_prototypes $nmb_prototypes \
 --queue_length 3840 \
---epoch_queue_starts 15 \
---epochs 200 \
+--epoch_queue_starts $epoch_queue_starts \
+--epochs $epochs \
 --batch_size 64 \
 --base_lr 0.6 \
 --final_lr 0.0006 \
