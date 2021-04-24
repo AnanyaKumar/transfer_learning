@@ -28,8 +28,11 @@ from src.utils import (
     AverageMeter,
     init_distributed_mode,
     accuracy,
+    ParseKwargs,
 )
 import src.resnet50 as resnet_models
+
+from unlabeled_extrapolation.datasets.breeds import Breeds
 
 logger = getLogger()
 
@@ -48,6 +51,14 @@ parser.add_argument("--data_path", type=str, default="/path/to/imagenet",
                     help="path to imagenet")
 parser.add_argument("--workers", default=10, type=int,
                     help="number of data loading workers")
+# Added by MX
+parser.add_argument("--domains", type=str, default=None,
+                    help="domain string to pass to dataset")
+parser.add_argument("--dataset_name", type=str, default=None,
+                    help="name of the dataset")
+parser.add_argument('--dataset_kwargs', nargs='*', action=ParseKwargs, default={})
+parser.add_argument("--is_not_slurm_job", default=False, type=bool_flag,
+                    help="optionally add a batchnorm layer before the linear classifier")
 
 #########################
 #### model parameters ###
@@ -91,32 +102,60 @@ def main():
         args, "epoch", "loss", "prec1", "prec5", "loss_val", "prec1_val", "prec5_val"
     )
 
-    # build data
-    train_data_path = os.path.join(args.data_path, "train")
-    train_dataset = datasets.ImageFolder(train_data_path)
-    # take either 1% or 10% of images
-    subset_file = urllib.request.urlopen("https://raw.githubusercontent.com/google-research/simclr/master/imagenet_subsets/" + str(args.labels_perc) + "percent.txt")
-    list_imgs = [li.decode("utf-8").split('\n')[0] for li in subset_file]
-    train_dataset.samples = [(
-        os.path.join(train_data_path, li.split('_')[0], li),
-        train_dataset.class_to_idx[li.split('_')[0]]
-    ) for li in list_imgs]
-    val_dataset = datasets.ImageFolder(os.path.join(args.data_path, "val"))
-    tr_normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], std=[0.228, 0.224, 0.225]
-    )
-    train_dataset.transform = transforms.Compose([
-        transforms.RandomResizedCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        tr_normalize,
-    ])
-    val_dataset.transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        tr_normalize,
-    ])
+    if args.dataset_name is None or args.dataset_name == 'imagenet':
+        # build data
+        train_data_path = os.path.join(args.data_path, "train")
+        train_dataset = datasets.ImageFolder(train_data_path)
+        # take either 1% or 10% of images
+        subset_file = urllib.request.urlopen("https://raw.githubusercontent.com/google-research/simclr/master/imagenet_subsets/" + str(args.labels_perc) + "percent.txt")
+        list_imgs = [li.decode("utf-8").split('\n')[0] for li in subset_file]
+        train_dataset.samples = [(
+            os.path.join(train_data_path, li.split('_')[0], li),
+            train_dataset.class_to_idx[li.split('_')[0]]
+        ) for li in list_imgs]
+        val_dataset = datasets.ImageFolder(os.path.join(args.data_path, "val"))
+        tr_normalize = transforms.Normalize(
+            mean=[0.485, 0.456, 0.406], std=[0.228, 0.224, 0.225]
+        )
+        train_dataset.transform = transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            tr_normalize,
+        ])
+        val_dataset.transform = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            tr_normalize,
+        ])
+    elif args.dataset_name == 'breeds':
+        train_dataset = Breeds(
+                args.data_path, split='train',
+                source=True, target=False,
+                **args.dataset_kwargs)
+        val_dataset = Breeds(
+                args.data_path, split='val',
+                source=False, target=True,
+                **args.dataset_kwargs)
+        tr_normalize = transforms.Normalize(
+            mean=train_dataset.means, std=train_dataset.stds,
+        )
+        train_dataset._transform = transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            tr_normalize,
+        ])
+        val_dataset._transform = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            tr_normalize,
+        ])
+    else:
+        raise ValueError("Not implemeneted")
+
     sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
