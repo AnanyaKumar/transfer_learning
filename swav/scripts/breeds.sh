@@ -37,7 +37,7 @@ if [ ! -d "$LOCAL_IMAGENET_PATH" ]; then
   cp $GLOBAL_IMAGENET_PATH/*.tar.gz $LOCAL_IMAGENET_PATH
   for f in $LOCAL_IMAGENET_PATH/*.tar.gz;
   do
-    tar xzf $f;
+    tar xzf $f -C $LOCAL_IMAGENET_PATH;
   done
 fi
 
