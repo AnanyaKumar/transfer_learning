@@ -48,6 +48,7 @@ test_datasets:
       classname: datasets.breeds.Breeds
       args:
           source: False
+          target: True
           split: 'val'
           breeds_name: 'entity30'
           root: 'imagenet/'
