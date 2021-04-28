@@ -30,4 +30,5 @@ setup(name='unlabeled_extrapolation',
         'robustness',
         'networkx',
         'cvxpy',
+        'pytorch-lightning-bolts',
         ])
