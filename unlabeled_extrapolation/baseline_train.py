@@ -54,6 +54,7 @@ def get_test_stats(config, net, test_loader, criterion, device, max_examples=flo
             val_loss.add_value(loss.tolist())
             num_examples += len(images)
             if num_examples >= max_examples:
+                logging.info("Breaking after %d examples.", num_examples)
                 break
     reset_state(net, training_state)
     return val_loss, val_acc
@@ -87,7 +88,12 @@ def get_test_loaders(config):
         test_loaders[test_config_name] = test_loader
         # Some test datasets like CINIC are huge so we only test part of the dataset.
         if 'max_test_examples' in test_dataset_config:
+            logging.info(
+                'Only logging %d examples for %s', test_dataset_config['max_test_examples'],
+                test_dataset_config['name'])
             max_test_examples[test_config_name] = test_dataset_config['max_test_examples']
+        else:
+            max_test_examples[test_config_name] = float('infinity')
         logging.info('test loader name: ' + test_dataset_config['name'])
         logging.info('test loader: ' + str(test_loader))
         logging.info('test transform: ' + str(test_dataset_config['transforms']))
@@ -104,9 +110,11 @@ def build_model(config):
     if finetune or linear_probe:
         if linear_probe:
             logging.info('linear probing, freezing bottom layers.')
-            if 'use_net_val_mode' not in config:
-                config['use_net_val_mode'] = True
-                logging.warning('Linear probing, so setting unspecified use_net_val_mode to True')
+            # If unspecified, we set use_net_val_mode = True for linear-probing.
+            # We did this in update_net_eval_mode which we called in main.
+            assert('use_net_val_mode' in config)
+            # Freeze all the existing weights of the neural network.
+            # TODO: enable keeeping the top linear layer.
             net.set_requires_grad(False)
         if 'probe_net' in config:
             probe_net = utils.initialize(config['probe_net'])
@@ -121,6 +129,7 @@ def build_model(config):
 
 def train(epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
           test_loaders, max_test_examples):
+    # Returns a dictionary with epoch, train/loss and train/acc.
     # Train model.
     training_state = net.training
     logging.info("\nEpoch #{}".format(epoch))
@@ -183,11 +192,12 @@ def get_all_test_stats(epoch, test_loaders, max_test_examples, config, net, crit
         max_examples = float('infinity')
         if name in max_test_examples:
             max_examples = max_test_examples[name]
-            val_loss, val_acc = get_test_stats(
-                config, net, test_loader, criterion, device,
-                max_examples=max_examples)
-            stats[loss_name_prefix + name] = val_loss.get_mean()
-            stats[acc_name_prefix + name] = val_acc.get_mean()
+        val_loss, val_acc = get_test_stats(
+            config, net, test_loader, criterion, device,
+            max_examples=max_examples)
+        # So this will look something like 'test_loss/cinic', 'test_acc/cinic'.
+        stats[loss_name_prefix + name] = val_loss.get_mean()
+        stats[acc_name_prefix + name] = val_acc.get_mean()
     return stats
 
 
@@ -254,8 +264,9 @@ def main(config, log_dir, checkpoints_dir):
         test_metrics.append(test_stats)
         train_df = pd.DataFrame(train_metrics)
         test_df = pd.DataFrame(test_metrics)
-        train_df.to_csv(log_dir + '/stats_train.tsv', sep='\t')
-        test_df.to_csv(log_dir + '/stats_test.tsv', sep='\t')
+        df = train_df.merge(test_df, on='epoch')
+        assert(len(df) == len(train_df) == len(test_df))
+        df.to_csv(log_dir + '/stats.tsv', sep='\t')
         if config['wandb']:
             wandb.log(train_stats)
             wandb.log(test_stats)
@@ -347,6 +358,21 @@ def update_test_transform_configs(config):
             test_dataset_config['transforms'] = config['default_test_transforms']
 
 
+def update_root_prefix(config):
+    # Go through test datasets, and train dataset. If root_prefix specified, then prepend that
+    # to the root.
+    def apply_root_prefix(dataset_config, root_prefix):
+        if 'root' in dataset_config['args']:
+            orig_root = dataset_config['args']['root']
+            dataset_config['args']['root'] = root_prefix + '/' + orig_root
+    if 'root_prefix' in config:
+        root_prefix = config['root_prefix']
+        logging.info("Adding root prefix %s to all roots.", root_prefix)
+        apply_root_prefix(config['train_dataset'], root_prefix)
+        for test_dataset_config in config['test_datasets']:
+            apply_root_prefix(test_dataset_config, root_prefix)
+
+
 def update_net_eval_mode(config):
     # If linear probing, then by default we want to turn off batchnorm while training.
     # In other words we want to use validation mode while training unless otherwise specified.
@@ -387,11 +413,18 @@ def setup():
     # Open config, update with command line args.
     config = quinine.Quinfig(args.config)
     utils.update_config(unparsed, config)
-    # We make specifying some things more convenient - we don't need to specify
-    # a transform for each test, but can specify a default transform.
+    # If we don't specify a transform for some test datasets, but specify a default transform,
+    # then use the default transform for that dataset. For datasets that do specify a transform
+    # we use that and not the default transform.
     update_test_transform_configs(config)
     # If linear probing, by default we turn batch-norm off while training, if unspecified.
+    # If you want bach-norm even when lin probing then set use_net_val_mode to False in the config.
     update_net_eval_mode(config)
+    # Datasets may be stored in different directories in different clusters and platforms.
+    # We allow specifying a root_prefix that gets prepended to any specified dataset roots.
+    # So if config['root_prefix'] is defined then we prepend it to dataset['args']['root'] for
+    # train and test datasets.
+    update_root_prefix(config)
     # Note: copying config over is not that useful anymore with Quinine, so use json below.
     shutil.copy(args.config, log_dir+'/original_config.yaml')
     # Setup wandb.

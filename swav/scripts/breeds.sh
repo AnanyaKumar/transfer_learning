@@ -50,6 +50,7 @@ mkdir -p $EXPERIMENT_PATH
 echo "Saving checkpoints to $EXPERIMENT_PATH"
 
 source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
+conda deactivate
 conda activate $conda_env
 srun --output=${EXPERIMENT_PATH}/%j.out --error=${EXPERIMENT_PATH}/%j.err --label python -u main_swav.py \
 --data_path $DATASET_PATH \

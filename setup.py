@@ -28,5 +28,7 @@ setup(name='unlabeled_extrapolation',
         'tensorboard',
         'opencv-python',
         'robustness',
-        'networkx'
+        'networkx',
+        'cvxpy',
+        'pytorch-lightning-bolts',
         ])
