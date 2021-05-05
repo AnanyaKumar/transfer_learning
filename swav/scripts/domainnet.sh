@@ -5,17 +5,128 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=96G
 
-set -x
+show_help() {
+    usage_string="Usage: domainnet.sh [-d|--domains DOMAINS] [--epochs EPOCHS]"
+    usage_string="$usage_string [-b|--batch_size BATCH_SIZE]"
+    usage_string="$usage_string [-q|--queue_start QUEUE_START]"
+    usage_string="$usage_string [-a|--arch ARCHITECTURE]"
+    usage_string="$usage_string [--epsilon EPSILON]"
+    usage_string="$usage_string [--nmb_prototypes NUM_PROTOTYPES]"
+    usage_string="$usage_string [--conda_env CONDA_ENV]"
+    usage_string="$usage_string [-p|--port PORT]"
 
-domains=${1:-'all'}
-epochs=${2:-200}
-batch_size=${3:-64}
-queue_start=${4:-15}
-arch=${5:-resnet50}
-epsilon=${6:-'0.05'}
-nmb_prototypes=${7:-3000}
-conda_env=${8:-`whoami`-ue}
-port=${9:-'40000'}
+    usage_string="$usage_string\n\n"
+    usage_string="$usage_string\t-d|--domains Domains (default:all)\n"
+    usage_string="$usage_string\t-b|--batch_size Batch Size (default: 64)\n"
+    usage_string="$usage_string\t-q|--queue_start Epoch to introduce queue (default: 15)\n"
+    usage_string="$usage_string\t-a|--arch ResNet architecture (default: resnet50)\n"
+    usage_string="$usage_string\t--epsilon Epsilon (default: 0.05)\n"
+    usage_string="$usage_string\t--nmb_prototypes Number of prototypes (default: 3000)\n"
+    usage_string="$usage_string\t--conda_env Conda environment (default: \$(whoami)-ue)\n"
+    usage_string="$usage_string\t-p|--port TCP port for distributed training (default: 40000)\n"
+    printf "$usage_string"
+}
+
+domains=all
+epochs=200
+batch_size=64
+queue_start=15
+arch=resnet50
+epsilon=0.05
+nmb_prototypes=3000
+conda_env=$(whoami)-ue
+port=40000
+
+while true; do
+    case $1 in
+	-h|--help) # Print help
+	    show_help
+	    exit
+	    ;;
+	-d|--domains) # Comma-separated list of domains
+	    if [ "$2" ]; then
+		domains=$2
+		shift
+	    else
+		echo '-d|--domains must be non-empty!'; exit 1
+	    fi
+	    ;;
+	--epochs)
+	    if [ "$2" ]; then
+		epochs=$2
+		shift
+	    else
+		echo '--epochs must be non-empty!'; exit 1
+	    fi
+	    ;;
+	-b|--batch_size) # Batch size for a single GPU
+	    if [ "$2" ]; then
+		batch_size=$2
+		shift
+	    else
+		echo '-b|--batch_size must be non-empty!'; exit 1
+	    fi
+	    ;;
+	-q|--queue_start) # Epoch to introduce queue
+	    if [ "$2" ]; then
+		queue_start=$2
+		shift
+	    else
+		echo '-q|--queue_start must be non-empty!'; exit 1
+	    fi
+	    ;;
+	-a|--arch) # ResNet architecture
+	    if [ "$2" ]; then
+		arch=$2
+		shift
+	    else
+		echo '-a|--arch must be non-empty!'; exit 1
+	    fi
+	    ;;
+	--epsilon) # Epsilon for entropy minimization
+	    if [ "$2" ]; then
+		epsilon=$2
+		shift
+	    else
+		echo '--epsilon must be non-empty!'; exit 1
+	    fi
+	    ;;
+	--nmb_prototypes) # Number of prototypes
+	    if [ "$2" ]; then
+		nmb_prototypes=$2
+		shift
+	    else
+		echo '--nmb_prototypes must be non-empty!'; exit 1
+	    fi
+	    ;;
+	--conda_env) # Conda environment
+	    if [ "$2" ]; then
+		conda_env=$2
+		shift
+	    else
+		echo '--conda_env must be non-empty!'; exit 1
+	    fi
+	    ;;
+	-p|--port) # TCP Port for distributed training
+	    if [ "$2" ]; then
+		port=$2
+		shift
+	    else
+		echo '-p|--port must be non-empty!'; exit 1
+	    fi
+	    ;;
+	*)
+	    if [ -z "$1" ]; then
+	       break
+	    else
+		echo "Unsupported argument: $1"; exit 1
+	    fi
+	    ;;
+    esac
+    shift
+done
+
+set -x
 
 printf "Running DomainNet with domains $domains for $epochs epochs "
 printf " with batch size $batch_size, introducing queue at epoch $queue_start "
