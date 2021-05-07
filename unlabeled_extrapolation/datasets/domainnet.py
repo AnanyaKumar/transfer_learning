@@ -60,7 +60,7 @@ def load_dataset(data_dir, domains, split, version):
 class DomainNet(Dataset):
     def __init__(self, domain, split='train', root=ROOT,
                  transform=None, unlabeled=False, verbose=False,
-                 version='full'):
+                 version='sentry'):
         super().__init__()
 
         if version not in VALID_VERSIONS:

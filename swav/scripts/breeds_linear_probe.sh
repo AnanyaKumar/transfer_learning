@@ -51,12 +51,12 @@ mkdir -p $EXPERIMENT_PATH_LINEAR
 echo "Results saved in $EXPERIMENT_PATH_LINEAR"
 
 PRETRAINED=$EXPERIMENT_PATH/checkpoints/ckp-199.pth
-if [ ! -f $PRETRAINED ]; then
-source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
-conda activate $conda_env
-# convert checkpoint
-python convert_checkpoints.py --pretrained $PRETRAINED --arch resnet50
-conda deactivate
+if [ ! -f $PRETRAINED.oldformat ]; then
+    source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
+    conda activate $conda_env
+    # convert checkpoint
+    python convert_checkpoints.py --pretrained $PRETRAINED --arch resnet50
+    conda deactivate
 fi
 
 PYTHON_CMD=.env/bin/python

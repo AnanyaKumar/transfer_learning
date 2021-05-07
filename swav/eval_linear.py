@@ -32,6 +32,7 @@ from src.utils import (
 import src.resnet50 as resnet_models
 
 from unlabeled_extrapolation.datasets.breeds import Breeds
+from unlabeled_extrapolation.datasets.domainnet import DomainNet
 
 logger = getLogger()
 
@@ -151,8 +152,36 @@ def main():
             transforms.ToTensor(),
             tr_normalize,
         ])
+    elif args.dataset_name == 'domainnet':
+        domain_list = args.domains.split(',')
+        if len(domain_list) != 2:
+            raise ValueError('"domain" param should be of form "source,target"')
+        source_domain, target_domain = domain_list
+        train_dataset = DomainNet(
+            source_domain, split='train',
+            **args.dataset_kwargs
+        )
+        val_dataset = DomainNet(
+            target_domain, split='test',
+            **args.dataset_kwargs
+        )
+        tr_normalize = transforms.Normalize(
+            mean=train_dataset.means, std=train_dataset.stds,
+        )
+        train_dataset._transform = transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            tr_normalize,
+        ])
+        val_dataset._transform = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            tr_normalize,
+        ])
     else:
-        raise ValueError("Not implemeneted")
+        raise ValueError('Not implemented')
 
     sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
@@ -272,7 +301,9 @@ class RegLog(nn.Module):
         super(RegLog, self).__init__()
         self.bn = None
         if global_avg:
-            if arch == "resnet50":
+            if arch == "resnet18":
+                s = 512
+            elif arch == "resnet50":
                 s = 2048
             elif arch == "resnet50w2":
                 s = 4096
