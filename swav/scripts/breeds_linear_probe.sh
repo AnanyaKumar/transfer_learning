@@ -148,7 +148,9 @@ if [ -z "$lr" ]; then
     lr=$(python3 -c "print($DEFAULT_LR / ($DEFAULT_BATCH_SIZE / $effective_batch_size))")
 fi
 
-experiment_name="linearprobe_epochs${epochs}_lr$lr"
+checkpoint_base=$(basename $checkpoint)
+checkpoint_name=${checkpoint_base%%.*}
+experiment_name="linearprobe_${checkpoint_name}epochs${epochs}_lr$lr"
 experiment_name+="_batchsize${batch_size}"
 
 experiment_path_linear="$pretrain_experiment_path/$experiment_name"
