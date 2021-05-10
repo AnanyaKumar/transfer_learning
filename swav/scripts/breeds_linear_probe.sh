@@ -1,7 +1,9 @@
 #!/bin/bash
+#SBATCH --partition jag-standard
+#SBATCH --exclude jagupard[4-8,28-29]
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:1
-#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:2
+#SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 
