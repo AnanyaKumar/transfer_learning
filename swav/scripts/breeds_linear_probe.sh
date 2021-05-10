@@ -18,7 +18,7 @@ show_help() {
     usage_string+="\n\nOptions:\n"
     usage_string+="\t-e|--epochs Number of epochs to train (default: 100)\n"
     usage_string+="\t-b|--batch_size Batch size (default: 64)\n"
-    usage_string+="\t-a|--arch ResNet architecture (default: resnet18)\n"
+    usage_string+="\t-a|--arch ResNet architecture (default: resnet50)\n"
     usage_string+="\t--lr|--learning_rate Learning rate (default: 0.3 for batch size 64, linearly scaled)\n"
     usage_string+="\t--overwrite Overwrite existing experiment\n"
     usage_string+="\t--conda_env Conda environment (default: \$(whoami)-ue)\n"
