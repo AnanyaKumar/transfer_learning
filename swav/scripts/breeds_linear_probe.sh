@@ -9,7 +9,7 @@
 
 show_help() {
     usage_string="Usage: breeds_linear_probe.sh"
-    usage_string+=" breeds_name checkpoint"
+    usage_string+=" checkpoint breeds_name"
     usage_string+=" [-e|--epochs EPOCHS]"
     usage_string+=" [-b|--batch_size BATCH_SIZE] [-a|--arch ARCHITECTURE]"
     usage_string+=" [--lr|--learning_rate LEARNING_RATE]"
@@ -36,16 +36,17 @@ if [ $# -lt 2 ]; then
     exit 1
 fi
 
-breeds_name=$1
-if [[ $breeds_name != living17 && $breeds_name != entity30 ]]; then
-    echo "Unsupported BREEDS name: $breeds_name"
-    exit 1
-fi
-checkpoint=$2
+checkpoint=$1
 checkpoint_base=$(basename $checkpoint)
 checkpoint_extension=${checkpoint_base#*.}
 if [[ "$checkpoint_extension" != pth.tar && "$checkpoint_extension" != pth ]]; then
     echo "Invalid checkpoint: $checkpoint"
+    exit 1
+fi
+
+breeds_name=$2
+if [[ $breeds_name != living17 && $breeds_name != entity30 ]]; then
+    echo "Unsupported BREEDS name: $breeds_name"
     exit 1
 fi
 
