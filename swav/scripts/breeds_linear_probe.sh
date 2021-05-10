@@ -186,7 +186,7 @@ fi
 if [ ! -d "${LOCAL_IMAGENET_PATH}/train" ]; then
   for f in $LOCAL_IMAGENET_PATH/*.tar.gz;
   do
-    tar xzf $f;
+    tar xzf $f -C $LOCAL_IMAGENET_PATH;
   done
 fi
 DATASET_PATH=$LOCAL_IMAGENET_PATH
