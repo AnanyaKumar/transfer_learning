@@ -222,7 +222,7 @@ dump_path="/scr/scr-with-most-space/$(whoami)/swav_experiments/$experiment_name"
 mkdir -p $dump_path
 echo "Will dump checkpoints in $dump_path"
 experiment_path="checkpoints/$experiment_name"
-mkdir -p $experiment_path
+
 echo "Final checkpoints and logs will be copied to $experiment_path"
 
 source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
@@ -259,4 +259,5 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --dataset_kwargs breeds_name=$breeds_name source=$use_source target=$use_target
 
 echo "Copying from $dump_path to $experiment_path"
+mkdir -p $experiment_path
 cp -r $dump_path/* $experiment_path
