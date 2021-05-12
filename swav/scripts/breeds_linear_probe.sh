@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:2
 #SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=32G
+#SBATCH --mem=20G
 
 show_help() {
     usage_string="Usage: breeds_linear_probe.sh"
