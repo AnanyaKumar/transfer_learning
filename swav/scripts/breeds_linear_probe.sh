@@ -158,7 +158,7 @@ if [[ -d "$experiment_path_linear" && "$overwrite" != True ]]; then
     echo "$experiment_path_linear already exists! Pass --overwrite to overwrite."
     exit 1
 fi
-mkdir -p $experiment_path_linear
+
 echo "Final checkpoints and logs will be copied to $experiment_path"
 
 dump_relative=$(basename $pretrain_experiment_path)/$experiment_name
@@ -216,4 +216,5 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label $PYTHON_CM
 --workers $SLURM_NTASKS_PER_NODE
 
 echo "Copying from $dump_path to $experiment_path_linear"
+mkdir -p $experiment_path_linear
 cp -r $dump_path/* $experiment_path_linear
