@@ -14,9 +14,14 @@ import pathlib
 import numpy as np
 import torch
 
+import matplotlib
+import matplotlib.pyplot as plt
+
 from .logger import create_logger, PD_Stats
 
 import torch.distributed as dist
+
+matplotlib.use('Agg')
 
 FALSY_STRINGS = {"off", "false", "0"}
 TRUTHY_STRINGS = {"on", "true", "1"}
@@ -254,12 +259,6 @@ def plot_experiment(dump_path):
         Path containing the results of the experiment. Should have files of the
         form stats*.pkl.
     '''
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError:
-        print('Failed to import matplotlib, can\'t print experiment...')
-        return
-
     dump_path = pathlib.Path(dump_path)
     df_list = []
     for filepath in dump_path.iterdir():
