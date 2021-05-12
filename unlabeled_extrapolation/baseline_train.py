@@ -301,6 +301,8 @@ def make_new_dir(new_dir):
 def make_checkpoints_dir(log_dir):
     checkpoints_dir = log_dir + '/checkpoints'
     checkpoints_dir = Path(checkpoints_dir).resolve().expanduser()
+    if os.path.exists(checkpoints_dir):
+        shutil.rmtree(checkpoints_dir)
     os.makedirs(checkpoints_dir)
     return checkpoints_dir
 
@@ -383,6 +385,12 @@ def update_net_eval_mode(config):
             logging.warning('Linear probing, so setting unspecified use_net_val_mode to True')
 
 
+def set_random_seed(seed):
+    if seed is not None:
+        torch.manual_seed(seed)
+        np.random.seed(seed + 111)
+
+
 def setup():
     parser = argparse.ArgumentParser(
         description='Run model')
@@ -390,6 +398,8 @@ def setup():
                         help='YAML config', required=True)
     parser.add_argument('--log_dir', type=str, metavar='ld',
                         help='Log directory', required=True)
+    parser.add_argument('--tmp_par_ckp_dir', type=str,
+                        help='Temporary directory to save checkpoints instead of log_dir.')
     parser.add_argument('--no_wandb', action='store_true', help='disable W&B')
     parser.add_argument('--copy_all_folders', action='store_true',
                         help='Copy all folders (e.g. code, utils) for reproducibility.')
@@ -398,12 +408,19 @@ def setup():
     parser.add_argument('--group_name', default=None, help='Name of the wandb group (a group of runs)')
     parser.add_argument('--run_name', default=None, help='Name of the wandb run')
     parser.add_argument('--entity_name', default='p-lambda', help='Name of the team')
+    parser.add_argument('--seed', type=int, default=None, help='random seed')
 
     args, unparsed = parser.parse_known_args()
     log_dir = args.log_dir
     # Make log and checkpoint directories.
     make_new_dir(log_dir)
-    checkpoints_dir = make_checkpoints_dir(log_dir)
+    # Sometimes we don't want to overload a distributed file system with checkpoints.
+    # So we save checkpoints on a tmp folder on a local machine. Then later we transfer
+    # the checkpoints back.
+    if args.tmp_par_ckp_dir is not None:
+        checkpoints_dir = make_checkpoints_dir(args.tmp_par_ckp_dir)
+    else:
+        checkpoints_dir = make_checkpoints_dir(log_dir)
     # If you want to copy folders to get the whole state of code
     # while running. For more reproducibility.
     if args.copy_all_folders:
@@ -429,16 +446,24 @@ def setup():
     shutil.copy(args.config, log_dir+'/original_config.yaml')
     # Setup wandb.
     setup_wandb(args, config)
+    # Set seed.
+    config['seed'] = args.seed
+    set_random_seed(args.seed)
     # Save updated config.
     config_json = log_dir+'/config.json'
     with open(config_json, 'w') as f:
         json.dump(config, f)
     # Save command line arguments.
     save_command_line_args(log_dir)
-    return config, log_dir, checkpoints_dir
+    return config, log_dir, checkpoints_dir, args.tmp_par_ckp_dir
 
 
 if __name__ == "__main__":
-    config, log_dir, checkpoints_dir = setup()
+    config, log_dir, checkpoints_dir, tmp_par_ckp_dir = setup()
     main(config, log_dir, checkpoints_dir)
+    # Tear down, i.e. copy checkpoints over from local machine to juice.
+    if tmp_par_ckp_dir is not None:
+        new_checkpoints_dir = log_dir + '/checkpoints'
+        logging.info('Copying from %s to %s', checkpoints_dir, new_checkpoints_dir)
+        shutil.copytree(checkpoints_dir, new_checkpoints_dir)
 

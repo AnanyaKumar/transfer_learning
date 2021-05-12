@@ -9,6 +9,7 @@
 set -x
 conda_env=`whoami`-ue
 
+source copy_imagenet_local.sh
 source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
 conda deactivate
 conda activate $conda_env

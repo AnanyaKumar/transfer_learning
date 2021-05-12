@@ -2,7 +2,6 @@
 log_interval: 5000
 use_cuda: True
 save_freq: 1001
-epochs: &epochs 25
 batch_size: 64
 num_workers: 2
 save_all_checkpoints: False
@@ -15,11 +14,6 @@ optimizer:
   args:
     lr: 0.03
     momentum: 0.9
-
-scheduler:
-  classname: torch.optim.lr_scheduler.CosineAnnealingLR
-  args:
-    T_max: *epochs
 
 model:
   classname: models.imnet_resnet.ResNet50

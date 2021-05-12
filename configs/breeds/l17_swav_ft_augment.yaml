@@ -1,10 +1,10 @@
 
 inherit:
   - resnet50_transfer.yaml 
-  - datasets_e30_swav_augment.yaml
+  - datasets_l17_swav_augment.yaml
 
-num_classes: 30
-epochs: &epochs 50
+num_classes: 17
+epochs: &epochs 100
 
 model:
   classname: models.imnet_resnet.ResNet50
