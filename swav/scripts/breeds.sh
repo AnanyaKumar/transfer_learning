@@ -3,7 +3,7 @@
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=96G
+#SBATCH --mem=80G
 #SBATCH --exclude=jagupard[4-8],jagupard[10-15]
 
 show_help() {
@@ -12,6 +12,7 @@ show_help() {
     usage_string+=" [--epochs EPOCHS] [--nmb_prototypes NUM_PROTOTYPES]"
     usage_string+=" [-q|--queue_start QUEUE_START] [-b|--batch_size BATCH_SIZE]"
     usage_string+=" [--epsilon EPSILON] [-a|--arch ARCHITECTURE]"
+    usage_string+=" [--queue_length QUEUE_LENGTH]"
     usage_string+=" [--conda_env CONDA_ENV] [-p|--port PORT]"
 
     usage_string+="\n\n"
@@ -22,6 +23,7 @@ show_help() {
     usage_string+="\t-q|--queue_start Epoch to introduce queue (default: 15)\n"
     usage_string+="\t-b|--batch_size Batch Size (default: 64)\n"
     usage_string+="\t-a|--arch ResNet architecture (default: resnet50)\n"
+    usage_string+="\t--queue_length Length of queue (default: 3840)\n"
     usage_string+="\t--epsilon Epsilon (default: 0.05)\n"
     usage_string+="\t--conda_env Conda environment (default: \$(whoami)-ue)\n"
     usage_string+="\t-p|--port TCP port for distributed training (default: 40000)\n"
@@ -54,6 +56,7 @@ epoch_queue_starts=15
 batch_size=64
 arch=resnet50
 epsilon=0.05
+queue_length=3840
 conda_env=$(whoami)-ue
 port=40000
 
@@ -118,7 +121,14 @@ while true; do
 		echo '--epsilon must be non-empty!'; exit 1
 	    fi
 	    ;;
-
+	--queue_length) # Length of queue
+	    if [ "$2" ]; then
+		queue_length=$2
+		shift
+	    else
+		echo '--queue_length must be non-empty!'; exit 1
+	    fi
+	    ;;
 	--conda_env) # Conda environment
 	    if [ "$2" ]; then
 		conda_env=$2
@@ -176,7 +186,8 @@ exp_info="Running Breeds $breeds_name exp"
 exp_info+=" with Source=$use_source and Target=$use_target for $epochs epochs"
 exp_info+=", using $nmb_prototypes prototypes, architecture $arch"
 exp_info+=", starting queue at $epoch_queue_starts, batch size $batch_size"
-exp_info+=", epsilon $epsilon, base lr $base_lr, final_lr $final_lr"
+exp_info+=", epsilon $epsilon, queue length $queue_length"
+exp_info+=", base_lr $base_lr, final_lr $final_lr"
 exp_info+=". Using conda environment $conda_env"
 echo $exp_info
 
@@ -203,7 +214,7 @@ DATASET_PATH=$LOCAL_IMAGENET_PATH
 echo "Using ImageNet data from $DATASET_PATH"
 experiment_name="breeds_${breeds_name}_source${use_source}_target${use_target}"
 experiment_name+="_${epochs}epochs_${nmb_prototypes}protos"
-experiment_name+="_${epoch_queue_starts}qstart"
+experiment_name+="_${epoch_queue_starts}qstart_${queue_length}qlength"
 experiment_name+="_batchsize${batch_size}"
 experiment_name+="_epsilon${epsilon}_arch$arch"
 echo "Experiment name: $experiment_name"
@@ -211,7 +222,7 @@ dump_path="/scr/scr-with-most-space/$(whoami)/swav_experiments/$experiment_name"
 mkdir -p $dump_path
 echo "Will dump checkpoints in $dump_path"
 experiment_path="checkpoints/$experiment_name"
-mkdir -p $experiment_path
+
 echo "Final checkpoints and logs will be copied to $experiment_path"
 
 source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
@@ -229,7 +240,7 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --sinkhorn_iterations 3 \
 --feat_dim 128 \
 --nmb_prototypes $nmb_prototypes \
---queue_length 3840 \
+--queue_length $queue_length \
 --epoch_queue_starts $epoch_queue_starts \
 --epochs $epochs \
 --batch_size $batch_size \
@@ -248,4 +259,5 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --dataset_kwargs breeds_name=$breeds_name source=$use_source target=$use_target
 
 echo "Copying from $dump_path to $experiment_path"
+mkdir -p $experiment_path
 cp -r $dump_path/* $experiment_path

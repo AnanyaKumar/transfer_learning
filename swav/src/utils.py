@@ -9,6 +9,7 @@ import argparse
 from logging import getLogger
 import pickle
 import os
+import pathlib
 
 import numpy as np
 import torch
@@ -194,8 +195,7 @@ def accuracy(output, target, topk=(1,)):
 
         res = []
         for k in topk:
-            # correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
+            correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
@@ -217,3 +217,63 @@ class ParseKwargs(argparse.Action):
             else:
                 processed_val = value_str
             getattr(namespace, self.dest)[key] = processed_val
+
+
+def save_plot(df, key_name, plot_name, save_folder):
+    '''
+    Saves a plot of a particular statistic provided by the dataframe.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame whose columns are statistics from an experiment and whose
+        rows are epochs.
+    key_name : str
+        Column name in the DataFrame for the desired statistic to plot.
+    plot_name : str
+        Name to use for plot title, y-axis, and filename.
+    save_folder : Union[str, pathlib.Path]
+        Directory to save plots.
+    '''
+    if key_name in df:
+        ax = df[key_name].plot()
+        ax.set_title(plot_name)
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel(plot_name)
+        filename = f'{plot_name}.png'
+        ax.get_figure().savefig(pathlib.Path(save_folder) / filename)
+
+
+def plot_experiment(dump_path):
+    '''
+    Plots some statistics from the specified experiment and saves the plots.
+
+    Parameters
+    ----------
+    dump_path : Union[str, pathlib.Path]
+        Path containing the results of the experiment. Should have files of the
+        form stats*.pkl.
+    '''
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print('Failed to import matplotlib, can\'t print experiment...')
+        return
+
+    dump_path = pathlib.Path(dump_path)
+    df_list = []
+    for filepath in dump_path.iterdir():
+        filename = str(filepath.name)
+        if filename.startswith('stats') and filename.endswith('.pkl'):
+            with open(filepath, 'rb') as open_file:
+                df_list.append(pickle.load(open_file))
+    avg_df = sum(df_list) / len(df_list)
+
+    STAT_NAMES = [
+        ('loss', 'Loss'),
+        ('prec1', 'Accuracy'),
+        ('prec1_val', 'Val Accuracy')
+    ]
+    for stat in STAT_NAMES:
+        save_plot(avg_df, stat[0], stat[1], dump_path)
+        plt.close()

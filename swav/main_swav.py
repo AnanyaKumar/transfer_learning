@@ -29,7 +29,8 @@ from src.utils import (
     fix_random_seeds,
     AverageMeter,
     init_distributed_mode,
-    ParseKwargs
+    ParseKwargs,
+    plot_experiment
 )
 from src.multicropdataset import MultiCropDataset, CustomMultiCropDataset
 import src.resnet50 as resnet_models
@@ -213,8 +214,7 @@ def main():
     # wrap model
     model = nn.parallel.DistributedDataParallel(
         model,
-        device_ids=[args.gpu_to_work_on],
-        find_unused_parameters=True,
+        device_ids=[args.gpu_to_work_on]
     )
 
     # optionally resume from a checkpoint
@@ -278,6 +278,8 @@ def main():
                 )
         if queue is not None:
             torch.save({"queue": queue}, queue_path)
+
+    plot_experiment(args.dump_path)
 
 
 def train(train_loader, model, optimizer, epoch, lr_schedule, queue):
