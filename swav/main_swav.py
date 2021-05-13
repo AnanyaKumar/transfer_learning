@@ -279,7 +279,8 @@ def main():
         if queue is not None:
             torch.save({"queue": queue}, queue_path)
 
-    plot_experiment(args.dump_path)
+    if args.rank == 0:
+        plot_experiment(args.dump_path)
 
 
 def train(train_loader, model, optimizer, epoch, lr_schedule, queue):

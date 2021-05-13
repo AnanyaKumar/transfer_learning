@@ -293,7 +293,9 @@ def main():
             torch.save(save_dict, os.path.join(args.dump_path, "checkpoint.pth.tar"))
     logger.info("Training of the supervised linear classifier on frozen features completed.\n"
                 "Top-1 test accuracy: {acc:.1f}".format(acc=best_acc))
-    plot_experiment(args.dump_path)
+
+    if args.rank == 0:
+        plot_experiment(args.dump_path)
 
 
 class RegLog(nn.Module):
