@@ -4,6 +4,7 @@ inherit:
   - datasets_e30_swav_noaugment.yaml
 
 num_classes: 30
+epochs: &epochs 25
 
 model:
   classname: models.imnet_resnet.ResNet50
@@ -11,4 +12,9 @@ model:
     pretrained: True
     pretrain_style: 'swav'
     checkpoint_path: '/u/scr/ananya/simclr_weights/swav_800ep_pretrain.pth.tar'
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
 

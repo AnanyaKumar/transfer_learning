@@ -28,6 +28,7 @@ from src.utils import (
     init_distributed_mode,
     accuracy,
     ParseKwargs,
+    plot_experiment
 )
 import src.resnet50 as resnet_models
 
@@ -292,6 +293,9 @@ def main():
             torch.save(save_dict, os.path.join(args.dump_path, "checkpoint.pth.tar"))
     logger.info("Training of the supervised linear classifier on frozen features completed.\n"
                 "Top-1 test accuracy: {acc:.1f}".format(acc=best_acc))
+
+    if args.rank == 0:
+        plot_experiment(args.dump_path)
 
 
 class RegLog(nn.Module):
