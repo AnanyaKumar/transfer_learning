@@ -1,0 +1,40 @@
+
+batch_size: 64
+num_workers: 2
+use_cuda: True
+save_path: '/u/scr/ananya/cifar_experiments/unlabeled_extrapolation/logs/extract_features/l17_swav_800'
+
+config_paths:
+  - '/u/scr/ananya/cifar_experiments/unlabeled_extrapolation/logs/l17_swav_ft/augment_lr0.03/config.json'
+
+checkpoint_paths:
+  - '/u/scr/ananya/cifar_experiments/unlabeled_extrapolation/logs/l17_swav_ft/augment_lr0.03/checkpoints/ckp_0'
+
+model_names:
+  - 'swav_800'
+
+loader_names:
+  - 'l17_trg_train'
+  - 'l17_trg_val'
+  - 'l17_src_train'
+  - 'l17_src_val'
+
+split_names:
+  - 'train'
+  - 'val'
+  - 'train'
+  - 'val'
+
+split_arg_names:
+  - 'split'
+  - 'split'
+  - 'split'
+  - 'split'
+
+# Relative to the config file in the first config path in config_paths.
+loader_indices:
+  - 1
+  - 1
+  - 0
+  - 0
+

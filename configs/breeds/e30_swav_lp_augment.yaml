@@ -1,0 +1,20 @@
+
+inherit:
+  - resnet50_linearprobe.yaml 
+  - datasets_e30_swav_augment.yaml
+
+num_classes: 30
+epochs: &epochs 50
+
+model:
+  classname: models.imnet_resnet.ResNet50
+  args:
+    pretrained: True
+    pretrain_style: 'swav'
+    checkpoint_path: '/u/scr/ananya/simclr_weights/swav_800ep_pretrain.pth.tar'
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
+
