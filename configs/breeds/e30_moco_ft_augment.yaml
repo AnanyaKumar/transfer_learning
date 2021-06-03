@@ -1,0 +1,20 @@
+
+inherit:
+  - resnet50_transfer.yaml 
+  - datasets_e30_swav_augment.yaml
+
+num_classes: 30
+epochs: &epochs 50
+
+model:
+  classname: models.imnet_resnet.ResNet50
+  args:
+    pretrained: True
+    pretrain_style: 'mocov2'
+    checkpoint_path: '/u/scr/ananya/simclr_weights/moco_v2_800ep_pretrain.pth.tar'
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
+

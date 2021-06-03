@@ -1,0 +1,19 @@
+
+inherit:
+  - resnet50_transfer.yaml 
+  - datasets_e30_swav_augment.yaml
+
+num_classes: 30
+epochs: &epochs 50
+
+model:
+  classname: models.imnet_resnet.ResNet50
+  args:
+    pretrained: True
+    pretrain_style: 'supervised'
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
+

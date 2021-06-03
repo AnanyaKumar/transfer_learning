@@ -84,8 +84,9 @@ class DomainNet(Dataset):
         self.means = [0.485, 0.456, 0.406]
         self.stds = [0.228, 0.224, 0.225]
         if verbose:
-            print(f'Loaded domains {", ".join(domain_list)}')
+            print(f'Loaded domains {", ".join(domain_list)}, split is {split}')
             print(f'Total number of images: {len(self.data)}')
+            print(f'Total number of classes: {self.get_num_classes()}')
 
     def __len__(self):
         return len(self.data)
@@ -101,6 +102,8 @@ class DomainNet(Dataset):
         # else:
         return x, int(y)
 
+    def get_num_classes(self):
+        return len(set([self.data[idx][1] for idx in range(len(self.data))]))
 
 class DomainNetDataModule(LightningDataModule):  # pragma: no cover
     """
