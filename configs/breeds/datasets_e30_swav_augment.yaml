@@ -53,3 +53,7 @@ test_datasets:
           breeds_name: 'entity30'
           root: 'imagenet/'
 
+early_stop_dataset_names:
+    - 'source_val_entity'
+    - 'target_val_entity'
+

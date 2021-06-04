@@ -18,6 +18,7 @@ import torch.nn.functional as F
 import wandb
 import yaml
 import quinine
+import numpy as np
 
 from unlabeled_extrapolation.models import resnet
 from unlabeled_extrapolation.utils.accumulator import Accumulator

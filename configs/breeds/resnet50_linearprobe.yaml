@@ -7,8 +7,8 @@ num_workers: 2
 save_all_checkpoints: False
 
 finetune: True
-linear_probe: False
-use_net_val_mode: False
+linear_probe: True
+use_net_val_mode: True
 
 optimizer:
   classname: torch.optim.SGD
