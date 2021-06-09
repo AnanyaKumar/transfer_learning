@@ -1,0 +1,94 @@
+
+root_prefix: '/u/scr/nlp/'
+
+# Add augmentations, and change normalization a bit.
+# The difference is swav augmentation has a 0.228 instead of 0.229 (lol)
+# Probably doesn't make a difference.
+train_dataset:
+    classname: datasets.fmow.Fmow
+    args:
+        split: 'train'
+        regions: [3] 
+        root: 'wilds/data'
+    transforms:
+        - classname: torchvision.transforms.ToTensor
+        - classname: torchvision.transforms.Normalize
+          args:
+              mean: [0.485, 0.456, 0.406]
+              std: [0.2289, 0.224, 0.225]
+
+# Change transform (e.g. centercrop), and change normalization a bit.
+default_test_transforms:
+    - classname: torchvision.transforms.ToTensor
+    - classname: torchvision.transforms.Normalize
+      args:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+
+test_datasets:
+    - name: 'asia_val'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'val'
+          regions: [0]
+          root: 'wilds/data'
+    - name: 'europe_val'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'val'
+          regions: [1]
+          root: 'wilds/data'
+    - name: 'africa_val'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'val'
+          regions: [2]
+          root: 'wilds/data'
+    - name: 'americas_val'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'val'
+          regions: [3]
+          root: 'wilds/data'
+    - name: 'oceania_val'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'val'
+          regions: [4]
+          root: 'wilds/data'
+    - name: 'asia_val_future'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'ood_val'
+          regions: [0]
+          root: 'wilds/data'
+    - name: 'europe_val_future'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'ood_val'
+          regions: [1]
+          root: 'wilds/data'
+    - name: 'africa_val_future'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'ood_val'
+          regions: [2]
+          root: 'wilds/data'
+    - name: 'americas_val_future'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'ood_val'
+          regions: [3]
+          root: 'wilds/data'
+    - name: 'oceania_val_future'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'ood_val'
+          regions: [4]
+          root: 'wilds/data'
+     
+early_stop_dataset_names:
+    - 'americas_val'
+    - 'asia_val'
+    - 'africa_val'
+
