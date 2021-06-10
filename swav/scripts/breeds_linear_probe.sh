@@ -127,7 +127,7 @@ while true; do
     shift
 done
 
-set -x
+set -ex
 
 checkpoint_realpath=$(realpath $checkpoint)
 checkpoint_parent=$(dirname $checkpoint_realpath)
@@ -174,24 +174,9 @@ dist_url="tcp://"
 dist_url+=$master_node
 dist_url+=:$port
 
-# COPY to local
-LOCAL_IMAGENET_PATH=/scr/scr-with-most-space/imagenet
-GLOBAL_IMAGENET_PATH=/u/scr/nlp/eix/imagenet
-# COPY imagenet
-if [ ! -d "$LOCAL_IMAGENET_PATH" ]; then
-  mkdir -p $LOCAL_IMAGENET_PATH
-  echo "Copying ImageNet files to $LOCAL_DATASET_PATH"
-  cp $GLOBAL_IMAGENET_PATH/*.tar.gz $LOCAL_IMAGENET_PATH
-fi
-if [ ! -d "${LOCAL_IMAGENET_PATH}/train" ]; then
-  for f in $LOCAL_IMAGENET_PATH/*.tar.gz;
-  do
-    tar xzf $f -C $LOCAL_IMAGENET_PATH;
-  done
-fi
-DATASET_PATH=$LOCAL_IMAGENET_PATH
+scripts/copy_dataset.sh imagenet
+DATASET_PATH=/scr/scr-with-most-space/imagenet
 echo "Using ImageNet data from $DATASET_PATH"
-
 
 if [ ! -f "$checkpoint.oldformat" ]; then
     source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
