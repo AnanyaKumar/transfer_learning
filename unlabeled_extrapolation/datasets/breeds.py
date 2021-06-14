@@ -105,3 +105,5 @@ class Breeds(Dataset):
     def __len__(self) -> int:
         return len(self._image_paths_by_class)
 
+    def get_num_classes(self):
+        return len(self._idx_to_class_id)
