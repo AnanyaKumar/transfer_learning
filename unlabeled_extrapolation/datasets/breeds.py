@@ -64,7 +64,7 @@ class Breeds(Dataset):
 
     def __init__(self, root, breeds_name,
                  info_dir='/juice/scr/ananya/cifar_experiments/BREEDS-Benchmarks/imagenet_class_hierarchy/modified',
-                 source=True, target=False, split='train', transform=None):
+                 source=True, target=False, split='train', transform=None, downsample=False):
         super().__init__()
         if breeds_name not in BREEDS_SPLITS_TO_FUNC.keys():
             raise ValueError(f'breeds_name must be in {BREEDS_SPLITS_TO_FUNC.keys()} but was {breeds_name}')
@@ -72,6 +72,8 @@ class Breeds(Dataset):
             raise ValueError(f'split must be in {SPLITS} but was {split}')
         if not source and not target:
             raise ValueError('At least one of "source" and "target" must be True!')
+        if downsample and split != 'train':
+            raise ValueError('Should only downsample for the train dataset')
 
         self._breeds_name = breeds_name
         self._source = source
@@ -83,6 +85,16 @@ class Breeds(Dataset):
         breeds_func = BREEDS_SPLITS_TO_FUNC[breeds_name]
         self._superclasses, self._subclass_split, self._label_map = breeds_func(self._info_dir, split="rand")
         self._subclasses = []
+
+        if downsample:
+            # calculate size of source and target datasets
+            source_size = len(get_image_paths_by_class(self._data_dir, self._idx_to_class_id,
+                                                       self._subclasses + self._subclass_split[0], 'train'))
+            target_size = len(get_image_paths_by_class(self._data_dir, self._idx_to_class_id,
+                                                       self._subclasses + self._subclass_split[1], 'train'))
+            print(f'Dataset sizes: source ({source_size}), target ({target_size}). Standardizing to the smaller size.')
+            size_to_use = min(source_size, target_size)
+
         if source:
             self._subclasses.extend(self._subclass_split[0])
         if target:
@@ -90,6 +102,11 @@ class Breeds(Dataset):
 
         self._image_paths_by_class = get_image_paths_by_class(
             self._data_dir, self._idx_to_class_id, self._subclasses, split)
+
+        if downsample:
+            # shuffle the full dataset and then cap its size
+            permutation = np.random.permutation(len(self._image_paths_by_class))
+            self._image_paths_by_class = [self._image_paths_by_class[i] for i in permutation[:size_to_use]]
 
         self.means = [0.485, 0.456, 0.406]
         self.stds = [0.228, 0.224, 0.225]

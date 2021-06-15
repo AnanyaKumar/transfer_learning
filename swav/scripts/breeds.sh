@@ -18,6 +18,7 @@ show_help() {
     usage_string+="\n\n"
     usage_string+="\t-s|--use_source Use source domain data for pretraining.\n"
     usage_string+="\t-t|--use_target Use target domain data for pretraining.\n"
+    usage_string+="\t--standardize_ds_size Standardize dataset size.\n"
     usage_string+="\t--epochs Number of epochs to pretrain (default: 400)\n"
     usage_string+="\t--nmb_prototypes Number of prototypes (default: 3000)\n"
     usage_string+="\t-q|--queue_start Epoch to introduce queue (default: 15)\n"
@@ -50,6 +51,7 @@ fi
 shift
 use_source=False
 use_target=False
+standardize_ds_size=False
 epochs=400
 nmb_prototypes=3000
 epoch_queue_starts=15
@@ -72,6 +74,9 @@ while true; do
 	-t|--use_target) # Use target domain for pretraining
 	    use_target=True
 	    ;;
+	--standardize_ds_size)
+		standardize_ds_size=True
+		;;
 	--epochs)
 	    if [ "$2" ]; then
 		epochs=$2
@@ -217,6 +222,7 @@ experiment_name+="_${epochs}epochs_${nmb_prototypes}protos"
 experiment_name+="_${epoch_queue_starts}qstart_${queue_length}qlength"
 experiment_name+="_batchsize${batch_size}"
 experiment_name+="_epsilon${epsilon}_arch$arch"
+experiment_name+="_standardsize${standardize_ds_size}"
 echo "Experiment name: $experiment_name"
 dump_path="/scr/scr-with-most-space/$(whoami)/swav_experiments/$experiment_name"
 mkdir -p $dump_path
@@ -255,6 +261,7 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --sync_bn pytorch \
 --dump_path $dump_path \
 --dataset_name breeds \
+--standardize_ds_size $standardize_ds_size \
 --epsilon $epsilon \
 --dataset_kwargs breeds_name=$breeds_name source=$use_source target=$use_target
 
