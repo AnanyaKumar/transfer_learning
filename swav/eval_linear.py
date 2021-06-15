@@ -10,6 +10,8 @@ import os
 import time
 from logging import getLogger
 
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -55,6 +57,9 @@ parser.add_argument("--domains", type=str, default=None,
                     help="domain string to pass to dataset")
 parser.add_argument("--dataset_name", type=str, default=None,
                     help="name of the dataset")
+parser.add_argument('--standardize_ds_size', type=bool_flag, default=False,
+                    help='require that all splits use the same size, ' +
+                    'specifying which dataset to standardize to')
 parser.add_argument('--dataset_kwargs', nargs='*', action=ParseKwargs, default={})
 parser.add_argument("--is_not_slurm_job", default=False, type=bool_flag,
                     help="optionally add a batchnorm layer before the linear classifier")
@@ -107,31 +112,30 @@ def main():
     init_distributed_mode(args)
     fix_random_seeds(args.seed)
 
-    
     # build data
     target_dataset = None
     if args.dataset_name is None or args.dataset_name == 'imagenet':
         train_dataset = datasets.ImageFolder(os.path.join(args.data_path, "train"))
+        if args.standardize_ds_size:
+            if args.seed is None:
+                raise ValueError('Must provide a seed for downsampling')
+            raise Exception('Must define the standard size for ImageNet')
+            size_to_use = 4 # TODO
+            prng = np.random.RandomState(args.seed)
+            permutation = prng.permutation(len(train_dataset.samples))
+            train_dataset.samples = [train_dataset.samples[i] for i in permutation[:size_to_use]]
         val_dataset = datasets.ImageFolder(os.path.join(args.data_path, "val"))
-        tr_normalize = transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.228, 0.224, 0.225]
+        train_dataset.transform = get_train_transform(
+            [0.485, 0.456, 0.406], [0.228, 0.224, 0.225]
         )
-        train_dataset.transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
-        val_dataset.transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
+        val_dataset.transform = get_val_transform(
+            [0.485, 0.456, 0.406], [0.228, 0.224, 0.225]
+        )
     elif args.dataset_name == 'breeds':
         train_dataset = Breeds(
                 args.data_path, split='train',
                 source=True, target=False,
+                downsample=args.standardize_ds_size, seed=args.seed,
                 **args.dataset_kwargs)
         val_dataset = Breeds(
                 args.data_path, split='val',
@@ -141,32 +145,22 @@ def main():
                 args.data_path, split='val',
                 source=False, target=True,
                 **args.dataset_kwargs)
-        tr_normalize = transforms.Normalize(
-            mean=train_dataset.means, std=train_dataset.stds,
+        train_dataset._transform = get_train_transform(
+            train_dataset.means, train_dataset.stds
         )
-        train_dataset._transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
-        val_dataset._transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
-        target_dataset._transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
+        val_dataset._transform = get_val_transform(
+            train_dataset.means, train_dataset.stds
+        )
+        target_dataset._transform = get_val_transform(
+            train_dataset.means, train_dataset.stds
+        )
     elif args.dataset_name == 'domainnet':
         domain_list = args.domains.split(',')
         if len(domain_list) != 2:
             raise ValueError('"domain" param should be of form "source,target"')
         source_domain, target_domain = domain_list
+        if args.standardize_ds_size:
+            raise ValueError('Dataset standardization not supported for DomainNet.')
         train_dataset = DomainNet(
             source_domain, split='train',
             **args.dataset_kwargs
@@ -179,27 +173,15 @@ def main():
             target_domain, split='test',
             **args.dataset_kwargs
         )
-        tr_normalize = transforms.Normalize(
-            mean=train_dataset.means, std=train_dataset.stds,
+        train_dataset._transform = get_train_transform(
+            train_dataset.means, train_dataset.stds,
         )
-        train_dataset._transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
-        val_dataset._transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
-        target_dataset._transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
+        val_dataset._transform = get_val_transform(
+            train_dataset.means, train_dataset.stds,
+        )
+        target_dataset._transform = get_val_transform(
+            train_dataset.means, train_dataset.stds,
+        )
     else:
         raise ValueError('Not implemented')
 
@@ -242,7 +224,8 @@ def main():
         num_classes = 1000
     else: # TODO: why is this returning wrong number??????
         num_classes = train_dataset.get_num_classes()
-    linear_classifier = RegLog(1000, args.arch, args.global_pooling, args.use_bn)
+        num_classes = 1000
+    linear_classifier = RegLog(num_classes, args.arch, args.global_pooling, args.use_bn)
 
     # convert batch norm layers (if any)
     linear_classifier = nn.SyncBatchNorm.convert_sync_batchnorm(linear_classifier)
@@ -350,6 +333,29 @@ def main():
     if args.rank == 0:
         plot_experiment(args.dump_path)
 
+def get_train_transform(mean, std):
+    tr_normalize = transforms.Normalize(
+        mean=mean, std=std,
+    )
+    train_transform = transforms.Compose([
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        tr_normalize,
+    ])
+    return train_transform
+
+def get_val_transform(mean, std):
+    tr_normalize = transforms.Normalize(
+        mean=mean, std=std,
+    )
+    val_transform = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        tr_normalize,
+    ])
+    return val_transform
 
 class RegLog(nn.Module):
     """Creates logistic regression on top of frozen features"""

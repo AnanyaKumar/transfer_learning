@@ -18,6 +18,7 @@ show_help() {
     usage_string+="\n\nOptions:\n"
     usage_string+="\t-e|--epochs Number of epochs to train (default: 100)\n"
     usage_string+="\t-b|--batch_size Batch size (default: 64)\n"
+    usage_string+="\t--standardize_ds_size Standardize dataset size (default: False)\n"
     usage_string+="\t-a|--arch ResNet architecture (default: resnet50)\n"
     usage_string+="\t--lr|--learning_rate Learning rate (default: 0.3 for batch size 64, linearly scaled)\n"
     usage_string+="\t--overwrite Overwrite existing experiment\n"
@@ -54,6 +55,7 @@ shift 2
 
 epochs=100
 batch_size=64
+standardize_ds_size=False
 arch=resnet50
 overwrite=False
 conda_env=$(whoami)-ue
@@ -81,6 +83,9 @@ while true; do
 		echo '-b|--batch_size must be non-empty!'; exit 1
 	    fi
 	    ;;
+	--standardize_ds_size)
+		standardize_ds_size=True
+		;;
 	-a|--arch) # ResNet architecture
 	    if [ "$2" ]; then
 		arch=$2
@@ -152,6 +157,7 @@ checkpoint_base=$(basename $checkpoint)
 checkpoint_name=${checkpoint_base%%.*}
 experiment_name="linearprobe_${checkpoint_name}epochs${epochs}_lr$lr"
 experiment_name+="_batchsize${batch_size}"
+experiment_name+="_standardsize${standardize_ds_size}"
 
 experiment_path_linear="$pretrain_experiment_path/$experiment_name"
 if [[ -d "$experiment_path_linear" && "$overwrite" != True ]]; then
@@ -193,6 +199,7 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label $PYTHON_CM
 --epochs $epochs \
 --lr $lr \
 --batch_size $batch_size \
+--standardize_ds_size $standardize_ds_size \
 --arch $arch \
 --dump_path $dump_path \
 --dataset_name breeds \

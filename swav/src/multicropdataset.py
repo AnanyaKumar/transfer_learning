@@ -29,6 +29,8 @@ class CustomMultiCropDataset(Dataset):
         nmb_crops,
         min_scale_crops,
         max_scale_crops,
+        standardize_ds_size=False,
+        seed=None,
         size_dataset=-1,
         return_index=False,
         **dataset_kwargs
@@ -37,12 +39,18 @@ class CustomMultiCropDataset(Dataset):
 
         # ADD DATASETS HERE
         if dataset_name == 'domainnet':
+            if standardize_ds_size:
+                raise ValueError('Dataset size standardization not supported for DomainNet')
             self.ds = DomainNet(domains, split='train', root=data_path, transform=None)
         elif dataset_name == 'breeds':
-            self.ds = Breeds(data_path, **dataset_kwargs)
+            self.ds = Breeds(data_path, standardize_ds_size=standardize_ds_size, seed=seed, **dataset_kwargs)
         else:
             raise ValueError("dataset not supported")
 
+        if standardize_ds_size and size_dataset > 0:
+            print('Cannot set both dataset size standardization and exact dataset size. '
+                    'Using standardization instead.')
+            size_dataset = -1
         self.size_dataset = size_dataset
 
         assert len(size_crops) == len(nmb_crops)
@@ -97,6 +105,8 @@ class MultiCropDataset(datasets.ImageFolder):
         nmb_crops,
         min_scale_crops,
         max_scale_crops,
+        standardize_ds_size=False,
+        seed=None,
         size_dataset=-1,
         return_index=False,
     ):
@@ -104,8 +114,21 @@ class MultiCropDataset(datasets.ImageFolder):
         assert len(size_crops) == len(nmb_crops)
         assert len(min_scale_crops) == len(nmb_crops)
         assert len(max_scale_crops) == len(nmb_crops)
-        if size_dataset >= 0:
-            self.samples = self.samples[:size_dataset]
+
+        if standardize_ds_size:
+            if seed is None:
+                raise ValueError('Must provide a seed for downsampling')
+            if size_dataset > 0:
+                print('Cannot set both dataset size standardization and exact dataset size. '
+                        'Using standardization instead.')
+            raise Exception('Must define the standard size for ImageNet')
+            size_to_use = 4 # TODO
+            prng = np.random.RandomState(seed)
+            permutation = prng.permutation(len(self.samples))
+            self.samples = [self.samples[i] for i in permutation[:size_to_use]]
+        else:
+            if size_dataset >= 0:
+                self.samples = self.samples[:size_dataset]
         self.return_index = return_index
 
         color_transform = [get_color_distortion(), PILRandomGaussianBlur()]
@@ -125,6 +148,9 @@ class MultiCropDataset(datasets.ImageFolder):
                 transforms.Normalize(mean=mean, std=std)])
             ] * nmb_crops[i])
         self.trans = trans
+    
+    def __len__(self):
+        return len(self.samples)
 
     def __getitem__(self, index):
         path, _ = self.samples[index]
