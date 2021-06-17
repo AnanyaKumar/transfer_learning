@@ -19,6 +19,7 @@ show_help() {
     usage_string+="\t-s|--use_source Use source domain data for pretraining.\n"
     usage_string+="\t-t|--use_target Use target domain data for pretraining.\n"
     usage_string+="\t--standardize_ds_size Standardize dataset size.\n"
+    usage_string+="\t--standardize_to For Imagenet, the dataset to which to standardize.\n"
     usage_string+="\t--epochs Number of epochs to pretrain (default: 400)\n"
     usage_string+="\t--nmb_prototypes Number of prototypes (default: 3000)\n"
     usage_string+="\t-q|--queue_start Epoch to introduce queue (default: 15)\n"
@@ -52,6 +53,7 @@ shift
 use_source=False
 use_target=False
 standardize_ds_size=False
+standardize_to=None
 epochs=400
 nmb_prototypes=3000
 epoch_queue_starts=15
@@ -76,6 +78,14 @@ while true; do
 	    ;;
 	--standardize_ds_size)
 		standardize_ds_size=True
+		;;
+	--standardize_to)
+		if [ "$2" ]; then
+		standardize_to=$2
+		shift
+		else
+		echo '--standardize_to must be non-empty!'; exit 1
+		fi
 		;;
 	--epochs)
 	    if [ "$2" ]; then
@@ -202,7 +212,7 @@ dist_url+=$master_node
 dist_url+=:$port
 
 # COPY to local
-LOCAL_IMAGENET_PATH=/scr/scr-with-most-space/imagenet
+LOCAL_IMAGENET_PATH=/scr/biggest/imagenet
 GLOBAL_IMAGENET_PATH=/u/scr/nlp/eix/imagenet
 # COPY imagenet
 if [ ! -d "$LOCAL_IMAGENET_PATH" ]; then
@@ -223,8 +233,9 @@ experiment_name+="_${epoch_queue_starts}qstart_${queue_length}qlength"
 experiment_name+="_batchsize${batch_size}"
 experiment_name+="_epsilon${epsilon}_arch$arch"
 experiment_name+="_standardsize${standardize_ds_size}"
+experiment_name+="_standardto${standardize_to}"
 echo "Experiment name: $experiment_name"
-dump_path="/scr/scr-with-most-space/$(whoami)/swav_experiments/$experiment_name"
+dump_path="/scr/biggest/$(whoami)/swav_experiments/$experiment_name"
 mkdir -p $dump_path
 echo "Will dump checkpoints in $dump_path"
 experiment_path="checkpoints/$experiment_name"
@@ -262,6 +273,7 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --dump_path $dump_path \
 --dataset_name breeds \
 --standardize_ds_size $standardize_ds_size \
+--standardize_to $standardize_to \
 --epsilon $epsilon \
 --dataset_kwargs breeds_name=$breeds_name source=$use_source target=$use_target
 

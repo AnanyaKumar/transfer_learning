@@ -14,7 +14,9 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
 from unlabeled_extrapolation.datasets.domainnet import DomainNet
-from unlabeled_extrapolation.datasets.breeds import Breeds
+from unlabeled_extrapolation.datasets.breeds import Breeds, BREEDS_SPLITS_TO_FUNC
+
+BREEDS_DATASETS = BREEDS_SPLITS_TO_FUNC.keys()
 
 logger = getLogger()
 
@@ -106,6 +108,7 @@ class MultiCropDataset(datasets.ImageFolder):
         min_scale_crops,
         max_scale_crops,
         standardize_ds_size=False,
+        standardize_to=None,
         seed=None,
         size_dataset=-1,
         return_index=False,
@@ -121,8 +124,17 @@ class MultiCropDataset(datasets.ImageFolder):
             if size_dataset > 0:
                 print('Cannot set both dataset size standardization and exact dataset size. '
                         'Using standardization instead.')
-            raise Exception('Must define the standard size for ImageNet')
-            size_to_use = 4 # TODO
+            if standardize_to is None or standardize_to not in BREEDS_DATASETS:
+                raise ValueError('Must provide some valid Breeds dataset to standardize to.')
+
+            # calculate size of source and target datasets
+            source_ds = Breeds(data_path, standardize_to, source=True, target=False)
+            source_size = len(source_ds)
+            target_ds = Breeds(data_path, standardize_to, source=False, target=True)
+            target_size = len(target_ds)
+            print(f'Dataset sizes: source ({source_size}), target ({target_size}). '
+                  'Standardizing to the smaller size.')
+            size_to_use = min(source_size, target_size)
             prng = np.random.RandomState(seed)
             permutation = prng.permutation(len(self.samples))
             self.samples = [self.samples[i] for i in permutation[:size_to_use]]

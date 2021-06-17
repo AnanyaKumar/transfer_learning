@@ -21,6 +21,9 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 
+from unlabeled_extrapolation.datasets.breeds import Breeds, BREEDS_SPLITS_TO_FUNC
+BREEDS_DATASETS = BREEDS_SPLITS_TO_FUNC.keys()
+
 from src.utils import (
     bool_flag,
     initialize_exp,
@@ -38,7 +41,6 @@ from unlabeled_extrapolation.datasets.breeds import Breeds
 from unlabeled_extrapolation.datasets.domainnet import DomainNet
 
 logger = getLogger()
-
 
 parser = argparse.ArgumentParser(description="Evaluate models: Linear classification on ImageNet")
 
@@ -60,6 +62,8 @@ parser.add_argument("--dataset_name", type=str, default=None,
 parser.add_argument('--standardize_ds_size', type=bool_flag, default=False,
                     help='require that all splits use the same size, ' +
                     'specifying which dataset to standardize to')
+parser.add_argument('--standardize_to', type=str, default=None,
+                    help='Which breeds dataset to which to standardize')
 parser.add_argument('--dataset_kwargs', nargs='*', action=ParseKwargs, default={})
 parser.add_argument("--is_not_slurm_job", default=False, type=bool_flag,
                     help="optionally add a batchnorm layer before the linear classifier")
@@ -119,8 +123,16 @@ def main():
         if args.standardize_ds_size:
             if args.seed is None:
                 raise ValueError('Must provide a seed for downsampling')
-            raise Exception('Must define the standard size for ImageNet')
-            size_to_use = 4 # TODO
+            if args.standardize_to is None or args.standardize_to not in BREEDS_DATASETS:
+                raise ValueError('Must provide some valid Breeds dataset to standardize to.')
+            # calculate size of source and target datasets
+            source_ds = Breeds(args.data_path, args.standardize_to, source=True, target=False)
+            source_size = len(source_ds)
+            target_ds = Breeds(args.data_path, args.standardize_to, source=False, target=True)
+            target_size = len(target_ds)
+            print(f'Dataset sizes: source ({source_size}), target ({target_size}). '
+                  'Standardizing to the smaller size.')
+            size_to_use = min(source_size, target_size)
             prng = np.random.RandomState(args.seed)
             permutation = prng.permutation(len(train_dataset.samples))
             train_dataset.samples = [train_dataset.samples[i] for i in permutation[:size_to_use]]
