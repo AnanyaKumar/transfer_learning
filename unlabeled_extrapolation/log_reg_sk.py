@@ -28,10 +28,10 @@ def normalize_features(features, normalize_index):
         features[0][i] = (features[0][i] - mean) / stddev
 
 
-def test_log_reg_warm_starting(features, labels, source_idx, test_indices, num_cs=50):
+def test_log_reg_warm_starting(features, labels, source_idx, test_indices, num_cs=100):
     M, L = len(features), len(features[0])
     m = 0
-    Cs = np.logspace(-7, 0, num_cs)
+    Cs = np.logspace(-7, 7, num_cs)
     clf = LogisticRegression(random_state=0, warm_start=True, max_iter=200)
     #.fit(features[m][source_idx], labels[m][source_idx])
     accs = []

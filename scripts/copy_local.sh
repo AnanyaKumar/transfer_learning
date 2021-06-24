@@ -1,6 +1,6 @@
 
 SOURCE_PATH=$1
-BASE_DST=${3:-/scr/scr-with-most-space}
+BASE_DST=${3:-/scr/biggest}
 DST_PATH=$BASE_DST/$2
 TAR_NAME=$(basename $SOURCE_PATH)
 

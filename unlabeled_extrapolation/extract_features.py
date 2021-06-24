@@ -47,7 +47,7 @@ def get_features_labels(net, loader, use_cuda=True):
     if use_cuda:
         net.cuda()
     net.eval()
-    feature_model = nn.Sequential(*list(net._model.children())[:-1])
+    feature_model = net.get_feature_extractor() # nn.Sequential(*list(net._model.children())[:-1])
     features_list, labels_list = [], []
     with torch.no_grad():
         for data in loader:
@@ -111,6 +111,8 @@ def main():
         config.config_paths, config.checkpoint_paths, config.model_names,
         config.loader_names, config.loader_indices, config.split_arg_names,
         config.split_names, config.batch_size, config.num_workers, config.use_cuda)
+    print('output shapes: ', features[0][0].shape, labels[0][0].shape)
+    print('save path: ', config.save_path)
     pickle.dump((features, labels, config.loader_names, config.model_names),
                 open(config.save_path, 'wb'))
 
