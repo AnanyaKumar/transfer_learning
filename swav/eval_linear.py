@@ -10,6 +10,8 @@ import os
 import time
 from logging import getLogger
 
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -18,6 +20,9 @@ import torch.optim
 import torch.utils.data as data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
+
+from unlabeled_extrapolation.datasets.breeds import Breeds, BREEDS_SPLITS_TO_FUNC
+BREEDS_DATASETS = BREEDS_SPLITS_TO_FUNC.keys()
 
 from src.utils import (
     bool_flag,
@@ -37,7 +42,6 @@ from unlabeled_extrapolation.datasets.domainnet import DomainNet
 
 logger = getLogger()
 
-
 parser = argparse.ArgumentParser(description="Evaluate models: Linear classification on ImageNet")
 
 #########################
@@ -55,6 +59,11 @@ parser.add_argument("--domains", type=str, default=None,
                     help="domain string to pass to dataset")
 parser.add_argument("--dataset_name", type=str, default=None,
                     help="name of the dataset")
+parser.add_argument('--standardize_ds_size', type=bool_flag, default=False,
+                    help='require that all splits use the same size, ' +
+                    'specifying which dataset to standardize to')
+parser.add_argument('--standardize_to', type=str, default=None,
+                    help='Which breeds dataset to which to standardize')
 parser.add_argument('--dataset_kwargs', nargs='*', action=ParseKwargs, default={})
 parser.add_argument("--is_not_slurm_job", default=False, type=bool_flag,
                     help="optionally add a batchnorm layer before the linear classifier")
@@ -102,85 +111,89 @@ parser.add_argument("--local_rank", default=0, type=int,
 
 
 def main():
-    global args, best_acc
+    global args
     args = parser.parse_args()
     init_distributed_mode(args)
     fix_random_seeds(args.seed)
-    logger, training_stats = initialize_exp(
-        args, "epoch", "loss", "prec1", "prec5", "loss_val", "prec1_val", "prec5_val"
-    )
 
     # build data
+    target_dataset = None
     if args.dataset_name is None or args.dataset_name == 'imagenet':
         train_dataset = datasets.ImageFolder(os.path.join(args.data_path, "train"))
+        if args.standardize_ds_size:
+            if args.seed is None:
+                raise ValueError('Must provide a seed for downsampling')
+            if args.standardize_to is None or args.standardize_to not in BREEDS_DATASETS:
+                raise ValueError('Must provide some valid Breeds dataset to standardize to.')
+            # calculate size of source and target datasets
+            source_ds = Breeds(args.data_path, args.standardize_to, source=True, target=False)
+            source_size = len(source_ds)
+            target_ds = Breeds(args.data_path, args.standardize_to, source=False, target=True)
+            target_size = len(target_ds)
+            print(f'Dataset sizes: source ({source_size}), target ({target_size}). '
+                  'Standardizing to the smaller size.')
+            size_to_use = min(source_size, target_size)
+            prng = np.random.RandomState(args.seed)
+            permutation = prng.permutation(len(train_dataset.samples))
+            train_dataset.samples = [train_dataset.samples[i] for i in permutation[:size_to_use]]
         val_dataset = datasets.ImageFolder(os.path.join(args.data_path, "val"))
-        tr_normalize = transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.228, 0.224, 0.225]
+        train_dataset.transform = get_train_transform(
+            [0.485, 0.456, 0.406], [0.228, 0.224, 0.225]
         )
-        train_dataset.transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
-        val_dataset.transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
+        val_dataset.transform = get_val_transform(
+            [0.485, 0.456, 0.406], [0.228, 0.224, 0.225]
+        )
     elif args.dataset_name == 'breeds':
         train_dataset = Breeds(
                 args.data_path, split='train',
                 source=True, target=False,
+                downsample=args.standardize_ds_size, seed=args.seed,
                 **args.dataset_kwargs)
         val_dataset = Breeds(
                 args.data_path, split='val',
+                source=True, target=False,
+                **args.dataset_kwargs)
+        target_dataset = Breeds(
+                args.data_path, split='val',
                 source=False, target=True,
                 **args.dataset_kwargs)
-        tr_normalize = transforms.Normalize(
-            mean=train_dataset.means, std=train_dataset.stds,
+        train_dataset._transform = get_train_transform(
+            train_dataset.means, train_dataset.stds
         )
-        train_dataset._transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
-        val_dataset._transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
+        val_dataset._transform = get_val_transform(
+            train_dataset.means, train_dataset.stds
+        )
+        target_dataset._transform = get_val_transform(
+            train_dataset.means, train_dataset.stds
+        )
     elif args.dataset_name == 'domainnet':
         domain_list = args.domains.split(',')
         if len(domain_list) != 2:
             raise ValueError('"domain" param should be of form "source,target"')
         source_domain, target_domain = domain_list
+        if args.standardize_ds_size:
+            raise ValueError('Dataset standardization not supported for DomainNet.')
         train_dataset = DomainNet(
             source_domain, split='train',
             **args.dataset_kwargs
         )
         val_dataset = DomainNet(
+            source_domain, split='test',
+            **args.dataset_kwargs
+        )
+        target_dataset = DomainNet(
             target_domain, split='test',
             **args.dataset_kwargs
         )
-        tr_normalize = transforms.Normalize(
-            mean=train_dataset.means, std=train_dataset.stds,
+        train_dataset._transform = get_train_transform(
+            train_dataset.means, train_dataset.stds,
         )
-        train_dataset._transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
-        val_dataset._transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            tr_normalize,
-        ])
+        val_dataset._transform = get_val_transform(
+            train_dataset.means, train_dataset.stds,
+        )
+        target_dataset._transform = get_val_transform(
+            train_dataset.means, train_dataset.stds,
+        )
     else:
         raise ValueError('Not implemented')
 
@@ -198,11 +211,33 @@ def main():
         num_workers=args.workers,
         pin_memory=True,
     )
+    if target_dataset is not None:
+        target_loader = torch.utils.data.DataLoader(
+            target_dataset,
+            batch_size=args.batch_size,
+            num_workers=args.workers,
+            pin_memory=True,
+        )
+    else:
+        target_loader = None
+
+    column_names = ("epoch", "loss", "prec1", "prec5", "loss_val", "prec1_val", "prec5_val")
+    if target_dataset is not None:
+        column_names += ('loss_tgt', 'prec1_tgt', 'prec5_tgt')
+
+    logger, training_stats = initialize_exp(
+        args, *column_names
+    )
     logger.info("Building data done")
 
     # build model
     model = resnet_models.__dict__[args.arch](output_dim=0, eval_mode=True)
-    linear_classifier = RegLog(1000, args.arch, args.global_pooling, args.use_bn)
+    if args.dataset_name == 'imagenet':
+        num_classes = 1000
+    else: # TODO: why is this returning wrong number??????
+        num_classes = train_dataset.get_num_classes()
+        num_classes = 1000
+    linear_classifier = RegLog(num_classes, args.arch, args.global_pooling, args.use_bn)
 
     # convert batch norm layers (if any)
     linear_classifier = nn.SyncBatchNorm.convert_sync_batchnorm(linear_classifier)
@@ -255,7 +290,7 @@ def main():
         )
 
     # Optionally resume from a checkpoint
-    to_restore = {"epoch": 0, "best_acc": 0.}
+    to_restore = {"epoch": 0, "best_val_acc": 0., "best_tgt_acc": 0.}
     restart_from_checkpoint(
         os.path.join(args.dump_path, "checkpoint.pth.tar"),
         run_variables=to_restore,
@@ -264,7 +299,8 @@ def main():
         scheduler=scheduler,
     )
     start_epoch = to_restore["epoch"]
-    best_acc = to_restore["best_acc"]
+    best_val_acc = to_restore["best_val_acc"]
+    best_tgt_acc = to_restore["best_tgt_acc"]
     cudnn.benchmark = True
 
     for epoch in range(start_epoch, args.epochs):
@@ -276,7 +312,14 @@ def main():
         train_loader.sampler.set_epoch(epoch)
 
         scores = train(model, linear_classifier, optimizer, train_loader, epoch)
-        scores_val = validate_network(val_loader, model, linear_classifier)
+        if args.rank == 0:
+            logger.info("Evaluating on validation dataset...")
+        scores_val, best_val_acc = validate_network(val_loader, model, linear_classifier, best_val_acc)
+        if target_loader is not None:
+            if args.rank == 0:
+                logger.info("Evaluating on target dataset...")
+            scores_tgt, best_tgt_acc = validate_network(target_loader, model, linear_classifier, best_tgt_acc)
+            scores_val += scores_tgt
         training_stats.update(scores + scores_val)
 
         scheduler.step()
@@ -288,15 +331,43 @@ def main():
                 "state_dict": linear_classifier.state_dict(),
                 "optimizer": optimizer.state_dict(),
                 "scheduler": scheduler.state_dict(),
-                "best_acc": best_acc,
+                "best_val_acc": best_val_acc,
             }
+            if target_loader is not None:
+                save_dict["best_tgt_acc"] = best_tgt_acc
             torch.save(save_dict, os.path.join(args.dump_path, "checkpoint.pth.tar"))
+
     logger.info("Training of the supervised linear classifier on frozen features completed.\n"
-                "Top-1 test accuracy: {acc:.1f}".format(acc=best_acc))
+                "Top-1 val accuracy: {acc:.1f}".format(acc=best_val_acc))
+    if target_loader is not None:
+        logger.info("Top-1 tgt accuracy: {acc:.1f}".format(acc=best_tgt_acc))
 
     if args.rank == 0:
         plot_experiment(args.dump_path)
 
+def get_train_transform(mean, std):
+    tr_normalize = transforms.Normalize(
+        mean=mean, std=std,
+    )
+    train_transform = transforms.Compose([
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        tr_normalize,
+    ])
+    return train_transform
+
+def get_val_transform(mean, std):
+    tr_normalize = transforms.Normalize(
+        mean=mean, std=std,
+    )
+    val_transform = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        tr_normalize,
+    ])
+    return val_transform
 
 class RegLog(nn.Module):
     """Creates logistic regression on top of frozen features"""
@@ -412,12 +483,11 @@ def train(model, reglog, optimizer, loader, epoch):
     return epoch, losses.avg, top1.avg.item(), top5.avg.item()
 
 
-def validate_network(val_loader, model, linear_classifier):
+def validate_network(val_loader, model, linear_classifier, best_acc):
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
-    global best_acc
 
     # switch to evaluate mode
     model.eval()
@@ -458,7 +528,7 @@ def validate_network(val_loader, model, linear_classifier):
             "Best Acc@1 so far {acc:.1f}".format(
                 batch_time=batch_time, loss=losses, top1=top1, acc=best_acc))
 
-    return losses.avg, top1.avg.item(), top5.avg.item()
+    return (losses.avg, top1.avg.item(), top5.avg.item()), best_acc
 
 
 if __name__ == "__main__":

@@ -4,11 +4,11 @@
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=80G
-#SBATCH --exclude=jagupard[4-8],jagupard[10-15]
+#SBATCH --exclude=jagupard[10-15]
 
 show_help() {
-    usage_string="Usage: breeds.sh breeds_name"
-    usage_string+=" [-s|--use_source] [-t|-- use_target]"
+    usage_string="Usage: our_swav_imagenet.sh"
+	usage_string+=" [--standardize_to STANDARDIZE_TO]"
     usage_string+=" [--epochs EPOCHS] [--nmb_prototypes NUM_PROTOTYPES]"
     usage_string+=" [-q|--queue_start QUEUE_START] [-b|--batch_size BATCH_SIZE]"
     usage_string+=" [--epsilon EPSILON] [-a|--arch ARCHITECTURE]"
@@ -16,10 +16,7 @@ show_help() {
     usage_string+=" [--conda_env CONDA_ENV] [-p|--port PORT]"
 
     usage_string+="\n\n"
-    usage_string+="\t-s|--use_source Use source domain data for pretraining.\n"
-    usage_string+="\t-t|--use_target Use target domain data for pretraining.\n"
-    usage_string+="\t--standardize_ds_size Standardize dataset size.\n"
-    usage_string+="\t--standardize_to For Imagenet, the dataset to which to standardize.\n"
+    usage_string+="\t--standardize_to If provided, the dataset to which to standardize.\n"
     usage_string+="\t--epochs Number of epochs to pretrain (default: 400)\n"
     usage_string+="\t--nmb_prototypes Number of prototypes (default: 3000)\n"
     usage_string+="\t-q|--queue_start Epoch to introduce queue (default: 15)\n"
@@ -32,8 +29,6 @@ show_help() {
     printf "$usage_string"
 }
 
-
-
 if [[ $# -lt 1 ]]; then
     show_help
     exit 1
@@ -44,14 +39,6 @@ if [[ $1 = -h || $1 = --help ]]; then
     exit
 fi
 
-breeds_name=$1
-if [[ $breeds_name != living17 && $breeds_name != entity30 ]]; then
-    echo "Unsupported BREEDS name: $breeds_name"
-    exit 1
-fi
-shift
-use_source=False
-use_target=False
 standardize_ds_size=False
 standardize_to=None
 epochs=400
@@ -70,17 +57,9 @@ while true; do
 	    show_help
 	    exit
 	    ;;
-	-s|--use_source) # Use source domain for pretraining
-	    use_source=True
-	    ;;
-	-t|--use_target) # Use target domain for pretraining
-	    use_target=True
-	    ;;
-	--standardize_ds_size)
-		standardize_ds_size=True
-		;;
 	--standardize_to)
 		if [ "$2" ]; then
+		standardize_ds_size=True
 		standardize_to=$2
 		shift
 		else
@@ -171,13 +150,7 @@ while true; do
     shift
 done
 
-
 set -x
-
-if [[ $use_source = False && $use_target = False ]]; then
-    echo 'At least one of -s|--use_source or -t|--use_target must be given!'
-    exit 1
-fi
 
 # Use linear scaling for learning rate
 DEFAULT_LR=4.8
@@ -197,8 +170,8 @@ final_lr=$(python3 -c "print($base_lr / 1000)")
 
 echo "Using base_lr=$base_lr and final_lr=$final_lr"
 
-exp_info="Running Breeds $breeds_name exp"
-exp_info+=" with Source=$use_source and Target=$use_target for $epochs epochs"
+exp_info="Running Imagenet exp for $epochs epochs"
+exp_info+=", downsampled at $standardize_to"
 exp_info+=", using $nmb_prototypes prototypes, architecture $arch"
 exp_info+=", starting queue at $epoch_queue_starts, batch size $batch_size"
 exp_info+=", epsilon $epsilon, queue length $queue_length"
@@ -227,7 +200,6 @@ fi
 
 DATASET_PATH=$LOCAL_IMAGENET_PATH
 echo "Using ImageNet data from $DATASET_PATH"
-experiment_name="breeds_${breeds_name}_source${use_source}_target${use_target}"
 experiment_name+="_${epochs}epochs_${nmb_prototypes}protos"
 experiment_name+="_${epoch_queue_starts}qstart_${queue_length}qlength"
 experiment_name+="_batchsize${batch_size}"
@@ -271,11 +243,9 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --use_fp16 true \
 --sync_bn pytorch \
 --dump_path $dump_path \
---dataset_name breeds \
 --standardize_ds_size $standardize_ds_size \
 --standardize_to $standardize_to \
 --epsilon $epsilon \
---dataset_kwargs breeds_name=$breeds_name source=$use_source target=$use_target
 
 echo "Copying from $dump_path to $experiment_path"
 mkdir -p $experiment_path

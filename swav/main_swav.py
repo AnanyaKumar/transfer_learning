@@ -49,6 +49,11 @@ parser.add_argument("--domains", type=str, default=None,
                     help="domain string to pass to dataset")
 parser.add_argument("--dataset_name", type=str, default=None,
                     help="name of the dataset")
+parser.add_argument('--standardize_ds_size', type=bool_flag, default=False,
+                    help='require that all splits use the same size, ' +
+                    'specifying which dataset to standardize to')
+parser.add_argument('--standardize_to', type=str, default=None,
+                    help='which breeds dataset to standardize the Imagenet size to')
 
 parser.add_argument("--nmb_crops", type=int, default=[2], nargs="+",
                     help="list of number of crops (example: [2, 6])")
@@ -148,15 +153,20 @@ def main():
             args.nmb_crops,
             args.min_scale_crops,
             args.max_scale_crops,
+            args.standardize_ds_size,
+            args.seed,
             **args.dataset_kwargs
         )
     else:
-        train_dataset = MultiCropDataset(
+        train_dataset = MultiCropDataset( # Imagenet
             args.data_path,
             args.size_crops,
             args.nmb_crops,
             args.min_scale_crops,
             args.max_scale_crops,
+            args.standardize_ds_size,
+            args.standardize_to,
+            args.seed
         )
 
     sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)

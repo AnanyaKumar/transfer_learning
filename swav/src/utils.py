@@ -269,9 +269,10 @@ def plot_experiment(dump_path):
     avg_df = sum(df_list) / len(df_list)
 
     STAT_NAMES = [
-        ('loss', 'Loss'),
-        ('prec1', 'Accuracy'),
-        ('prec1_val', 'Val Accuracy')
+        ('loss', 'Training Loss'),
+        ('prec1', 'Training Accuracy'),
+        ('prec1_val', 'Source Validation Accuracy'),
+        ('prec1_tgt', 'Target Accuracy')
     ]
     for stat in STAT_NAMES:
         save_plot(avg_df, stat[0], stat[1], dump_path)
