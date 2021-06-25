@@ -106,9 +106,10 @@ def build_model(config):
     # If fine-tune, re-initialize the last layer.
     finetune = 'finetune' in config and config['finetune']
     linear_probe = 'linear_probe' in config and config['linear_probe']
+    batch_norm = 'batchnorm_ft' in config and config['batchnorm_ft']
     def count_parameters(model, trainable):
         return sum(p.numel() for p in model.parameters() if p.requires_grad == trainable)
-    if finetune or linear_probe:
+    if finetune or linear_probe or batch_norm:
         if linear_probe:
             logging.info('linear probing, freezing bottom layers.')
             # If unspecified, we set use_net_val_mode = True for linear-probing.
@@ -117,6 +118,14 @@ def build_model(config):
             # Freeze all the existing weights of the neural network.
             # TODO: enable keeeping the top linear layer.
             net.set_requires_grad(False)
+        if batch_norm:
+            assert(not linear_probe)
+            logging.info("tuning only batch norm layers and lin probe")
+            net.set_requires_grad(False)
+            for layer in net._model.modules():
+                if isinstance(layer, nn.modules.batchnorm.BatchNorm2d): 
+                    for param in layer.parameters():
+                        param.requires_grad = True 
         if 'probe_net' in config:
             probe_net = utils.initialize(config['probe_net'])
             net.add_probe(probe_net)
@@ -202,6 +211,14 @@ def get_all_test_stats(epoch, test_loaders, max_test_examples, config, net, crit
     return stats
 
 
+def get_params(layers):
+    params = []
+    for layer in layers:
+        for param in layer.parameters():
+            params.append(param)
+    return params
+
+
 def main(config, log_dir, checkpoints_dir):
     # Set up datasets and loaders.
     logging.info("Entering main.")
@@ -230,10 +247,23 @@ def main(config, log_dir, checkpoints_dir):
     model_loss = None
     if 'model_loss' in config:
         model_loss = utils.initialize(config['model_loss'])
-    optimizer = utils.initialize(
+    if 'linear_layer_lr_multiplier' in config:
+        base_params = get_params(list(net._model.children())[:-1])
+        fc_params = get_params(list(net._model.children())[-1:])
+        base_lr = config['optimizer']['args']['lr']
+        fc_lr = config['linear_layer_lr_multiplier'] * base_lr
+        logging.info('Using lr %f for fc layer, %d params', fc_lr, len(fc_params))
+        param_groups = [
+            {'params': base_params},
+            {'params': fc_params, 'lr': fc_lr}
+        ]
+        optimizer = utils.initialize(
+            config['optimizer'], update_args={'params': param_groups})
+    else:
+        optimizer = utils.initialize(
             config['optimizer'], update_args={'params': net.parameters()})
     scheduler = utils.initialize(
-            config['scheduler'], update_args={'optimizer': optimizer})
+        config['scheduler'], update_args={'optimizer': optimizer})
     # Training loop.
     best_stats = {}
     best_accs = {}  # Used to save checkpoints of best models on some datasets.
@@ -293,9 +323,10 @@ def main(config, log_dir, checkpoints_dir):
     utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, 'ckp_last')
 
 
-def make_new_dir(new_dir):
+def make_new_dir(new_dir, remove_old_ok=True):
     if os.path.isdir(new_dir):
-        raise ValueError('{} already exists.'.format(new_dir))
+        logging.warning("Removed old run directory.")
+        shutil.rmtree(new_dir)
     os.makedirs(new_dir)
 
 
@@ -365,9 +396,12 @@ def update_root_prefix(config):
     # Go through test datasets, and train dataset. If root_prefix specified, then prepend that
     # to the root.
     def apply_root_prefix(dataset_config, root_prefix):
-        if 'root' in dataset_config['args']:
-            orig_root = dataset_config['args']['root']
-            dataset_config['args']['root'] = root_prefix + '/' + orig_root
+        for key in ['root', 'cache_path']:
+            if key in dataset_config['args']:
+                orig_path = dataset_config['args'][key]
+                logging.info('orig_path %s', orig_path)
+                dataset_config['args'][key] = root_prefix + '/' + orig_path
+
     if 'root_prefix' in config:
         root_prefix = config['root_prefix']
         logging.info("Adding root prefix %s to all roots.", root_prefix)

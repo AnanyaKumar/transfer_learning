@@ -54,3 +54,9 @@ class WildsVisionModel(nn.Module):
     def add_probe(self, probe):
         setattr(self._model, self._last_layer_name, probe)
 
+    def get_last_layer(self):
+        return getattr(self._model, self._last_layer_name)
+    
+    def get_feature_extractor(self):
+        return nn.Sequential(*list(self._model.children())[:-1])
+

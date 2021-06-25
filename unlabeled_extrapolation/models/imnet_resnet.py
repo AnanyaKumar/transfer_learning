@@ -77,3 +77,9 @@ class ResNet50(nn.Module):
     def add_probe(self, probe):
         self._model.fc = probe
 
+    def get_last_layer(self):
+        return self._model.fc
+ 
+    def get_feature_extractor(self):
+        return nn.Sequential(*list(self._model.children())[:-1])
+
