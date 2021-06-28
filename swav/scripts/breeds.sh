@@ -77,16 +77,16 @@ while true; do
 	    use_target=True
 	    ;;
 	--standardize_ds_size)
-		standardize_ds_size=True
-		;;
+	    standardize_ds_size=True
+	    ;;
 	--standardize_to)
-		if [ "$2" ]; then
-		standardize_to=$2
-		shift
-		else
-		echo '--standardize_to must be non-empty!'; exit 1
-		fi
-		;;
+	    if [ "$2" ]; then
+	    standardize_to=$2
+	    shift
+	    else
+	    echo '--standardize_to must be non-empty!'; exit 1
+	    fi
+	    ;;
 	--epochs)
 	    if [ "$2" ]; then
 		epochs=$2
