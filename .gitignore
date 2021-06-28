@@ -144,3 +144,6 @@ cython_debug/.ipynb_checkpoints/*
 logs/
 checkpoints/
 swav/*.out
+*.out
+/results/
+*~
