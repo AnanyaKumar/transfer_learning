@@ -33,6 +33,11 @@ SENTRY_DOMAINS = [
     'sketch'
 ]
 
+NUM_CLASSES_DICT = {
+    'full': 345,
+    'sentry': 40
+}
+
 VALID_SPLITS = ['train', 'test']
 
 VALID_VERSIONS = ['full', 'sentry']

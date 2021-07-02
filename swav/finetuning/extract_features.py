@@ -1,6 +1,5 @@
 import argparse
 import os
-from numpy.lib.utils import source
 import torch
 from torch import nn
 import torchvision.transforms as transforms
@@ -91,18 +90,21 @@ def get_model_representations(args):
         model = load_model(args.checkpoint_dir, args.checkpoint_names[m], args)
         models.append(model)
 
-    train_loader = get_breeds_data_loader(args.dataset_name, True, 'train',
-                                          args.batch_size, args.num_workers)
+    source_train_loader = get_breeds_data_loader(args.dataset_name, True, 'train',
+                                                 args.batch_size, args.num_workers)
+    target_train_loader = get_breeds_data_loader(args.dataset_name, False, 'train',
+                                                 args.batch_size, args.num_workers)
     source_test_loader = get_breeds_data_loader(args.dataset_name, True, 'val',
                                                 args.batch_size, args.num_workers)
     target_test_loader = get_breeds_data_loader(args.dataset_name, False, 'val',
                                                 args.batch_size, args.num_workers)
 
-    features, labels = make_none_list(M, 3), make_none_list(M, 3)
+    features, labels = make_none_list(M, 4), make_none_list(M, 4)
     for m in range(M):
-        features[m][0], labels[m][0] = get_features_labels(models[m], train_loader, use_cuda=args.use_cuda) 
-        features[m][1], labels[m][1] = get_features_labels(models[m], source_test_loader, use_cuda=args.use_cuda) 
-        features[m][2], labels[m][2] = get_features_labels(models[m], target_test_loader, use_cuda=args.use_cuda) 
+        features[m][0], labels[m][0] = get_features_labels(models[m], source_train_loader, use_cuda=args.use_cuda) 
+        features[m][1], labels[m][1] = get_features_labels(models[m], target_train_loader, use_cuda=args.use_cuda) 
+        features[m][2], labels[m][2] = get_features_labels(models[m], source_test_loader, use_cuda=args.use_cuda) 
+        features[m][3], labels[m][3] = get_features_labels(models[m], target_test_loader, use_cuda=args.use_cuda) 
     return features, labels
 
 
