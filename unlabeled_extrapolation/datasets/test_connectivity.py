@@ -13,7 +13,7 @@ from unlabeled_extrapolation.datasets.connectivity_utils import *
 import argparse
 parser = argparse.ArgumentParser(description='Test Connectivity of dataset',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--source', type=str, default=None,
+parser.add_argument('--source', type=str, required=True,
                     help='Name of source dataset')
 parser.add_argument('--target', type=str, default=None,
                     help='Name of target dataset. If not provided, will be set to the '
@@ -21,8 +21,8 @@ parser.add_argument('--target', type=str, default=None,
 parser.add_argument('--data-path', type=str, default='/scr/biggest/imagenet',
                     help='Root path of the data')
 parser.add_argument('--test-between', type=str, choices=['classes', 'domains'],
-                    help='Whether to test intra- or inter- connectivity')
-parser.add_argument('--transform', type=str, choices=['imagenet', 'simclr'])
+                    help='Whether to test intra- or inter- connectivity', required=True)
+parser.add_argument('--transform', type=str, choices=['imagenet', 'simclr'], required=True)
 parser.add_argument('--num-iters', default=15, type=int,
                     help='If doing class-comparison, the number of random pairs to choose.')
 
@@ -39,11 +39,9 @@ parser.add_argument('--save-freq', type=int, default=25, help='How often to save
 parser.add_argument('--print-freq', type=int, default=5, help='How often to print')
 
 def main(args):
+    # TODO: DATA PATH STUFF
     transform = get_transforms(args)
-    num_classes = {
-        'entity30': 30,
-        'living17': 17
-    }[args.source]
+    dataset_name, num_classes = infer_dataset(args.source, args.target)
     if args.test_between == 'classes':
         already_chosen = set()
         class_1, class_2 = None, None # for proper scope
@@ -55,22 +53,23 @@ def main(args):
                     already_chosen.add(curr_pair)
                     break
             # Do the source first
-            source_train_ds, source_test_ds = get_class_datasets(args, class_1, class_2, transform,
-                                                                 args.source, True)
+            source_train_ds, source_test_ds = get_class_datasets(dataset_name, args.source, class_1, class_2,
+                                                                 transform, args.data_path, True)
             identifier = f'class-idxes-source-{class_1}-{class_2}'
             main_loop(source_train_ds, source_test_ds, identifier, args)
             # Now, do the target
-            target_train_ds, target_test_ds = get_class_datasets(args, class_1, class_2, transform,
-                                                                 args.source, False)
+            target_train_ds, target_test_ds = get_class_datasets(dataset_name, args.target, class_1, class_2,
+                                                                 transform, args.data_path, False)
             identifier = f'class-idxes-target-{class_1}-{class_2}'
             main_loop(target_train_ds, target_test_ds, identifier, args)
     else: # between domains
         for class_idx in range(num_classes):
-            train_ds, test_ds = get_domain_datasets(args, class_idx, transform)
+            train_ds, test_ds = get_domain_datasets(dataset_name, args.source, args.target, args.data_path,
+                                                    class_idx, transform)
             identifier = f'class-idx-{class_idx}'
             file_name = f'connectivity_checkpoints/{args.source}-{args.target}-{args.test_between}' \
                 + f'-{args.transform}-{identifier}-final'
-            if os.path.isfile(file_name):
+            if os.path.exists(file_name):
                 print(f'Already completed {file_name}, skipping...')
                 continue
             main_loop(train_ds, test_ds, identifier, args)
@@ -97,6 +96,7 @@ def main_loop(train_ds, test_ds, identifier, args):
 
     train_acc = []
     test_acc = []
+    file_name = f'connectivity_checkpoints/{args.source}-{args.target}-{args.test_between}-{args.transform}-{identifier}'
     for epoch in range(args.epochs):
         # train for one epoch
         train_acc.append(train_epoch(train_loader, model, criterion, optimizer, epoch, args))
@@ -109,14 +109,17 @@ def main_loop(train_ds, test_ds, identifier, args):
             torch.save({
                 'train_accs': train_acc,
                 'test_accs': test_acc
-            }, f'connectivity_checkpoints/{args.source}-{args.target}-{args.test_between}-{args.transform}-{epoch}-{identifier}')
+            }, f'{file_name}-{epoch}')
+            previous_file = f'{file_name}-{epoch - args.save_freq}'
+            if os.path.exists(previous_file):
+                os.remove(previous_file)
 
     torch.save({
         'state_dict': model.state_dict(),
         'optimizer' : optimizer.state_dict(),
         'train_accs': train_acc,
         'test_accs': test_acc
-    }, f'connectivity_checkpoints/{args.source}-{args.target}-{args.test_between}-{args.transform}-{identifier}-final')
+    }, f'{file_name}-final')
 
 def train_epoch(train_loader, model, criterion, optimizer, epoch, args):
     loss_meter = AverageMeter('Loss', ':.4e')
@@ -183,8 +186,6 @@ if __name__ == '__main__':
 
     if args.source is None:
         raise ValueError('Must provide a dataset to test connectivity')
-    if args.source not in VALID_BREEDS_DOMAINS:
-        raise ValueError('Must provide a Breeds task')
     if args.target is None:
         args.target = args.source
 

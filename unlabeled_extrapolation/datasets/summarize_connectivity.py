@@ -19,10 +19,13 @@ if __name__ == '__main__':
     if args.test_between == 'domains':
         for class_idx in range(len(class_mapping)):
             file_name = f'connectivity_checkpoints/{args.dataset_name}-{args.dataset_name}-domains-{args.data_aug}-class-idx-{class_idx}-final'
-            data = torch.load(file_name, map_location=torch.device('cpu'))
-            final_train_acc = data['train_accs'][-1]
-            final_test_acc = data['test_accs'][-1]
-            results.append([class_mapping[class_idx], final_train_acc, final_test_acc])
+            try:
+                data = torch.load(file_name, map_location=torch.device('cpu'))
+                final_train_acc = data['train_accs'][-1]
+                final_test_acc = data['test_accs'][-1]
+                results.append([class_idx, class_mapping[class_idx], final_train_acc, final_test_acc])
+            except:
+                print('Failed at', file_name, '. Skipping...')
     else:
         this_run = args.dataset_name + '-' + args.dataset_name + '-classes-' + args.data_aug + '-class-idxes'
         format_str = '-{}-{}-final'

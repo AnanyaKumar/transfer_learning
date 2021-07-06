@@ -18,17 +18,29 @@ def get_acc(preds, labels):
     return np.mean(preds == labels)
 
 
-def normalize_features(features, normalize_col=0):
+def get_subsampled_features(features, labels, frac, train_col=0):
     for row in range(len(features)):
-        # normalize_col is the index to compute mean and std-dev
-        mean = np.mean(features[row][normalize_col])
-        stddev = np.std(features[row][normalize_col])
+        num_samples = len(features[row][train_col])
+        idx = np.random.choice(num_samples, size=int(frac * num_samples), replace=False)
+        features[row][train_col] = features[row][train_col][idx]
+        labels[row][train_col] = labels[row][train_col][idx]
+
+def normalize_features(features, train_col=0):
+    for row in range(len(features)):
+        # train_col is the index to compute mean and std-dev
+        mean = np.mean(features[row][train_col])
+        stddev = np.std(features[row][train_col])
         for i in range(len(features[row])):
             features[row][i] = (features[row][i] - mean) / stddev
 
 
 def test_log_reg_warm_starting(features, labels, num_cs=50, max_iters=100):
-    train_col, source_test_col, target_test_col = range(3)
+    if len(features[0]) == 3:
+        train_col, source_test_col, target_test_col = range(3)
+    elif len(features[0]) == 4:
+        train_col, source_test_col, target_test_col = 0, 2, 3 # 1 is target train
+    else:
+        raise ValueError(f'Not sure why there are {len(features[0])} design matrices, rather than 3 or 4.')
     M = len(features)
     all_accs = []
     for m in range(M):
@@ -58,12 +70,16 @@ def main():
                         help='Pickle file where features, labels are saved', required=True)
     parser.add_argument('--save_path', type=str,
                         help='Path to save tsv results file')
+    parser.add_argument('--train_data_frac', type=float, default=1.0,
+                        help='The amount of source data to actually use for fine-tuning.')
     parser.add_argument('--num_reg_values', type=int,
                         help='Number of regularization values to sweep over.', required=False)
     args = parser.parse_args()
     features, labels, previous_args = pickle.load(open(args.load_path, 'rb'))
     print(f'Using representations from {previous_args.dataset} {previous_args.dataset_name}, using '
-          f'model {previous_args.checkpoint_dir} {",".join(previous_args.checkpoint_names)}')
+          f'model {previous_args.checkpoint_dir} {",".join(previous_args.checkpoint_names)}, '
+          f'now using a training data fraction {args.train_data_frac}.')
+    get_subsampled_features(features, labels, args.train_data_frac)
     normalize_features(features)
     max_iters = get_max_iters(previous_args.dataset_name)
     accs = test_log_reg_warm_starting(features, labels, num_cs=args.num_reg_values, max_iters=max_iters)
@@ -72,7 +88,7 @@ def main():
         save_path = args.save_path
     else:
         directory = os.path.dirname(args.load_path)
-        save_path = os.path.join(directory, 'sklearn_finetuning.tsv')
+        save_path = os.path.join(directory, f'sklearn_finetuning_fraction_{args.train_data_frac}.tsv')
     accs_df.to_csv(save_path, sep='\t')
 
 
