@@ -14,8 +14,9 @@ print_usage () {
     usage_string+=" [-h|--help]"
     usage_string+=" [--C inv_reg_strength]"
     usage_string+="\n\nOptions:\n"
-    usage_string+="-h, --help        Show this help message\n"
-    usage_string+="--C               Inverse regularization for linear probe\n"
+    usage_string+="-h, --help               Show this help message\n"
+    usage_string+="--C                      Inverse regularization for linear probe\n"
+    usage_string+="--num_selftrain_iters    Iterations of self-training\n"
     printf "$usage_string"
 }
 
@@ -45,6 +46,7 @@ fi
 shift
 
 C=0.316
+num_selftrain_iters=0
 
 while true; do
     if [[ -z "$1" ]]; then
@@ -63,6 +65,14 @@ while true; do
 	    C=$2
 	    shift
 	    ;;
+	--num_selftrain_iters)
+	    if [[ -z "$2" ]]; then
+		echo "--num_selftrain_iters must be non-empty!"
+		exit 1
+	    fi
+	    num_selftrain_iters=$2
+	    shift
+	    ;;
 	*)
 	    echo "Unsupported argument $1"
 	    print_usage
@@ -74,4 +84,5 @@ done
 
 set -ex
 source ../.env/bin/activate
-python run_clip_experiment.py $model --C $C
+python run_clip_experiment.py $model \
+       --C $C --num_selftrain_iters $num_selftrain_iters
