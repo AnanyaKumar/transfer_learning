@@ -13,17 +13,19 @@ from unlabeled_extrapolation.datasets.connectivity_utils import *
 import argparse
 parser = argparse.ArgumentParser(description='Test Connectivity of dataset',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('--dataset_name', type=str, required=True,
+                    help='Which dataset on which to test connectivity.')
 parser.add_argument('--source', type=str, required=True,
                     help='Name of source dataset')
 parser.add_argument('--target', type=str, default=None,
                     help='Name of target dataset. If not provided, will be set to the '
                     'same as --source')
-parser.add_argument('--data-path', type=str, default='/scr/biggest/imagenet',
+parser.add_argument('--data_path', type=str, default='/scr/biggest/imagenet',
                     help='Root path of the data')
-parser.add_argument('--test-between', type=str, choices=['classes', 'domains'],
+parser.add_argument('--test_between', type=str, choices=['classes', 'domains'],
                     help='Whether to test intra- or inter- connectivity', required=True)
 parser.add_argument('--transform', type=str, choices=['imagenet', 'simclr'], required=True)
-parser.add_argument('--num-iters', default=15, type=int,
+parser.add_argument('--num_iters', default=15, type=int,
                     help='If doing class-comparison, the number of random pairs to choose.')
 
 # training args
@@ -41,7 +43,7 @@ parser.add_argument('--print-freq', type=int, default=5, help='How often to prin
 def main(args):
     # TODO: DATA PATH STUFF
     transform = get_transforms(args)
-    dataset_name, num_classes = infer_dataset(args.source, args.target)
+    num_classes = validate_dataset(args.dataset_name, args.source, args.target)
     if args.test_between == 'classes':
         already_chosen = set()
         class_1, class_2 = None, None # for proper scope
@@ -53,18 +55,18 @@ def main(args):
                     already_chosen.add(curr_pair)
                     break
             # Do the source first
-            source_train_ds, source_test_ds = get_class_datasets(dataset_name, args.source, class_1, class_2,
+            source_train_ds, source_test_ds = get_class_datasets(args.dataset_name, args.source, class_1, class_2,
                                                                  transform, args.data_path, True)
             identifier = f'class-idxes-source-{class_1}-{class_2}'
             main_loop(source_train_ds, source_test_ds, identifier, args)
             # Now, do the target
-            target_train_ds, target_test_ds = get_class_datasets(dataset_name, args.target, class_1, class_2,
+            target_train_ds, target_test_ds = get_class_datasets(args.dataset_name, args.target, class_1, class_2,
                                                                  transform, args.data_path, False)
             identifier = f'class-idxes-target-{class_1}-{class_2}'
             main_loop(target_train_ds, target_test_ds, identifier, args)
     else: # between domains
         for class_idx in range(num_classes):
-            train_ds, test_ds = get_domain_datasets(dataset_name, args.source, args.target, args.data_path,
+            train_ds, test_ds = get_domain_datasets(args.dataset_name, args.source, args.target, args.data_path,
                                                     class_idx, transform)
             identifier = f'class-idx-{class_idx}'
             file_name = f'connectivity_checkpoints/{args.source}-{args.target}-{args.test_between}' \

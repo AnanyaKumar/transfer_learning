@@ -14,23 +14,28 @@ VALID_DOMAINNET_DOMAINS = domainnet.SENTRY_DOMAINS
 ### DATASET STUFF ###
 #####################
 
-def infer_dataset(source, target):
-    if target is None:
-        target = source
-    if source in VALID_BREEDS_DOMAINS:
-        dataset = 'breeds'
-        if source != target:
-            raise ValueError('For Breeds, must use the same source and target.')
+def validate_dataset(dataset_name, source, target):
+    if dataset_name == 'breeds':
+        if source not in VALID_BREEDS_DOMAINS:
+            raise ValueError(f'Valid Breeds domains are {VALID_BREEDS_DOMAINS} but received '
+                             f'source {source}.')
+        if target is not None and source != target:
+            raise ValueError(f'Must use the same task for source and target: tried to set '
+                             f'source {source} and target {target}.')
         num_classes = {
             'entity30': 30,
             'living17': 17
         }[source]
-        return dataset, num_classes
-    if (source in VALID_DOMAINNET_DOMAINS and target in VALID_DOMAINNET_DOMAINS):
-        dataset = 'domainnet'
+    elif dataset_name == 'domainnet':
+        if source not in VALID_DOMAINNET_DOMAINS or target not in VALID_DOMAINNET_DOMAINS:
+            raise ValueError(f'Valid DomainNet domains are {VALID_DOMAINNET_DOMAINS} but '
+                             f'received source {source} and target {target}.')
+        if source == target:
+            raise ValueError(f'Should not use the same domain as source and target: {source}.')
         num_classes = domainnet.NUM_CLASSES_DICT['sentry']
-        return dataset, num_classes
-    raise ValueError('Must provide valid breeds task or domainnet domain pair.')
+    else:
+        raise ValueError(f'Unsupported dataset: {dataset_name}.')
+    return num_classes
 
 class DomainClassificationDataset(Dataset):
     def __init__(self, ds1, ds2, data_attr_name, dataset_name, transform=None,
@@ -79,7 +84,7 @@ def get_transforms(args):
     elif args.transform == 'simclr':
         # adapted from
         # https://github.com/facebookresearch/moco/blob/master/main_moco.py
-        augmentation = [
+        transform = transforms.Compose([
             transforms.RandomResizedCrop(224),
             transforms.RandomHorizontalFlip(),
             transforms.RandomApply([
@@ -89,8 +94,7 @@ def get_transforms(args):
             transforms.RandomApply([GaussianBlur([.1, 2.])], p=0.5),
             transforms.ToTensor(),
             normalize
-        ]
-        transform = transforms.Compose(augmentation)
+        ])
     else:
         raise ValueError('Transformation scheme not supported')
     return transform

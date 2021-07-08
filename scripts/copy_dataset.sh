@@ -3,9 +3,7 @@
 set -ex
 
 # Usernames to give read/write permissions to
-USERNAMES="ananya eix"
-USERNAMES+=" kshen6"
-USERNAMES+=" rmjones"
+USERNAMES="ananya eix kshen6 rmjones"
 
 show_help() {
     usage_string="Usage: copy_dataset.sh"
@@ -100,7 +98,7 @@ for username in $(echo "$USERNAMES"); do
     if [[ $username = $(whoami) ]]; then
 	continue
     fi
-    ACL_STRING+="u:$username:rw,"
+    ACL_STRING+="u:$username:rwx,"
 done
 ACL_STRING=${ACL_STRING: : -1} # Remove trailing comma
 
@@ -121,7 +119,12 @@ if [ "$dataset_name" = imagenet ]; then
 	fi
     done
 elif [ "$dataset_name" = domainnet ]; then
-  echo "Copying DomainNet files to $dst_folder"
-  cp $dataset_src $dst_folder
-  unzip -q $dst_folder/domainnet.zip -d $dst_folder
+    if [ ! -f "$dst_folder/domainnet.zip" ]; then
+        echo "Copying DomainNet files to $dst_folder"
+        cp $dataset_src $dst_folder
+        unzip -q $dst_folder/domainnet.zip -d $dst_folder
+    fi
 fi
+
+setfacl -Rm $ACL_STRING $dst_folder
+
