@@ -1,3 +1,22 @@
+# Instructions for using this codebase (with WILDS)
+The main SwAV pre-training code is in `main_swav.py`, and our shell script `scripts/breeds.sh` has a CLI for running SwAV. For example, our command for running on Breeds Living17 source + target is:
+
+```sbatch -p jag-standard -x "jagupard[10-26]"  scripts/breeds.sh living17 -q 60 --epochs 400 -b 128 --epsilon 0.03 --nmb_prototypes 170 -p 40001 --source_amount 1.0 --target_amount 1.0```
+
+We only use Jags 27-29 to accomodate the larger batch sizes (128 is per-GPU).
+
+For linear probing, you can use the script `eval_linear.py`, but for greater consistency we chose to use the sklearn logistic regression module. The flow is:
+1. run `finetuning/extract_features.py` on a GPU machine to compute features.
+2. run `finetuning/log_reg_sk.py` on a John machine to run the actual logistic regression. (Ananya has a script in `../scripts/run_finetuning_experiments.py` that has another interface for this, if you want to look at it.)
+3. run `finetuning/summarize_results.py` to get a pastable CSV that finds the regularization value with highest source val accuracy and reports the corresponding target accuracy.
+
+Notes on hyperparameters:
+1. the number of prototypes should be approximately 10x the number of classes (think about this as the number of subpopulations). However, this isn't always the case, since the paper uses 3000 for ImageNet. For smaller numbers of classes, maybe 10x is a good starting point for tuning.
+2. the queue should be used when the batch size is < the number of prototypes. If you plan to use the queue, introducing it after ~60 epochs was what we ended up doing for Breeds (the paper suggests 15 epochs, but we wait longer to allow the network to learn good features before introducing it). If the loss stabilizes at around `ln(num_prototypes)`, then that is a likely indicator that the queue isn't working.
+3. The `scripts/breeds.sh` script is based off of `scripts/swav_400ep_bs256_pretrain.sh`.
+
+
+
 # Unsupervised Learning of Visual Features by Contrasting Cluster Assignments
 This code provides a PyTorch implementation and pretrained models for **SwAV** (**Sw**apping **A**ssignments between **V**iews), as described in the paper [Unsupervised Learning of Visual Features by Contrasting Cluster Assignments](https://arxiv.org/abs/2006.09882).
 
