@@ -64,18 +64,16 @@ class CustomSplitDataset(Dataset):
             if breeds_name not in BREEDS_TASKS:
                 raise ValueError(f'Must provide a task in {BREEDS_TASKS}, {breeds_name} provided.')
             source_amount, target_amount, related_amount = parse_splits(dataset_kwargs)
+
+            # calculate the reference "100%" dataset size, min of source and target sizes
+            source_ds = Breeds(data_path, breeds_name, source=True, target=False, split='train')
+            source_samples = source_ds._image_paths_by_class
+            target_ds = Breeds(data_path, breeds_name, source=False, target=True, split='train')
+            target_samples = target_ds._image_paths_by_class
+            reference_size = min(len(source_samples), len(target_samples))
             logger.info(f'Using {int(source_amount * reference_size)} source examples.')
             logger.info(f'Using {int(target_amount * reference_size)} target examples.')
             logger.info(f'Using {int(related_amount * reference_size)} related examples.')
-
-            # calculate the reference "100%" dataset size, min of source and target sizes
-            source_ds = Breeds(data_path, breeds_name, seed=seed, source=True, target=False,
-                               split='train')
-            source_samples = source_ds._image_paths_by_class
-            target_ds = Breeds(data_path, breeds_name, seed=seed, source=False, target=True,
-                               split='train')
-            target_samples = target_ds._image_paths_by_class
-            reference_size = min(len(source_samples), len(target_samples))
 
             self.means = target_ds.means # same means/stds is used for all Breeds tasks
             self.stds = target_ds.stds
@@ -108,6 +106,9 @@ class CustomSplitDataset(Dataset):
             target_ds = DomainNet(target_domain, root=data_path, split='train', version='sentry')
             target_samples = target_ds.data
             reference_size = min(len(source_samples), len(target_samples))
+            logger.info(f'Using {int(source_amount * reference_size)} source examples.')
+            logger.info(f'Using {int(target_amount * reference_size)} target examples.')
+            logger.info(f'Using {int(related_amount * reference_size)} related examples.')
 
             self.means = target_ds.means # same means/stds is used for all DomainNet domains
             self.stds = target_ds.stds

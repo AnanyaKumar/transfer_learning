@@ -135,7 +135,7 @@ def main():
     fix_random_seeds(args.seed)
     logger, training_stats = initialize_exp(args, "epoch", "loss")
 
-    train_dataset = CustomSplitMultiCropDatset(
+    train_dataset = CustomSplitMultiCropDataset(
         args.data_path,
         args.dataset_name,
         args.size_crops,
