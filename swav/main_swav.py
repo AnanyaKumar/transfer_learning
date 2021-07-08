@@ -32,7 +32,7 @@ from src.utils import (
     ParseKwargs,
     plot_experiment
 )
-from src.multicropdataset import MultiCropDataset, CustomMultiCropDataset
+from src.multicropdataset import CustomSplitMultiCropDataset
 import src.resnet50 as resnet_models
 
 logger = getLogger()
