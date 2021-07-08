@@ -148,7 +148,7 @@ class CustomSplitDataset(Dataset):
         self.samples.extend([samples_to_add[i] for i in permutation[:size_to_use]])
 
 
-class CustomSplitMultiCropDatset(Dataset):
+class CustomSplitMultiCropDataset(Dataset):
     def __init__(
         self,
         data_path,
