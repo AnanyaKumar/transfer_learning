@@ -14,6 +14,7 @@ show_help() {
     usage_string+="[--related_amount RELATED_AMOUNT]"
     usage_string+="[-b|--batch_size BATCH_SIZE]"
     usage_string+="[-q|--queue_start QUEUE_START]"
+    usage_string+="[--queue_length QUEUE_LENGTH]"
     usage_string+="[-a|--arch ARCHITECTURE]"
     usage_string+="[--epsilon EPSILON]"
     usage_string+="[--nmb_prototypes NUM_PROTOTYPES]"
@@ -28,6 +29,7 @@ show_help() {
     usage_string+="\t--related_amount Amount of related data to use (as a fraction of min(source, target) size) (default: 0).\n"
     usage_string+="\t-b|--batch_size Batch Size (default: 64)\n"
     usage_string+="\t-q|--queue_start Epoch to introduce queue (default: 15)\n"
+    usage_string+="\t--queue_length Length of queue (default: 3840)\n"
     usage_string+="\t-a|--arch ResNet architecture (default: resnet50)\n"
     usage_string+="\t--epsilon Epsilon (default: 0.05)\n"
     usage_string+="\t--nmb_prototypes Number of prototypes (default: 3000)\n"
@@ -36,17 +38,28 @@ show_help() {
     printf "$usage_string"
 }
 
+if [[ $# -lt 1 ]]; then
+    show_help
+    exit 1
+fi
+
+if [[ $1 = -h || $1 = --help ]]; then
+    show_help
+    exit
+fi
+
 source=""
 target=""
 source_amount=0
 target_amount=0
 related_amount=0
-epochs=200
+epochs=400
+nmb_prototypes=3000
+epoch_queue_starts=15
 batch_size=64
-queue_start=15
 arch=resnet50
 epsilon=0.05
-nmb_prototypes=3000
+queue_length=3840
 conda_env=$(whoami)-ue
 port=40000
 
@@ -104,20 +117,28 @@ while true; do
         echo '--epochs must be non-empty!'; exit 1
         fi
         ;;
+    --nmb_prototypes) # Number of prototypes
+        if [ "$2" ]; then
+        nmb_prototypes=$2
+        shift
+        else
+        echo '--nmb_prototypes must be non-empty!'; exit 1
+        fi
+        ;;
+    -q|--queue_start) # Epoch to introduce queue
+        if [ "$2" ]; then
+        epoch_queue_starts=$2
+        shift
+        else
+        echo '-q|--queue_start must be non-empty!'; exit 1
+        fi
+        ;;
     -b|--batch_size) # Batch size for a single GPU
         if [ "$2" ]; then
         batch_size=$2
         shift
         else
         echo '-b|--batch_size must be non-empty!'; exit 1
-        fi
-        ;;
-    -q|--queue_start) # Epoch to introduce queue
-        if [ "$2" ]; then
-        queue_start=$2
-        shift
-        else
-        echo '-q|--queue_start must be non-empty!'; exit 1
         fi
         ;;
     -a|--arch) # ResNet architecture
@@ -136,12 +157,12 @@ while true; do
         echo '--epsilon must be non-empty!'; exit 1
         fi
         ;;
-    --nmb_prototypes) # Number of prototypes
+    --queue_length) # Length of queue
         if [ "$2" ]; then
-        nmb_prototypes=$2
+        queue_length=$2
         shift
         else
-        echo '--nmb_prototypes must be non-empty!'; exit 1
+        echo '--queue_length must be non-empty!'; exit 1
         fi
         ;;
     --conda_env) # Conda environment
@@ -182,44 +203,6 @@ if [[ $source_amount != 0 && $related_amount != 0 ]]; then
     exit 1
 fi
 
-printf "Running DomainNet (SENTRY) with source $source and target $target for $epochs epochs "
-printf " with source amount $source_amount, target amount $target_amount, and related amount $related_amount"
-printf " with batch size $batch_size, introducing queue at epoch $queue_start "
-printf " epsilon $epsilon, arch $arch and nmb_prototypes $nmb_prototypes\n"
-echo "Using conda environment $conda_env"
-
-master_node=${SLURM_NODELIST:0:9}${SLURM_NODELIST:9:4}
-dist_url="tcp://"
-dist_url+=$master_node
-dist_url+=":$port"
-
-# COPY to local
-LOCAL_DOMAINNET_PATH=/scr/scr-with-most-space/domainnet
-GLOBAL_DOMAINNET_PATH=/u/scr/nlp/domainnet/domainnet.zip
-# COPY domainnet
-if [ ! -d "$LOCAL_DOMAINNET_PATH" ]; then
-  mkdir -p $LOCAL_DOMAINNET_PATH
-  echo "Copying DomainNet files to $LOCAL_DOMAINNET_PATH"
-  cp $GLOBAL_DOMAINNET_PATH $LOCAL_DOMAINNET_PATH
-  unzip -q ${LOCAL_DOMAINNET_PATH}/domainnet.zip -d $LOCAL_DOMAINNET_PATH
-fi
-
-DATASET_PATH=${LOCAL_DOMAINNET_PATH}
-echo "Using DomainNet data from $DATASET_PATH"
-experiment_name="domainnet_source${source}_target${target}"
-experiment_name+="_sourceamount${source_amount}_targetamount${target_amount})_relatedamount${related_amount}"
-experiment_name+="_queue${queue_start}_epochs${epochs}"
-experiment_name+="_batchsize${batch_size}"
-experiment_name+="_epsilon${epsilon}_arch$arch"
-experiment_name+="_prototypes${nmb_prototypes}"
-echo "Experiment name: $experiment_name"
-dump_path="/scr/scr-with-most-space/$(whoami)/swav_experiments/$experiment_name"
-mkdir -p $dump_path
-echo "Will dump checkpoints in $dump_path"
-experiment_path="checkpoints/$experiment_name"
-mkdir -p $experiment_path
-echo "Final checkpoints and logs will be copied to $experiment_path"
-
 # Use linear scaling for learning rate
 DEFAULT_LR=4.8
 DEFAULT_BATCH_SIZE=4096
@@ -228,13 +211,51 @@ if [ $effective_batch_size = 256 ]; then
     base_lr=0.6
 else
     base_lr=$(python3 -c "print($DEFAULT_LR / ($DEFAULT_BATCH_SIZE / $effective_batch_size))")
+        if [[ $? -ne 0 ]]; then
+    echo 'Error computing batch size, exiting...'
+    exit $?
+    fi
 fi
 
 final_lr=$(python3 -c "print($base_lr / 1000)")
 
 echo "Using base_lr=$base_lr and final_lr=$final_lr"
 
+printf "Running DomainNet (SENTRY) with source $source and target $target for $epochs epochs "
+printf " with source amount $source_amount, target amount $target_amount, and related amount $related_amount"
+printf " with batch size $batch_size, introducing queue at epoch $queue_start "
+printf " epsilon $epsilon, arch $arch and nmb_prototypes $nmb_prototypes\n"
+echo "Using conda environment $conda_env"
+
+
+master_node=${SLURM_NODELIST:0:9}${SLURM_NODELIST:9:4}
+dist_url="tcp://"
+dist_url+=$master_node
+dist_url+=:$port
+
+# COPY to local
+LOCAL_DOMAINNET_PATH=/scr/biggest/domainnet
+GLOBAL_DOMAINNET_PATH=/u/scr/nlp/domainnet/domainnet.zip
+../../scripts/copy_dataset.sh domainnet
+
+DATASET_PATH=$LOCAL_DOMAINNET_PATH
+echo "Using DomainNet data from $DATASET_PATH"
+experiment_name="domainnet_source${source}_target${target}"
+experiment_name+="_sourceamount${source_amount}_targetamount${target_amount})_relatedamount${related_amount}"
+experiment_name+="_queue${queue_start}_epochs${epochs}"
+experiment_name+="_batchsize${batch_size}"
+experiment_name+="_epsilon${epsilon}_arch$arch"
+experiment_name+="_prototypes${nmb_prototypes}"
+echo "Experiment name: $experiment_name"
+dump_path="/scr/biggest/$(whoami)/swav_experiments/$experiment_name"
+mkdir -p $dump_path
+echo "Will dump checkpoints in $dump_path"
+experiment_path="checkpoints/$experiment_name"
+
+echo "Final checkpoints and logs will be copied to $experiment_path"
+
 source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
+conda deactivate
 conda activate $conda_env
 srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u main_swav.py \
 --data_path $DATASET_PATH \
@@ -248,8 +269,8 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --sinkhorn_iterations 3 \
 --feat_dim 128 \
 --nmb_prototypes $nmb_prototypes \
---queue_length 3840 \
---epoch_queue_starts $queue_start \
+--queue_length $queue_length \
+--epoch_queue_starts $epoch_queue_starts \
 --epochs $epochs \
 --batch_size $batch_size \
 --base_lr $base_lr \
@@ -257,7 +278,6 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --freeze_prototypes_niters 5005 \
 --wd 0.000001 \
 --warmup_epochs 0 \
---workers 4 \
 --dist_url $dist_url \
 --arch $arch \
 --use_fp16 true \
@@ -268,4 +288,5 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
     source_amount=$source_amount target_amount=$target_amount related_amount=$related_amount
 
 echo "Copying from $dump_path to $experiment_path"
+mkdir -p $experiment_path
 cp -r $dump_path/* $experiment_path
