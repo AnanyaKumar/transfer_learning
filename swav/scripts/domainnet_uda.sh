@@ -274,7 +274,7 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --use_fp16 true \
 --sync_bn pytorch \
 --dump_path $dump_path \
---dataset_name domainnet
+--dataset_name domainnet \
 --dataset_kwargs source_domain=$source target_domain=$target \
     source_amount=$source_amount target_amount=$target_amount related_amount=$related_amount
 
