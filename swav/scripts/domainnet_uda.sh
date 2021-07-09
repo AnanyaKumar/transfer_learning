@@ -14,6 +14,7 @@ show_help() {
     usage_string+="[--related_amount RELATED_AMOUNT]"
     usage_string+="[-b|--batch_size BATCH_SIZE]"
     usage_string+="[-q|--queue_start QUEUE_START]"
+    usage_string+="[--queue_length QUEUE_LENGTH]"
     usage_string+="[-a|--arch ARCHITECTURE]"
     usage_string+="[--epsilon EPSILON]"
     usage_string+="[--nmb_prototypes NUM_PROTOTYPES]"
@@ -28,6 +29,7 @@ show_help() {
     usage_string+="\t--related_amount Amount of related data to use (as a fraction of min(source, target) size) (default: 0).\n"
     usage_string+="\t-b|--batch_size Batch Size (default: 64)\n"
     usage_string+="\t-q|--queue_start Epoch to introduce queue (default: 15)\n"
+    usage_string+="\t--queue_length Length of queue (default: 3840)\n"
     usage_string+="\t-a|--arch ResNet architecture (default: resnet50)\n"
     usage_string+="\t--epsilon Epsilon (default: 0.05)\n"
     usage_string+="\t--nmb_prototypes Number of prototypes (default: 3000)\n"
@@ -44,6 +46,7 @@ related_amount=0
 epochs=200
 batch_size=64
 queue_start=15
+queue_length=3840
 arch=resnet50
 epsilon=0.05
 nmb_prototypes=3000
@@ -118,6 +121,14 @@ while true; do
         shift
         else
         echo '-q|--queue_start must be non-empty!'; exit 1
+        fi
+        ;;
+    --queue_length) # Length of queue
+        if [ "$2" ]; then
+        queue_length=$2
+        shift
+        else
+        echo '--queue_length must be non-empty!'; exit 1
         fi
         ;;
     -a|--arch) # ResNet architecture
@@ -248,7 +259,7 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --sinkhorn_iterations 3 \
 --feat_dim 128 \
 --nmb_prototypes $nmb_prototypes \
---queue_length 3840 \
+--queue_length $queue_length \
 --epoch_queue_starts $queue_start \
 --epochs $epochs \
 --batch_size $batch_size \
