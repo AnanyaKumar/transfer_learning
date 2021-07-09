@@ -55,11 +55,11 @@ target_amount=0
 related_amount=0
 epochs=400
 nmb_prototypes=3000
-epoch_queue_starts=15
 batch_size=64
+queue_start=15
+queue_length=3840
 arch=resnet50
 epsilon=0.05
-queue_length=3840
 conda_env=$(whoami)-ue
 port=40000
 
@@ -77,7 +77,7 @@ while true; do
         echo '--source must be non-empty!'; exit 1
         fi
         ;;
-    -s|--target) # Target domain
+    -t|--target) # Target domain
         if [ "$2" ]; then
         target=$2
         shift
@@ -139,6 +139,13 @@ while true; do
         shift
         else
         echo '-b|--batch_size must be non-empty!'; exit 1
+    --queue_length) # Length of queue
+        if [ "$2" ]; then
+        queue_length=$2
+        shift
+        else
+        echo '--queue_length must be non-empty!'; exit 1
+>>>>>>> 7215bfa69363e7784747ffe546f22439971c68fa
         fi
         ;;
     -a|--arch) # ResNet architecture
@@ -270,7 +277,11 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --feat_dim 128 \
 --nmb_prototypes $nmb_prototypes \
 --queue_length $queue_length \
+<<<<<<< HEAD
 --epoch_queue_starts $epoch_queue_starts \
+=======
+--epoch_queue_starts $queue_start \
+>>>>>>> 7215bfa69363e7784747ffe546f22439971c68fa
 --epochs $epochs \
 --batch_size $batch_size \
 --base_lr $base_lr \
@@ -283,7 +294,7 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --use_fp16 true \
 --sync_bn pytorch \
 --dump_path $dump_path \
---dataset_name domainnet
+--dataset_name domainnet \
 --dataset_kwargs source_domain=$source target_domain=$target \
     source_amount=$source_amount target_amount=$target_amount related_amount=$related_amount
 
