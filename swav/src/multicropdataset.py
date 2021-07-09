@@ -71,17 +71,14 @@ class CustomSplitDataset(Dataset):
             target_ds = Breeds(data_path, breeds_name, source=False, target=True, split='train')
             target_samples = target_ds._image_paths_by_class
             reference_size = min(len(source_samples), len(target_samples))
-            logger.info(f'Using {int(source_amount * reference_size)} source examples.')
-            logger.info(f'Using {int(target_amount * reference_size)} target examples.')
-            logger.info(f'Using {int(related_amount * reference_size)} related examples.')
 
             self.means = target_ds.means # same means/stds is used for all Breeds tasks
             self.stds = target_ds.stds
 
             # fill in the proper proportions of samples
             self.samples = []
-            self.add_data(reference_size, target_amount, target_samples)
-            self.add_data(reference_size, source_amount, source_samples)
+            self.add_data(reference_size, target_amount, target_samples, 'target')
+            self.add_data(reference_size, source_amount, source_samples, 'source')
             if related_amount > 0:
                 # collect all ImageNet images
                 all_imagenet = datasets.ImageFolder(os.path.join(data_path, 'train'))
@@ -91,12 +88,12 @@ class CustomSplitDataset(Dataset):
                 # identify non-target ImageNet images
                 non_target_imagenet = list(filter(lambda item: item[0] not in target_images,
                                                   all_imagenet_images))
-                self.add_data(reference_size, related_amount, non_target_imagenet)
+                self.add_data(reference_size, related_amount, non_target_imagenet, 'related')
 
         elif dataset_name == 'domainnet':
             source_domain = dataset_kwargs.get('source_domain')
             target_domain = dataset_kwargs.get('target_domain')
-            if source_domain or target_domain not in SENTRY_DOMAINS:
+            if (source_domain not in SENTRY_DOMAINS) or (target_domain not in SENTRY_DOMAINS):
                 raise ValueError(f'Valid domains are {SENTRY_DOMAINS}, but source was {source_domain} '
                                  f'and target was {target_domain}.')
             source_amount, target_amount, related_amount = parse_splits(dataset_kwargs)
@@ -106,24 +103,21 @@ class CustomSplitDataset(Dataset):
             target_ds = DomainNet(target_domain, root=data_path, split='train', version='sentry')
             target_samples = target_ds.data
             reference_size = min(len(source_samples), len(target_samples))
-            logger.info(f'Using {int(source_amount * reference_size)} source examples.')
-            logger.info(f'Using {int(target_amount * reference_size)} target examples.')
-            logger.info(f'Using {int(related_amount * reference_size)} related examples.')
 
             self.means = target_ds.means # same means/stds is used for all DomainNet domains
             self.stds = target_ds.stds
 
             # fill in the proper proportions of samples
             self.samples = []
-            self.add_data(reference_size, target_amount, target_samples)
-            self.add_data(reference_size, source_amount, source_samples)
+            self.add_data(reference_size, target_amount, target_samples, 'target')
+            self.add_data(reference_size, source_amount, source_samples, 'source')
             if related_amount > 0:
                 # identify all non-target domains
                 non_target_domains = list(set(SENTRY_DOMAINS) - set([target_domain]))
                 # collect all DomainNet non-target images
                 non_target_domainnet = DomainNet(non_target_domains, root=data_path,
                                           split='train', version='sentry')
-                self.add_data(reference_size, related_amount, non_target_domainnet.data)
+                self.add_data(reference_size, related_amount, non_target_domainnet.data, 'related')
 
             # for DomainNet, edit all the samples so the __getitem__ function is consistent
             func = lambda inp: (os.path.join(data_path, inp[0]), int(inp[1]))
@@ -143,10 +137,12 @@ class CustomSplitDataset(Dataset):
             x = self._transform(x)
         return x, y
 
-    def add_data(self, reference_size, fraction, samples_to_add):
+    def add_data(self, reference_size, fraction, samples_to_add, label):
         size_to_use = int(fraction * reference_size)
         permutation = self.prng.permutation(len(samples_to_add))
-        self.samples.extend([samples_to_add[i] for i in permutation[:size_to_use]])
+        new_samples = [samples_to_add[i] for i in permutation[:size_to_use]]
+        logger.info(f'Using {len(new_samples)} examples from {label}.')
+        self.samples.extend(new_samples)
 
 
 class CustomSplitMultiCropDataset(Dataset):

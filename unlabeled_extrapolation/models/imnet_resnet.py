@@ -4,7 +4,10 @@ import torchvision.models as models
 from torchvision.models import resnet50
 import torch
 from torch import nn
-from models import swav_resnet50
+try:
+    from models import swav_resnet50
+except:
+    from . import swav_resnet50
 
 
 PRETRAIN_STYLE = ['supervised', 'mocov2', 'swav', 'simclrv2']

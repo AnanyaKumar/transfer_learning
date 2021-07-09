@@ -222,16 +222,7 @@ dist_url+=:$port
 # COPY to local
 LOCAL_IMAGENET_PATH=/scr/biggest/imagenet
 GLOBAL_IMAGENET_PATH=/u/scr/nlp/eix/imagenet
-# COPY imagenet
-if [ ! -d "$LOCAL_IMAGENET_PATH" ]; then
-  mkdir -p $LOCAL_IMAGENET_PATH
-  echo "Copying ImageNet files to $LOCAL_DATASET_PATH"
-  cp $GLOBAL_IMAGENET_PATH/*.tar.gz $LOCAL_IMAGENET_PATH
-  for f in $LOCAL_IMAGENET_PATH/*.tar.gz;
-  do
-    tar xzf $f -C $LOCAL_IMAGENET_PATH;
-  done
-fi
+../../scripts/copy_dataset.sh imagenet
 
 DATASET_PATH=$LOCAL_IMAGENET_PATH
 echo "Using ImageNet data from $DATASET_PATH"
@@ -277,7 +268,6 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --use_fp16 true \
 --sync_bn pytorch \
 --dump_path $dump_path \
---epsilon $epsilon \
 --dataset_name breeds \
 --dataset_kwargs breeds_name=$breeds_name \
     source_amount=$source_amount target_amount=$target_amount related_amount=$related_amount
