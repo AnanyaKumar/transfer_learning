@@ -64,7 +64,7 @@ while true; do
         echo '--source must be non-empty!'; exit 1
         fi
         ;;
-    -s|--target) # Target domain
+    -t|--target) # Target domain
         if [ "$2" ]; then
         target=$2
         shift
