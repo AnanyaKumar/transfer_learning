@@ -19,6 +19,7 @@ show_help() {
     usage_string+="\t-e|--epochs Number of epochs to train (default: 100)\n"
     usage_string+="\t-b|--batch_size Batch size (default: 64)\n"
     usage_string+="\t--standardize_ds_size Standardize dataset size (default: False)\n"
+    usage_string+="\t--standardize_to Breeds dataset to which to standardize\n"
     usage_string+="\t-a|--arch ResNet architecture (default: resnet50)\n"
     usage_string+="\t--lr|--learning_rate Learning rate (default: 0.3 for batch size 64, linearly scaled)\n"
     usage_string+="\t--overwrite Overwrite existing experiment\n"
@@ -56,6 +57,7 @@ shift 2
 epochs=100
 batch_size=64
 standardize_ds_size=False
+standardize_to=None
 arch=resnet50
 overwrite=False
 conda_env=$(whoami)-ue
@@ -85,6 +87,14 @@ while true; do
 	    ;;
 	--standardize_ds_size)
 		standardize_ds_size=True
+		;;
+	--standardize_to)
+		if [ "$2" ]; then
+		standardize_to=$2
+		shift
+		else
+		echo '--standardize_to must be non-empty'; exit 1
+		fi
 		;;
 	-a|--arch) # ResNet architecture
 	    if [ "$2" ]; then
@@ -158,6 +168,7 @@ checkpoint_name=${checkpoint_base%%.*}
 experiment_name="linearprobe_${checkpoint_name}epochs${epochs}_lr$lr"
 experiment_name+="_batchsize${batch_size}"
 experiment_name+="_standardsize${standardize_ds_size}"
+experiment_name+="_standardto${standardize_ds_size}"
 
 experiment_path_linear="$pretrain_experiment_path/$experiment_name"
 if [[ -d "$experiment_path_linear" && "$overwrite" != True ]]; then
@@ -168,7 +179,7 @@ fi
 echo "Final checkpoints and logs will be copied to $experiment_path"
 
 dump_relative=$(basename $pretrain_experiment_path)/$experiment_name
-dump_path="/scr/scr-with-most-space/$(whoami)/swav_experiments/$dump_relative"
+dump_path="/scr/biggest/$(whoami)/swav_experiments/$dump_relative"
 mkdir -p $dump_path
 echo "Will dump checkpoints in $dump_path"
 
@@ -181,7 +192,7 @@ dist_url+=$master_node
 dist_url+=:$port
 
 scripts/copy_dataset.sh imagenet
-DATASET_PATH=/scr/scr-with-most-space/imagenet
+DATASET_PATH=/scr/biggest/imagenet
 echo "Using ImageNet data from $DATASET_PATH"
 
 if [ ! -f "$checkpoint.oldformat" ]; then
@@ -200,6 +211,7 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label $PYTHON_CM
 --lr $lr \
 --batch_size $batch_size \
 --standardize_ds_size $standardize_ds_size \
+--standardize_to $standardize_to \
 --arch $arch \
 --dump_path $dump_path \
 --dataset_name breeds \

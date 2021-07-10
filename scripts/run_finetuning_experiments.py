@@ -1,13 +1,7 @@
-
 import subprocess
 import shlex
 import argparse
-import json
-import numpy as np
 from copy import deepcopy
-from pathlib import Path
-import datetime
-import pandas as pd
 
 
 def run_sbatch(cmd, job_name, args, exclude=None,
@@ -432,12 +426,21 @@ def spray_imagenet_jags(args):
         f'source {args.scripts_dir}/copy_dataset.sh imagenet')
 
 
+def spray_domainnet_jags(args):
+    for i in range(10, 30):
+        cmd = 'sbatch -p jag-lo --cpus-per-task=1 --gres=gpu:0 --mem=4G'
+        cmd += f' --nodelist=jagupard{i} -J copy_domainnet_jag{i} -o %x.out'
+        cmd += ' copy_dataset.sh domainnet'
+        subprocess.run(shlex.split(cmd))
+
+
 def main(args):
     experiment_to_fns = {
         'spray_fmow_jags': spray_fmow_jags,
         'spray_imagenet_jags': spray_imagenet_jags,
         'fmow_moco_ft_noaugment_sweep': fmow_moco_ft_noaugment_sweep,
         'fmow_moco_ft_noaugment_replication': fmow_moco_ft_noaugment_replication,
+        'spray_domainnet_jags': spray_domainnet_jags,
         'e30_moco_ft_augment_sweep': e30_moco_ft_augment_sweep,
         'e30_moco_ft_augment_replication': e30_moco_ft_augment_replication,
         'l17_moco_ft_augment_sweep': l17_moco_ft_augment_sweep,

@@ -32,7 +32,7 @@ from src.utils import (
     ParseKwargs,
     plot_experiment
 )
-from src.multicropdataset import MultiCropDataset, CustomMultiCropDataset
+from src.multicropdataset import CustomSplitMultiCropDataset
 import src.resnet50 as resnet_models
 
 logger = getLogger()
@@ -45,15 +45,8 @@ parser = argparse.ArgumentParser(description="Implementation of SwAV")
 parser.add_argument("--data_path", type=str, default="/path/to/imagenet",
                     help="path to dataset repository")
 # Added by MX
-parser.add_argument("--domains", type=str, default=None,
-                    help="domain string to pass to dataset")
 parser.add_argument("--dataset_name", type=str, default=None,
                     help="name of the dataset")
-parser.add_argument('--standardize_ds_size', type=bool_flag, default=False,
-                    help='require that all splits use the same size, ' +
-                    'specifying which dataset to standardize to')
-parser.add_argument('--standardize_to', type=str, default=None,
-                    help='which breeds dataset to standardize the Imagenet size to')
 
 parser.add_argument("--nmb_crops", type=int, default=[2], nargs="+",
                     help="list of number of crops (example: [2, 6])")
@@ -142,32 +135,16 @@ def main():
     fix_random_seeds(args.seed)
     logger, training_stats = initialize_exp(args, "epoch", "loss")
 
-    # build data
-    if args.dataset_name is not None:
-        # Added by MX
-        train_dataset = CustomMultiCropDataset(
-            args.data_path,
-            args.domains,
-            args.dataset_name,
-            args.size_crops,
-            args.nmb_crops,
-            args.min_scale_crops,
-            args.max_scale_crops,
-            args.standardize_ds_size,
-            args.seed,
-            **args.dataset_kwargs
-        )
-    else:
-        train_dataset = MultiCropDataset( # Imagenet
-            args.data_path,
-            args.size_crops,
-            args.nmb_crops,
-            args.min_scale_crops,
-            args.max_scale_crops,
-            args.standardize_ds_size,
-            args.standardize_to,
-            args.seed
-        )
+    train_dataset = CustomSplitMultiCropDataset(
+        args.data_path,
+        args.dataset_name,
+        args.size_crops,
+        args.nmb_crops,
+        args.min_scale_crops,
+        args.max_scale_crops,
+        args.seed,
+        args.dataset_kwargs
+    )
 
     sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
