@@ -82,11 +82,14 @@ def config_run(args, kwargs, config_path, run_name, group_name, project_name,
     run_job(cmd, job_name, args)
 
 
-def linprobe_run(args, rel_config_path, job_name, train_index, test_indices, num_reg_values=50):
+def linprobe_run(args, rel_config_path, job_name, train_index, test_indices, num_reg_values=50,
+                 extract_features_kwargs={}):
     feature_save_path = args.log_dir + '/extract_features/' + job_name + '.pkl'
     probe_stats_save_path = args.log_dir + '/linear_probe_sk/' + job_name + '.tsv'
     code_path = args.code_dir + '/extract_features.py'
-    kwargs = {'config': args.config_dir + '/' + rel_config_path, 'save_path': feature_save_path}
+    kwargs = deepcopy(extract_features_kwargs)
+    kwargs['config'] = args.config_dir + '/' + rel_config_path
+    kwargs['save_path'] = feature_save_path
     extract_cmd = get_python_cmd(code_path=code_path, python_path=args.python_path, kwargs=kwargs)
     code_path = args.code_dir + '/log_reg_sk.py'
     kwargs = {
@@ -96,6 +99,37 @@ def linprobe_run(args, rel_config_path, job_name, train_index, test_indices, num
     log_reg_cmd =  get_python_cmd(code_path=code_path, python_path=args.python_path, kwargs=kwargs)
     cmd = extract_cmd + ' && ' + log_reg_cmd 
     run_job(cmd, job_name, args)
+
+# FMOW.
+
+def fmow_run(args, lr, seed, group_suffix, pretrain='moco'):
+    run_name = str(lr) + '_' + str(seed)
+    kwargs = {'optimizer.args.lr': lr, 'seed': seed}
+    copy_cmd = f'source {args.scripts_dir}/copy_local.sh /u/scr/nlp/wilds/data/fmow_v1.1.tar.gz wilds/data'
+    config_path = 'wilds/fmow_' + pretrain + '_ft_noaugment.yaml'
+    group_name = 'fmow_' + pretrain + '_ft_noaugment_' + group_suffix
+    config_run(
+        args=args, kwargs=kwargs, config_path=config_path,
+        run_name=run_name, group_name=group_name, project_name='fmow',
+        dataset_copy_cmd=copy_cmd)
+
+
+def fmow_moco_ft_noaugment_sweep(args):
+    for lr in [1e-4, 3e-4, 0.001, 0.003, 0.01, 0.03]:
+        fmow_run(args=args, lr=lr, seed=args.seed, group_suffix='sweep')
+
+
+def fmow_mocotp_ft_noaugment_sweep(args):
+    for lr in [1e-4, 3e-4, 0.001, 0.003, 0.01, 0.03]:
+        fmow_run(args=args, lr=lr, seed=args.seed, group_suffix='sweep', pretrain='mocotp')
+
+
+def fmow_moco_ft_noaugment_replication(args):
+    for i in range(1,6):
+        fmow_run(args=args, lr=None, seed=args.seed+i, group_suffix='sweep')
+
+
+# Breeds.
 
 
 def e30_moco_ft_augment_sweep_run(args, lr):
@@ -361,11 +395,31 @@ def landcover_from_africa_linprobe(args):
         train_index=2, test_indices=[0,1,2,3], num_reg_values=100)
 
 
+def fmow_moco_linprobe(args):
+    linprobe_run(
+        args, rel_config_path='extract_features/fmow_moco.yaml',
+        job_name='fmow_moco_linprobe',
+        train_index=0, test_indices=list(range(11)), num_reg_values=40)
+
+
+def fmow_mocotp_linprobe(args):
+    extract_features_kwargs = {
+        'config_paths': args.log_dir+'/fmow_mocotp_ft_noaugment_sweep/0.01_0/config.json',
+        'checkpoint_paths': args.log_dir+'/fmow_mocotp_ft_noaugment_sweep/0.01_0/checkpoints/ckp_0',
+    }
+    linprobe_run(
+        args, rel_config_path='extract_features/fmow_moco.yaml',
+        job_name='fmow_mocotp_linprobe',
+        train_index=0, test_indices=list(range(11)), num_reg_values=40,
+        extract_features_kwargs=extract_features_kwargs)
+
+
+
 def spray_dataset_jags(copy_cmd):
     for i in range(10, 30):
         cmd = f'sbatch -p jag-lo --cpus-per-task=1 --gres=gpu:0 --mem=4G --nodelist=jagupard{i} ' +\
-              f'scripts/run_sbatch.sh "{copy+cmd}"'
-        subprocess.run(cmd)
+              f'scripts/run_sbatch.sh "{copy_cmd}"'
+        subprocess.run(cmd, shell=True)
 
 
 def spray_fmow_jags(args):
@@ -382,6 +436,8 @@ def main(args):
     experiment_to_fns = {
         'spray_fmow_jags': spray_fmow_jags,
         'spray_imagenet_jags': spray_imagenet_jags,
+        'fmow_moco_ft_noaugment_sweep': fmow_moco_ft_noaugment_sweep,
+        'fmow_moco_ft_noaugment_replication': fmow_moco_ft_noaugment_replication,
         'e30_moco_ft_augment_sweep': e30_moco_ft_augment_sweep,
         'e30_moco_ft_augment_replication': e30_moco_ft_augment_replication,
         'l17_moco_ft_augment_sweep': l17_moco_ft_augment_sweep,
@@ -405,6 +461,9 @@ def main(args):
         'landcover_from_africa_scratch_replication': landcover_from_africa_scratch_replication,
         'landcover_from_africa_probe_sweep': landcover_from_africa_probe_sweep,
         'landcover_from_africa_probe_replication': landcover_from_africa_probe_replication,
+        'fmow_moco_linprobe': fmow_moco_linprobe,
+        'fmow_mocotp_linprobe': fmow_mocotp_linprobe,
+        'fmow_mocotp_ft_noaugment_sweep': fmow_mocotp_ft_noaugment_sweep,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)

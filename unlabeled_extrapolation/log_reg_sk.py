@@ -31,7 +31,7 @@ def normalize_features(features, normalize_index):
 def test_log_reg_warm_starting(features, labels, source_idx, test_indices, num_cs=100):
     M, L = len(features), len(features[0])
     m = 0
-    Cs = np.logspace(-7, 7, num_cs)
+    Cs = np.logspace(-7, 2, num_cs)
     clf = LogisticRegression(random_state=0, warm_start=True, max_iter=200)
     #.fit(features[m][source_idx], labels[m][source_idx])
     accs = []
@@ -43,7 +43,7 @@ def test_log_reg_warm_starting(features, labels, source_idx, test_indices, num_c
             cur_preds = clf.predict(features[m][l])
             cur_acc = get_acc(cur_preds, labels[m][l])
             cur_accs.append(cur_acc)
-        print(cur_accs)
+        print(cur_accs, flush=True)
         accs.append(cur_accs)
     return clf, accs
 

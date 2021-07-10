@@ -46,7 +46,7 @@ else
     echo "Unsupported dataset $dataset_name"
     exit 1
 fi
-dst_folder=/scr/scr-with-most-space/$dataset_name
+dst_folder=/scr/biggest/$dataset_name
 
 while true; do
     case $1 in

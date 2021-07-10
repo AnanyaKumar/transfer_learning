@@ -50,9 +50,11 @@ def get_test_stats(config, net, test_loader, criterion, device, max_examples=flo
             images, labels = data
             outputs = net(images)
             _, predicted = torch.max(outputs.data, dim=1)
-            val_acc.add_values((predicted == labels).tolist())
-            loss = criterion(outputs, labels)
-            val_loss.add_value(loss.tolist())
+            correct = (predicted == labels).cpu()
+            val_acc.add_values(correct.tolist())
+            loss = criterion(outputs, labels).cpu()
+            loss_list = loss.tolist()
+            val_loss.add_value(loss_list)
             num_examples += len(images)
             if num_examples >= max_examples:
                 logging.info("Breaking after %d examples.", num_examples)
@@ -199,6 +201,7 @@ def get_all_test_stats(epoch, test_loaders, max_test_examples, config, net, crit
                    loss_name_prefix, acc_name_prefix):
     stats = {'epoch': epoch}
     for name, test_loader in test_loaders.items():
+        logging.info(f'testing {name}')
         max_examples = float('infinity')
         if name in max_test_examples:
             max_examples = max_test_examples[name]
@@ -280,8 +283,8 @@ def main(config, log_dir, checkpoints_dir):
             prev_ckp_path = checkpoints_dir / cur_ckp_filename
         # One epoch of model training.
         train_stats = train(
-            epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
-            test_loaders, max_test_examples)      
+           epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
+           test_loaders, max_test_examples) 
         scheduler.step()
         # Get test stats across all test sets.
         test_stats = get_all_test_stats(

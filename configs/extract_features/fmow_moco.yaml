@@ -1,0 +1,71 @@
+
+batch_size: 64
+num_workers: 2
+use_cuda: True
+save_path: '/u/scr/ananya/cifar_experiments/unlabeled_extrapolation/logs/extract_features/fmow_moco'
+
+config_paths:
+  - '/u/scr/ananya/cifar_experiments/unlabeled_extrapolation/logs/fmow_moco_ft_noaugment_sweep/0.01_0/config.json'
+
+checkpoint_paths:
+  - '/u/scr/ananya/cifar_experiments/unlabeled_extrapolation/logs/fmow_moco_ft_noaugment_sweep/0.01_0/checkpoints/ckp_0'
+
+model_names:
+  - 'resnet50'
+
+loader_names:
+  - 'americas-train'
+  - 'oceania-val'
+  - 'asia-val'
+  - 'europe-val'
+  - 'africa-val'
+  - 'americas-val'
+  - 'oceania-val-future'
+  - 'asia-val-future'
+  - 'europe-val-future'
+  - 'africa-val-future'
+  - 'americas-val-future'
+
+
+split_names:
+  - 'train'
+  - 'val'
+  - 'val'
+  - 'val'
+  - 'val'
+  - 'val'
+  - 'ood_val'
+  - 'ood_val'
+  - 'ood_val'
+  - 'ood_val'
+  - 'ood_val'
+
+
+split_arg_names:
+  - 'split'
+  - 'split'
+  - 'split'
+  - 'split'
+  - 'split'
+  - 'split'
+  - 'split'
+  - 'split'
+  - 'split'
+  - 'split'
+  - 'split'
+
+
+# Relative to the config file in the first config path in config_paths.
+loader_indices:
+  - 4
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9 
+
