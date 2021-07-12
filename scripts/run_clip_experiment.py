@@ -12,8 +12,10 @@ from unlabeled_extrapolation.datasets.domainnet import DomainNet
 
 
 DOMAINNET_ROOT = '/scr/biggest/domainnet'
-MODELS = ['RN50', 'RN101', 'RN50x4', 'ViT-B/32']
+DOMAINNET_CLASSNAMES_FILE = '/u/scr/nlp/domainnet/SENTRY_splits/classnames.txt'
 DOMAINS = ['real', 'clipart', 'painting', 'sketch']
+EXPERIMENT_TYPES = ['linear-probe', 'zero-shot']
+MODELS = ['RN50', 'RN101', 'RN50x4', 'ViT-B/32']
 
 
 def get_features(dataset, model):
@@ -32,7 +34,12 @@ def get_features(dataset, model):
     return features, labels
 
 
-def run_exp(model_name, C, num_selftrain_iters):
+def load_classnames():
+    with open(DOMAINNET_CLASSNAMES_FILE, 'r') as classnames_file:
+        return [classname.strip() for classname in classnames_file]
+
+
+def linear_probe(model_name, C, num_selftrain_iters):
     # Load the model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model, preprocess = clip.load(model_name, device)
@@ -61,9 +68,7 @@ def run_exp(model_name, C, num_selftrain_iters):
             for selftrain_iter in range(num_selftrain_iters + 1):
                 test_features, test_labels = test_features_labels[target_domain]
                 preds = classifier.predict(test_features)
-                cm = confusion_matrix(test_labels, preds)
-                per_class_correct = np.diag(cm)
-                per_class_avg_acc = np.mean(per_class_correct / cm.sum(axis=1))
+                per_class_avg_acc = compute_per_class_avg_acc(preds, test_labels)
                 accuracies.append(per_class_avg_acc)
                 if selftrain_iter < num_selftrain_iters:
                     target_features, _ = train_features_labels[target_domain]
@@ -90,8 +95,54 @@ def run_exp(model_name, C, num_selftrain_iters):
     print(transfer_accs.to_string(index=False))
 
 
+def compute_per_class_avg_acc(preds, labels):
+    cm = confusion_matrix(labels, preds)
+    per_class_correct = np.diag(cm)
+    return np.mean(per_class_correct / cm.sum(axis=1))
+
+
+def zero_shot(model_name):
+    # Load the model
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model, preprocess = clip.load(model_name, device)
+    print(f'Running experiments for model {model_name}')
+    classnames = load_classnames()
+    text_inputs = torch.cat(
+        [clip.tokenize(f"a photo of a {c}") for c in classnames]
+    ).to(device)
+
+    with torch.no_grad():
+        text_features = model.encode_text(text_inputs)
+        text_features /= text_features.norm(dim=-1, keepdim=True)
+
+    with torch.no_grad():
+        for domain in DOMAINS:
+            dataset = DomainNet(domain, split='test', root=DOMAINNET_ROOT,
+                                transform=preprocess)
+            all_preds = []
+            all_labels = []
+            for images, labels in tqdm(DataLoader(dataset, batch_size=128)):
+                # Calculate features
+                with torch.no_grad():
+                    image_features = model.encode_image(images)
+                # Pick the top 5 most similar labels for the image
+                image_features /= image_features.norm(dim=-1, keepdim=True)
+                logits = 100 * image_features @ text_features.T
+                sim = logits.softmax(dim=-1)
+                preds = sim.argmax(dim=-1).cpu()
+                all_preds.append(preds)
+                all_labels.append(labels)
+
+            preds = torch.cat(all_preds).numpy()
+            labels = torch.cat(all_labels).numpy()
+            per_class_avg_acc = 100. * compute_per_class_avg_acc(preds, labels)
+            print(f'Per-Class Avg. Acc. for {domain}: {per_class_avg_acc}')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run CLIP DA Experiments')
+    parser.add_argument('experiment_type', type=str, choices=EXPERIMENT_TYPES,
+                        help='Experiment to run')
     parser.add_argument('model', type=str, choices=MODELS + ['all'],
                         help='CLIP Model')
     parser.add_argument('--C', default=0.316, type=float,
@@ -100,8 +151,15 @@ if __name__ == '__main__':
                         help='Number of self-training iterations')
 
     args = parser.parse_args()
-    if args.model == 'all':
-        for model_name in MODELS:
-            run_exp(model_name, args.C, args.num_selftrain_iters)
-    else:
-        run_exp(args.model, args.C, args.num_selftrain_iters)
+    if args.experiment_type == 'linear-probe':
+        if args.model == 'all':
+            for model_name in MODELS:
+                linear_probe(model_name, args.C, args.num_selftrain_iters)
+        else:
+            linear_probe(args.model, args.C, args.num_selftrain_iters)
+    elif args.experiment_type == 'zero-shot':
+        if args.model == 'all':
+            for model_name in MODELS:
+                zero_shot(model_name)
+        else:
+            zero_shot(args.model)
