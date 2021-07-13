@@ -212,7 +212,7 @@ GLOBAL_DOMAINNET_PATH=/u/scr/nlp/domainnet/domainnet.zip
 DATASET_PATH=${LOCAL_DOMAINNET_PATH}
 echo "Using DomainNet data from $DATASET_PATH"
 experiment_name="domainnet_source${source}_target${target}"
-experiment_name+="_sourceamount${source_amount}_targetamount${target_amount})_relatedamount${related_amount}"
+experiment_name+="_sourceamount${source_amount}_targetamount${target_amount}_relatedamount${related_amount}"
 experiment_name+="_queue${queue_start}_epochs${epochs}"
 experiment_name+="_batchsize${batch_size}"
 experiment_name+="_epsilon${epsilon}_arch$arch"
