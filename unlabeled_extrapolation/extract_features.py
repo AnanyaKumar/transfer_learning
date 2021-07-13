@@ -76,10 +76,18 @@ def get_model_representations(
     batch_size=64, num_workers=2, use_cuda=True):
     M, L = len(model_names), len(loader_names)
     models = []
-    with open(config_paths[0]) as f:
-        config = json.load(f)
-    for m in range(M):
-        models.append(load_model(config_paths[m], checkpoint_paths[m], use_cuda=use_cuda))
+    if not type(config_paths) == list:
+    # If not a list, then just use the specified config_path and checkpoint path
+        if M > 1:
+            raise ValueError('Only specified one config path but > 1 models, see config_paths.')
+        with open(config_paths) as f:
+            config = json.load(f)
+        models.append(load_model(config_paths, checkpoint_paths, use_cuda=use_cuda))
+    else:
+        with open(config_paths[0]) as f:
+            config = json.load(f)
+        for m in range(M):
+            models.append(load_model(config_paths[m], checkpoint_paths[m], use_cuda=use_cuda))
 
     loaders = []
     for l in range(L):

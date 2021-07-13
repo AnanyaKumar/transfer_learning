@@ -1,0 +1,20 @@
+
+inherit:
+  - wilds_transfer.yaml 
+  - datasets_fmow_noaugment.yaml
+
+num_classes: 62
+epochs: &epochs 50
+
+model:
+  classname: models.imnet_resnet.ResNet50
+  args:
+    pretrained: True
+    pretrain_style: 'mocov2'
+    checkpoint_path: '/u/scr/ananya/simclr_weights/moco_checkpoint_0200.pth.tar'
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
+

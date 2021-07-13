@@ -26,12 +26,6 @@ default_test_transforms:
           std: [0.229, 0.224, 0.225]
 
 test_datasets:
-    - name: 'oceania_val'
-      classname: datasets.fmow.Fmow
-      args:
-          split: 'val'
-          regions: [4]
-          root: 'wilds/data'
     - name: 'asia_val'
       classname: datasets.fmow.Fmow
       args:
@@ -54,36 +48,6 @@ test_datasets:
       classname: datasets.fmow.Fmow
       args:
           split: 'val'
-          regions: [3]
-          root: 'wilds/data'
-    - name: 'oceania_val_future'
-      classname: datasets.fmow.Fmow
-      args:
-          split: 'ood_val'
-          regions: [4]
-          root: 'wilds/data'
-    - name: 'asia_val_future'
-      classname: datasets.fmow.Fmow
-      args:
-          split: 'ood_val'
-          regions: [0]
-          root: 'wilds/data'
-    - name: 'europe_val_future'
-      classname: datasets.fmow.Fmow
-      args:
-          split: 'ood_val'
-          regions: [1]
-          root: 'wilds/data'
-    - name: 'africa_val_future'
-      classname: datasets.fmow.Fmow
-      args:
-          split: 'ood_val'
-          regions: [2]
-          root: 'wilds/data'
-    - name: 'americas_val_future'
-      classname: datasets.fmow.Fmow
-      args:
-          split: 'ood_val'
           regions: [3]
           root: 'wilds/data'
 
