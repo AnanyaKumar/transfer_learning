@@ -123,8 +123,8 @@ elif [ "$dataset_name" = domainnet ]; then
         echo "Copying DomainNet files to $dst_folder"
         cp $dataset_src $dst_folder
         unzip -q $dst_folder/domainnet.zip -d $dst_folder
+        setfacl -Rm $ACL_STRING $dst_folder
     fi
 fi
 
-setfacl -Rm $ACL_STRING $dst_folder
 

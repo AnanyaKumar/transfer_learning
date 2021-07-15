@@ -1,14 +1,73 @@
 import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
+import numpy as np
+import cv2
 
 import os
-from PIL import Image, ImageFilter
-import random
+from PIL import Image
 
 from . import breeds, domainnet
 VALID_BREEDS_DOMAINS = breeds.BREEDS_SPLITS_TO_FUNC.keys()
 VALID_DOMAINNET_DOMAINS = domainnet.SENTRY_DOMAINS
+
+#########################
+#### DATA AUG STUFF #####
+#########################
+
+def get_transforms(transform_scheme):
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+    if transform_scheme == 'imagenet':
+        transform = transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ])
+    elif transform_scheme == 'simclr':
+        # adapted from
+        # https://github.com/PyTorchLightning/Lightning-Bolts/blob/master/pl_bolts/models/self_supervised/simclr/transforms.py
+        size = 224
+        kernel_size = int(0.1 * size)
+        if kernel_size % 2 == 0:
+            kernel_size += 1
+        transform = transforms.Compose([
+            transforms.RandomResizedCrop(size),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomApply([
+                transforms.ColorJitter(0.8, 0.8, 0.8, 0.2)
+            ], p=0.8),
+            transforms.RandomGrayscale(p=0.2),
+            GaussianBlur(kernel_size=kernel_size, p=0.5),
+            transforms.ToTensor(),
+        ])
+    else:
+        raise ValueError('Transformation scheme not supported')
+    return transform
+
+class GaussianBlur(object):
+    # Implements Gaussian blur as described in the SimCLR paper
+    # https://github.com/PyTorchLightning/Lightning-Bolts/blob/master/pl_bolts/models/self_supervised/simclr/transforms.py
+    def __init__(self, kernel_size, p=0.5, min=0.1, max=2.0):
+        self.min = min
+        self.max = max
+
+        # kernel size is set to be 10% of the image height/width
+        self.kernel_size = kernel_size
+        self.p = p
+
+    def __call__(self, sample):
+        sample = np.array(sample)
+
+        # blur the image with a 50% chance
+        prob = np.random.random_sample()
+
+        if prob < self.p:
+            sigma = (self.max - self.min) * np.random.random_sample() + self.min
+            sample = cv2.GaussianBlur(sample, (self.kernel_size, self.kernel_size), sigma)
+
+        return sample
 
 #####################
 ### DATASET STUFF ###
@@ -27,7 +86,7 @@ def validate_dataset(dataset_name, source, target):
             'living17': 17
         }[source]
     elif dataset_name == 'domainnet':
-        if source not in VALID_DOMAINNET_DOMAINS or target not in VALID_DOMAINNET_DOMAINS:
+        if (source not in VALID_DOMAINNET_DOMAINS) or (target not in VALID_DOMAINNET_DOMAINS):
             raise ValueError(f'Valid DomainNet domains are {VALID_DOMAINNET_DOMAINS} but '
                              f'received source {source} and target {target}.')
         if source == target:
@@ -69,46 +128,7 @@ class DomainClassificationDataset(Dataset):
 
 def filter_to_single_class(dataset, class_to_use, data_attr_name):
     setattr(dataset, data_attr_name,
-            list(filter(lambda item: item[1] == class_to_use, getattr(dataset, data_attr_name))))
-
-def get_transforms(args):
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    if args.transform == 'imagenet':
-        transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
-        ])
-    elif args.transform == 'simclr':
-        # adapted from
-        # https://github.com/facebookresearch/moco/blob/master/main_moco.py
-        transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
-            ], p=0.8),
-            transforms.RandomGrayscale(p=0.2),
-            transforms.RandomApply([GaussianBlur([.1, 2.])], p=0.5),
-            transforms.ToTensor(),
-            normalize
-        ])
-    else:
-        raise ValueError('Transformation scheme not supported')
-    return transform
-
-class GaussianBlur(object):
-    """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
-
-    def __init__(self, sigma=[.1, 2.]):
-        self.sigma = sigma
-
-    def __call__(self, x):
-        sigma = random.uniform(self.sigma[0], self.sigma[1])
-        x = x.filter(ImageFilter.GaussianBlur(radius=sigma))
-        return x
+            list(filter(lambda item: int(item[1]) == class_to_use, getattr(dataset, data_attr_name))))
 
 def get_class_datasets(dataset_name, domain_name, class_1, class_2, transform,
                        data_path, use_source):
@@ -168,6 +188,19 @@ def get_domain_datasets(dataset_name, source, target, data_path, class_idx, tran
 ######################
 ### TRAINING STUFF ###
 ######################
+
+def get_classes_to_compare(num_classes, num, seed):
+    prng = np.random.RandomState(seed)
+    classes = []
+    class_1, class_2 = None, None # for proper scope
+    for _ in range(num):
+        while True:
+            class_1, class_2 = prng.choice(num_classes, size=2, replace=False)
+            curr_pair = sorted([class_1, class_2])
+            if curr_pair not in classes:
+                classes.append(curr_pair)
+                break
+    return classes
 
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""

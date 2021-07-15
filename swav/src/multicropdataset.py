@@ -114,6 +114,7 @@ class CustomSplitDataset(Dataset):
             if related_amount > 0:
                 # identify all non-target domains
                 non_target_domains = list(set(SENTRY_DOMAINS) - set([target_domain]))
+                non_target_domains = ','.join(non_target_domains)
                 # collect all DomainNet non-target images
                 non_target_domainnet = DomainNet(non_target_domains, root=data_path,
                                           split='train', version='sentry')

@@ -1,5 +1,4 @@
 import argparse
-from multiprocessing import Value
 import os
 import torch
 from torch import nn
@@ -14,7 +13,7 @@ from unlabeled_extrapolation.models.imnet_resnet import ResNet50
 NORMALIZE = transforms.Normalize(
     mean=[0.485, 0.456, 0.406], std=[0.228, 0.224, 0.225]
 )
-# TODO: same for DomainNet as well?
+# TODO: check if ok to do the same for DomainNet as well
 TRANSFORM = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
@@ -26,43 +25,31 @@ TRANSFORM = transforms.Compose([
 import unlabeled_extrapolation.datasets.breeds as breeds
 BREEDS_ROOT = '/scr/biggest/imagenet'
 VALID_BREEDS_TASKS = breeds.BREEDS_SPLITS_TO_FUNC.keys()
-BREEDS_NUM_CLASSES_DICT = {
-    'entity30': 30,
-    'living17': 17
-}
 
 # DomainNet-specific values
 import unlabeled_extrapolation.datasets.domainnet as domainnet
-VALID_DOMAINNET_DOMAINS = domainnet.VALID_SENTRY_DOMAINS
-DOMAINNET_NUM_CLASSES = domainnet.NUM_CLASSES_DICT['sentry']
+VALID_DOMAINNET_DOMAINS = domainnet.SENTRY_DOMAINS
+DOMAINNET_ROOT = '/scr/biggest/domainnet'
 
-def load_model(ckpt_path, args):
+
+def load_model(args):
+    ckpt_path = os.path.join(args.run_dir, 'checkpoints', args.ckpt_name)
     model = ResNet50(pretrained=True, pretrain_style='swav', checkpoint_path=ckpt_path)
-    num_classes = get_num_classes(args)
-    model.new_last_layer(num_classes)
     return model
 
 
-def get_num_classes(args):
-    if args.dataset == 'breeds':
-        return BREEDS_NUM_CLASSES_DICT[args.dataset_name]
-    elif args.dataset == 'domainnet':
-        return DOMAINNET_NUM_CLASSES
-    else:
-        raise ValueError(f'Currently, only Breeds and DomainNet are supported, but received {args.dataset}.')
-
-
-def get_data_loader(dataset, source, target, use_source, split,
+def get_data_loader(dataset, source, target, use_source, use_train,
                     batch_size=64, num_workers=2):
     if dataset == 'breeds':
         ds = breeds.Breeds(root=BREEDS_ROOT, breeds_name=source, source=use_source,
-            target=(not use_source), split=split, transform=TRANSFORM)
+                           target=(not use_source), split=('train' if use_train else 'val'),
+                           transform=TRANSFORM)
     elif dataset == 'domainnet':
         domain_to_use = source if use_source else target
-        ds = domainnet.DomainNet(domain_to_use, split=split, version='sentry')
-    loader = torch.utils.data.DataLoader(
-        ds, batch_size=batch_size,
-        shuffle=False, num_workers=num_workers)
+        ds = domainnet.DomainNet(domain_to_use, split=('train' if use_train else 'test'),
+                                 version='sentry', root=DOMAINNET_ROOT, transform=TRANSFORM)
+    loader = torch.utils.data.DataLoader(ds, batch_size=batch_size,
+                                         shuffle=False, num_workers=num_workers)
     return loader
 
 
@@ -89,24 +76,16 @@ def get_acc(preds, labels):
     return np.mean(preds == labels)
 
 
-# Given a network how to get representations
 def get_model_representations(args):
-    model = load_model(args.checkpoint_path, args)
-
-    source_train_loader = get_data_loader(args.dataset, args.source, args.target, True, 'train',
-                                          args.batch_size, args.num_workers)
-    target_train_loader = get_data_loader(args.dataset, args.source, args.target, False, 'train',
-                                          args.batch_size, args.num_workers)
-    source_test_loader = get_data_loader(args.dataset, args.source, args.target, True, 'val',
-                                         args.batch_size, args.num_workers)
-    target_test_loader = get_data_loader(args.dataset, args.source, args.target, False, 'val',
-                                         args.batch_size, args.num_workers)
-
-    features, labels = [None] * 4, [None] * 4
-    features[0], labels[0] = get_features_labels(model, source_train_loader, use_cuda=args.use_cuda) 
-    features[1], labels[1] = get_features_labels(model, target_train_loader, use_cuda=args.use_cuda) 
-    features[2], labels[2] = get_features_labels(model, source_test_loader, use_cuda=args.use_cuda) 
-    features[3], labels[3] = get_features_labels(model, target_test_loader, use_cuda=args.use_cuda) 
+    model = load_model(args)
+    features, labels = [], []
+    for use_train in [True, False]:
+        for use_source in [True, False]:
+            loader = get_data_loader(args.dataset, args.source, args.target, use_source, use_train,
+                                     args.batch_size, args.num_workers)
+            feature, label = get_features_labels(model, loader, use_cuda=args.use_cuda) 
+            features.append(feature)
+            labels.append(label)
     return features, labels
 
 
@@ -116,8 +95,10 @@ def main():
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
     parser.add_argument('--num_workers', type=int, default=2, help='Number of workers.')
     parser.add_argument('--no_cuda', action='store_true', help='If set, will use CPU.')
-    parser.add_argument('--checkpoint_path', type=str, required=True,
-                        help='The saved model checkpoint to use.')
+    parser.add_argument('--run_dir', type=str, required=True,
+                        help='The (outer) run directory to use.')
+    parser.add_argument('--ckpt_name', type=str, required=True,
+                        help='The name of the checkpoint in the checkpoints/ folder.')
     parser.add_argument('--dataset', type=str, required=True,
                         help='Dataset on which to calculate features.')
     parser.add_argument('--source', type=str,
@@ -126,21 +107,26 @@ def main():
                         help='If using DomainNet, the target domain to use.')
     args = parser.parse_args()
 
+    save_path = os.path.join(args.run_dir, 'finetuning', 'features_and_labels.pickle')
+    if os.path.exists(save_path):
+        print(f'Feature/pickles exist already at {save_path}. Exiting...')
+        exit(0)
+    os.makedirs(os.dirname(save_path), exist_ok=True)
+
     args.use_cuda = not args.no_cuda
     if args.dataset == 'breeds':
         if args.source not in VALID_BREEDS_TASKS:
             raise ValueError(f'Invalid Breeds task name: provided {args.source}.')
-        if args.target != args.source:
+        if (args.target is not None) and (args.target != args.source):
             print('Breeds uses the same task for source and target; overwriting target arg with source.')
-            args.target = args.source
-    if args.dataset == 'domainnet':
-        if args.source not in VALID_DOMAINNET_DOMAINS or args.target not in VALID_DOMAINNET_DOMAINS:
+        args.target = args.source
+    elif args.dataset == 'domainnet':
+        if (args.source not in VALID_DOMAINNET_DOMAINS) or (args.target not in VALID_DOMAINNET_DOMAINS):
             raise ValueError(f'Invalid DomainNet domain name: provided source {args.source} and target {args.target}.')
     else:
         raise ValueError(f'The dataset {args.dataset} is not currently supported.')
 
     features, labels = get_model_representations(args)
-    save_path = os.path.join(args.checkpoint_dir, 'features_and_labels.pickle')
     pickle.dump((features, labels, args), open(save_path, 'wb'))
 
 
