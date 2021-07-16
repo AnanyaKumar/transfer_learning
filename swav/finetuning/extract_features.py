@@ -13,7 +13,6 @@ from unlabeled_extrapolation.models.imnet_resnet import ResNet50
 NORMALIZE = transforms.Normalize(
     mean=[0.485, 0.456, 0.406], std=[0.228, 0.224, 0.225]
 )
-# TODO: check if ok to do the same for DomainNet as well
 TRANSFORM = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),

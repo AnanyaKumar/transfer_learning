@@ -9,6 +9,7 @@ import random
 import os
 
 from unlabeled_extrapolation.datasets.connectivity_utils import *
+from unlabeled_extrapolation.models.imnet_resnet import ResNet50
 
 import argparse
 parser = argparse.ArgumentParser(description='Test Connectivity of dataset',
@@ -40,14 +41,24 @@ parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float, dest='we
 parser.add_argument('--save-freq', type=int, default=25, help='How often to save')
 parser.add_argument('--print-freq', type=int, default=5, help='How often to print')
 
+# frozen for linear probing
+parser.add_argument('--swav_dir', type=str,
+                    help='If provided, will use the checkpoint in this directory.')
+parser.add_argument('--swav_ckpt', type=str,
+                    help='The name of the checkpoint to use.')
+
 def main(args):
     num_classes = validate_dataset(args.dataset_name, args.source, args.target)
-    transform = get_transforms(args)
+    transform = get_transforms(args.transform)
+    args.linear_probe = (args.swav_dir is not None) and (args.swav_ckpt is not None)
     save_dir = os.path.join(
         'connectivity_checkpoints',
         f'{args.source}-{args.target}',
         f'{args.test_between}-{args.transform}'
     )
+    if args.linear_probe:
+        save_dir += f'-{args.swav_dir}-{args.swav_ckpt}'
+    os.makedirs(save_dir, exist_ok=True)
     if args.test_between == 'classes':
         class_pairs = get_classes_to_compare(num_classes, args.num_iters, args.seed)
         for class_1, class_2 in class_pairs:
@@ -74,9 +85,17 @@ def main_loop(train_ds, test_ds, save_dir, identifier, args):
         print(f'Already completed {base_file_name}, skipping...')
         return
 
-    # get model
-    model = models.__dict__[args.arch](num_classes=2)
-    model = model.cuda()
+    if args.linear_probe:
+        # only allow the last FC layer to be trainable
+        ckpt_path = os.path.join(args.swav_dir, 'checkpoints', args.swav_ckpt)
+        model = ResNet50(pretrained=True, pretrain_style='swav', checkpoint_path=ckpt_path)
+        model.set_requires_grad(False)
+        model.new_last_layer(num_classes=2)
+        model.get_last_layer().requires_grad = True
+        model.cuda()
+    else:
+        model = models.__dict__[args.arch](num_classes=2)
+        model = model.cuda()
 
     # get objective, optimizer, lr scheduler
     criterion = nn.CrossEntropyLoss().cuda()
