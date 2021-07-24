@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 import pathlib
+from RandAugment import RandAugment
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
 from torch.utils.data import DataLoader
@@ -39,7 +40,17 @@ def load_classnames():
         return [classname.strip() for classname in classnames_file]
 
 
-def linear_probe(model_name, C, num_selftrain_iters):
+def init_optimizer(args, model, predictor):
+    optimizer_class = getattr(torch.optim, args.optimizer_name)
+    optimizer_args = [{'params': predictor.parameters(), 'lr': args.lr}]
+    if not args.freeze:
+        optimizer_args.append(
+            {'params': model.visual.parameters(), 'lr': args.encoder_lr}
+        )
+    return optimizer_class(optimizer_args, **args.optimizer_kwargs)
+
+
+def linear_probe(args):
     # Load the model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model, preprocess = clip.load(model_name, device)
@@ -103,6 +114,7 @@ def compute_per_class_avg_acc(preds, labels):
 
 def zero_shot(model_name):
     # Load the model
+    model_name = args.model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model, preprocess = clip.load(model_name, device)
     print(f'Running experiments for model {model_name}')
@@ -137,24 +149,142 @@ def zero_shot(model_name):
             labels = torch.cat(all_labels).numpy()
             per_class_avg_acc = 100. * compute_per_class_avg_acc(preds, labels)
             print(f'Per-Class Avg. Acc. for {domain}: {per_class_avg_acc}')
+            # print(confusion_matrix(labels, preds))
+            print(f'Accuracy for {domain}: {np.mean(preds == labels)}')
+            return
+
+
+def finetune(args):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model_name = args.model
+    print(f'Running experiments for model {model_name}')
+    columns = ['SourceDomain', 'TargetDomain', 'AvgPerClassAcc']
+    df = pd.DataFrame(columns=columns)
+    embed_dim = EMBEDDING_DIMS[model_name]
+    loss = torch.nn.CrossEntropyLoss()
+    for src_domain in DOMAINS:
+        model, preprocess = clip.load(model_name, device, jit=False)
+        if args.randaugment_M > 0 and args.randaugment_N > 0:
+            augment = RandAugment(args.randaugment_M, args.randaugment_N)
+            preprocess.transforms.insert(0, augment)
+
+        model.train()
+        model.float()
+        train_dataset = DomainNet(src_domain, root=DOMAINNET_ROOT,
+                                  transform=preprocess)
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size,
+                                  shuffle=True)
+        num_classes = train_dataset.get_num_classes()
+        classifier = torch.nn.Linear(embed_dim, num_classes).to(device)
+        optimizer = init_optimizer(args, model, classifier)
+        for epoch in range(args.epochs):
+            print(f'Epoch {epoch}')
+            total_loss = 0.
+            for images, labels in tqdm(train_loader):
+                optimizer.zero_grad()
+                images = images.to(device)
+                labels = labels.to(device)
+                if args.freeze:
+                    with torch.no_grad():
+                        embeddings = model.encode_image(images)
+                        embeddings = embeddings / embeddings.norm(dim=-1, keepdim=True)
+                else:
+                    embeddings = model.encode_image(images)
+                    embeddings = embeddings / embeddings.norm(dim=-1, keepdim=True)
+                batch_loss = loss(classifier(embeddings), labels)
+                total_loss += batch_loss.item()
+                batch_loss.backward()
+                optimizer.step()
+            print(f'Average loss: {total_loss / len(train_loader)}')
+
+        model.eval()
+        for tgt_domain in DOMAINS:
+            target_dataset = DomainNet(tgt_domain, split='test',
+                                       root=DOMAINNET_ROOT,
+                                       transform=preprocess)
+            target_loader = DataLoader(target_dataset, args.batch_size)
+            all_preds = []
+            all_labels = []
+            for images, labels in tqdm(target_loader):
+                images = images.to(device)
+                with torch.no_grad():
+                    embeddings = model.encode_image(images)
+                    embeddings /= embeddings.norm(dim=-1, keepdim=True)
+                    logits = classifier(embeddings)
+                preds = logits.argmax(dim=-1).cpu()
+                all_preds.append(preds)
+                all_labels.append(labels)
+            preds = torch.cat(all_preds).numpy()
+            labels = torch.cat(all_labels).numpy()
+            per_cls_avg_acc = compute_per_class_avg_acc(preds, labels)
+            print(f'{src_domain} -> {tgt_domain}: {per_cls_avg_acc}')
+            df.loc[len(df)] = [src_domain, tgt_domain, per_cls_avg_acc]
+
+    # Format results for easy copy-paste
+    print(f'CLIP {model_name} Avg. Per-Class Acc.')
+    transfer_accs = df[df.SourceDomain != df.TargetDomain].AvgPerClassAcc
+    print(transfer_accs.to_string(index=False))
+
+    results_dir = pathlib.Path(__file__).parent.resolve().parent / 'results'
+    experiment_name = f'clip_domainnet_{model_name}'
+    experiment_name += f'_optimizer{args.optimizer_name}'
+    experiment_name += f'_lr{args.lr}_encoderlr{args.encoder_lr}'
+    if args.translate_features:
+        experiment_name += '_translatefeats'
+    experiment_name += '_finetune'
+    experiment_name = experiment_name.replace('/', '')
+    experiment_dir = results_dir / experiment_name
+    experiment_dir.mkdir(parents=True)
+    df.to_pickle(str(experiment_dir / 'results.pkl'))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run CLIP DA Experiments')
     parser.add_argument('experiment_type', type=str, choices=EXPERIMENT_TYPES,
                         help='Experiment to run')
-    parser.add_argument('model', type=str, choices=MODELS + ['all'],
+    parser.add_argument('model', type=str,
+                        choices=clip.available_models() + ['all'],
                         help='CLIP Model')
     parser.add_argument('--C', default=0.316, type=float,
                         help='Inverse regularization for linear probe')
     parser.add_argument('--num_selftrain_iters', default=0, type=int,
                         help='Number of self-training iterations')
 
+    linear_probe_group = parser.add_argument_group('Linear Probing Arguments')
+    linear_probe_group.add_argument('--C', default=0.316, type=float,
+                                    help='Inverse regularization')
+    linear_probe_group.add_argument('--translate_features',
+                                    action='store_true',
+                                    help='Use language to translate domains')
+
+    finetuning_group = parser.add_argument_group('Finetuning Arguments')
+    finetuning_group.add_argument('--epochs', default=10, type=int,
+                                  help='Number of epochs for finetuning')
+    finetuning_group.add_argument('--batch_size', default=128, type=int,
+                                  help='Batch size for finetuning')
+    finetuning_group.add_argument('--freeze', action='store_true',
+                                  help='Freeze encoder during finetuning')
+
+    randaugment_group = parser.add_argument_group('RandAugment Arguments')
+    randaugment_group.add_argument('--randaugment_M', default=0, type=int,
+                                   help='Value of M for RandAugment')
+    randaugment_group.add_argument('--randaugment_N', default=0, type=int,
+                                   help='Value of N for RandAugment')
+    optimizer_group = parser.add_argument_group('PyTorch Optimizer Arguments')
+    optimizer_group.add_argument('--optimizer_name', default='SGD', type=str,
+                                 help='Classname of PyTorch optimizer to use')
+    optimizer_group.add_argument('--lr', default=1e-3, type=float,
+                                 help='Learning rate for finetuning')
+    optimizer_group.add_argument('--encoder_lr', default=1e-3, type=float,
+                                 help='Learning rate for encoder')
+    optimizer_group.add_argument('--optimizer_kwargs', nargs='*',
+                                 action=ParseKwargs, default={})
     args = parser.parse_args()
     if args.experiment_type == 'linear-probe':
         if args.model == 'all':
             for model_name in MODELS:
-                linear_probe(model_name, args.C, args.num_selftrain_iters)
+                args.model = model_name
+                linear_probe(args)
         else:
             linear_probe(args.model, args.C, args.num_selftrain_iters)
     elif args.experiment_type == 'zero-shot':
@@ -163,3 +293,10 @@ if __name__ == '__main__':
                 zero_shot(model_name)
         else:
             zero_shot(args.model)
+    elif args.experiment_type == 'finetune':
+        if args.model == 'all':
+            for model_name in MODELS:
+                args.model = model_name
+                finetune(args)
+        else:
+            finetune(args)
