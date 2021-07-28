@@ -23,9 +23,9 @@ parser.add_argument('--target', type=str, default=None,
                     'same as --source')
 parser.add_argument('--data_path', type=str, default='/scr/biggest/imagenet',
                     help='Root path of the data')
-parser.add_argument('--test_between', type=str, choices=['classes', 'domains'],
+parser.add_argument('--test_between', type=str, choices=['classes', 'domains', 'domains_pooled'],
                     help='Whether to test intra- or inter- connectivity', required=True)
-parser.add_argument('--transform', type=str, choices=['imagenet', 'simclr'], required=True)
+parser.add_argument('--transform', type=str, choices=['imagenet', 'simclr'], default='simclr')
 parser.add_argument('--num_iters', default=15, type=int,
                     help='If doing class-comparison, the number of random pairs to choose.')
 parser.add_argument('--seed', default=20, type=int, help='Seed for choosing pairs of classes.')
@@ -72,12 +72,17 @@ def main(args):
                                                                  transform, args.data_path, False)
             identifier = f'target-classes-{class_1}-{class_2}'
             main_loop(target_train_ds, target_test_ds, save_dir, identifier, args)
-    else: # between domains
+    elif args.test_between == 'domains':
         for class_idx in range(num_classes):
             train_ds, test_ds = get_domain_datasets(args.dataset_name, args.source, args.target, args.data_path,
                                                     class_idx, transform)
             identifier = f'class-{class_idx}'
             main_loop(train_ds, test_ds, save_dir, identifier, args)
+    else: # domains pooled
+        train_ds, test_ds = get_pooled_datasets(args.dataset_name, args.source, args.target, args.data_path,
+                                                transform)
+        identifier = f'pooled'
+        main_loop(train_ds, test_ds, save_dir, identifier, args)
 
 def main_loop(train_ds, test_ds, save_dir, identifier, args):
     base_file_name = os.path.join(save_dir, identifier)
@@ -132,8 +137,6 @@ def main_loop(train_ds, test_ds, save_dir, identifier, args):
                 os.remove(previous_file)
 
     torch.save({
-        'state_dict': model.state_dict(),
-        'optimizer' : optimizer.state_dict(),
         'train_accs': train_acc,
         'test_accs': test_acc
     }, f'{base_file_name}-final')

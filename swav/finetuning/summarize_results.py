@@ -33,7 +33,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Result summarizer')
     parser.add_argument('--run_dirs', type=str, nargs='+',
                         help='Outer run directory to use.')
+    parser.add_argument('--use_file', type=str,
+                        help='If run dirs are in a file, provide that file here.')
     parser.add_argument('--train_data_fracs', type=float, nargs='+',
                         help='Train data fraction checkpoints to summarize.')
     args = parser.parse_args()
+    if args.use_file is not None:
+        fname = f'sl_scripts/{args.use_file}_ckpts.txt'
+        with open(fname, 'r') as f:
+            args.run_dirs = f.read().splitlines() 
     main(args)

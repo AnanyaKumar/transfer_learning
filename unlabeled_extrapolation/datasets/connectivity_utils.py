@@ -185,6 +185,27 @@ def get_domain_datasets(dataset_name, source, target, data_path, class_idx, tran
                                           transform=transform, data_path=data_path)
     return train_ds, test_ds
 
+def get_pooled_datasets(dataset_name, source, target, data_path, transform):
+    if dataset_name == 'breeds':
+        data_attr = '_image_paths_by_class'
+        source_train = breeds.Breeds(data_path, source, source=True, target=False, split='train')
+        target_train = breeds.Breeds(data_path, target, source=False, target=True, split='train')
+        source_test = breeds.Breeds(data_path, source, source=True, target=False, split='val')
+        target_test = breeds.Breeds(data_path, target, source=False, target=True, split='val')
+    elif dataset_name == 'domainnet':
+        data_attr = 'data'
+        source_train = domainnet.DomainNet(source, split='train', root=data_path)
+        target_train = domainnet.DomainNet(target, split='train', root=data_path)
+        source_test = domainnet.DomainNet(source, split='test', root=data_path)
+        target_test = domainnet.DomainNet(target, split='test', root=data_path)
+    else:
+        raise ValueError('Only supports Breeds and DomainNet currently')
+    train_ds = DomainClassificationDataset(source_train, target_train, data_attr, dataset_name,
+                                           transform=transform, data_path=data_path)
+    test_ds = DomainClassificationDataset(source_test, target_test, data_attr, dataset_name,
+                                          transform=transform, data_path=data_path)
+    return train_ds, test_ds
+
 ######################
 ### TRAINING STUFF ###
 ######################

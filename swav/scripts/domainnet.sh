@@ -14,6 +14,7 @@ show_help() {
     usage_string="$usage_string [--nmb_prototypes NUM_PROTOTYPES]"
     usage_string="$usage_string [--conda_env CONDA_ENV]"
     usage_string="$usage_string [-p|--port PORT]"
+    usage_string+="[--use_sentry USE_SENTRY]"
 
     usage_string="$usage_string\n\n"
     usage_string="$usage_string\t-d|--domains Domains (default:all)\n"
@@ -24,10 +25,12 @@ show_help() {
     usage_string="$usage_string\t--nmb_prototypes Number of prototypes (default: 3000)\n"
     usage_string="$usage_string\t--conda_env Conda environment (default: \$(whoami)-ue)\n"
     usage_string="$usage_string\t-p|--port TCP port for distributed training (default: 40000)\n"
+    usage_string+="\t--use_sentry Whether or not to use SENTRY splits (default: false).\n"
     printf "$usage_string"
 }
 
 domains=all
+use_sentry=false
 epochs=200
 batch_size=64
 queue_start=15
@@ -59,6 +62,14 @@ while true; do
 		echo '--epochs must be non-empty!'; exit 1
 	    fi
 	    ;;
+	--use_sentry)
+        if [ "$2" ]; then
+        use_sentry=$2
+        shift
+        else
+        echo '--use_sentry must be true or false!'; exit 1
+        fi
+        ;;
 	-b|--batch_size) # Batch size for a single GPU
 	    if [ "$2" ]; then
 		batch_size=$2
@@ -128,7 +139,7 @@ done
 
 set -x
 
-printf "Running DomainNet with domains $domains for $epochs epochs "
+printf "Running DomainNet (SENTRY splits: $use_sentry) with domains $domains for $epochs epochs "
 printf " with batch size $batch_size, introducing queue at epoch $queue_start "
 printf " epsilon $epsilon, arch $arch and nmb_prototypes $nmb_prototypes\n"
 echo "Using conda environment $conda_env"
@@ -139,25 +150,19 @@ dist_url+=$master_node
 dist_url+=":$port"
 
 # COPY to local
-LOCAL_DOMAINNET_PATH=/scr/scr-with-most-space/domainnet
+LOCAL_DOMAINNET_PATH=/scr/biggest/domainnet
 GLOBAL_DOMAINNET_PATH=/u/scr/nlp/domainnet/domainnet.zip
-# COPY domainnet
-if [ ! -d "$LOCAL_DOMAINNET_PATH" ]; then
-  mkdir -p $LOCAL_DOMAINNET_PATH
-  echo "Copying DomainNet files to $LOCAL_DOMAINNET_PATH"
-  cp $GLOBAL_DOMAINNET_PATH $LOCAL_DOMAINNET_PATH
-  unzip -q ${LOCAL_DOMAINNET_PATH}/domainnet.zip -d $LOCAL_DOMAINNET_PATH
-fi
+../../scripts/copy_dataset.sh domainnet
 
 DATASET_PATH=${LOCAL_DOMAINNET_PATH}
-echo "Using DomainNet data from $DATASET_PATH"
+echo "Using DomainNet data from $DATASET_PATH, using SENTRY splits $use_sentry"
 domain_list=`echo $domains | tr , -`
-experiment_name="domainnet_${domain_list}_queue${queue_start}_epochs${epochs}"
+experiment_name="domainnet_sentry${use_sentry}_${domain_list}_queue${queue_start}_epochs${epochs}"
 experiment_name="${experiment_name}_batchsize${batch_size}"
 experiment_name="${experiment_name}_epsilon${epsilon}_arch$arch"
 experiment_name="${experiment_name}_prototypes${nmb_prototypes}"
 echo "Experiment name: $experiment_name"
-dump_path="/scr/scr-with-most-space/$(whoami)/swav_experiments/$experiment_name"
+dump_path="/scr/biggest/$(whoami)/swav_experiments/$experiment_name"
 mkdir -p $dump_path
 echo "Will dump checkpoints in $dump_path"
 experiment_path="checkpoints/$experiment_name"
@@ -207,8 +212,8 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --use_fp16 true \
 --sync_bn pytorch \
 --dump_path $dump_path \
---domains $domains \
---dataset_name domainnet
+--dataset_name domainnet \
+--dataset_kwargs domains=$domains use_sentry=$use_sentry
 
 echo "Copying from $dump_path to $experiment_path"
 cp -r $dump_path/* $experiment_path

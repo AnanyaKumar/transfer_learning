@@ -14,7 +14,7 @@ import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
-from unlabeled_extrapolation.datasets.domainnet import DomainNet, SENTRY_DOMAINS
+from unlabeled_extrapolation.datasets.domainnet import DomainNet, SENTRY_DOMAINS, VALID_DOMAINS
 from unlabeled_extrapolation.datasets.breeds import Breeds, BREEDS_SPLITS_TO_FUNC
 
 BREEDS_TASKS = BREEDS_SPLITS_TO_FUNC.keys()
@@ -35,7 +35,7 @@ def parse_splits(dataset_kwargs):
 def process_data_amount(args, key):
     size = args.get(key, 0)
     if size == -1:
-        size = 100 # something larger than any single dataset, integer version of "infinity"
+        size = 1000 # something larger than any single dataset, integer version of "infinity"
     return size
 
 
@@ -91,34 +91,44 @@ class CustomSplitDataset(Dataset):
                 self.add_data(reference_size, related_amount, non_target_imagenet, 'related')
 
         elif dataset_name == 'domainnet':
+            use_sentry = dataset_kwargs.get('use_sentry', True)
+            version = 'sentry' if use_sentry else 'full'
             source_domain = dataset_kwargs.get('source_domain')
             target_domain = dataset_kwargs.get('target_domain')
-            if (source_domain not in SENTRY_DOMAINS) or (target_domain not in SENTRY_DOMAINS):
-                raise ValueError(f'Valid domains are {SENTRY_DOMAINS}, but source was {source_domain} '
-                                 f'and target was {target_domain}.')
-            source_amount, target_amount, related_amount = parse_splits(dataset_kwargs)
-            # calculate the reference "100%" dataset size, min of source and target sizes
-            source_ds = DomainNet(source_domain, root=data_path, split='train', version='sentry')
-            source_samples = source_ds.data
-            target_ds = DomainNet(target_domain, root=data_path, split='train', version='sentry')
-            target_samples = target_ds.data
-            reference_size = min(len(source_samples), len(target_samples))
+            if source_domain is not None and target_domain is not None: # for UDA
+                valid_domainset = SENTRY_DOMAINS if use_sentry else VALID_DOMAINS
+                if (source_domain not in valid_domainset) or (target_domain not in valid_domainset):
+                    raise ValueError(f'Valid domains are {valid_domainset}, but source was {source_domain} '
+                                    f'and target was {target_domain}.')
+                source_amount, target_amount, related_amount = parse_splits(dataset_kwargs)
+                # calculate the reference "100%" dataset size, min of source and target sizes
+                source_ds = DomainNet(source_domain, root=data_path, split='train', version=version)
+                source_samples = source_ds.data
+                target_ds = DomainNet(target_domain, root=data_path, split='train', version=version)
+                target_samples = target_ds.data
+                reference_size = min(len(source_samples), len(target_samples))
 
-            self.means = target_ds.means # same means/stds is used for all DomainNet domains
-            self.stds = target_ds.stds
+                self.means = target_ds.means # same means/stds is used for all DomainNet domains
+                self.stds = target_ds.stds
 
-            # fill in the proper proportions of samples
-            self.samples = []
-            self.add_data(reference_size, target_amount, target_samples, 'target')
-            self.add_data(reference_size, source_amount, source_samples, 'source')
-            if related_amount > 0:
-                # identify all non-target domains
-                non_target_domains = list(set(SENTRY_DOMAINS) - set([target_domain]))
-                non_target_domains = ','.join(non_target_domains)
-                # collect all DomainNet non-target images
-                non_target_domainnet = DomainNet(non_target_domains, root=data_path,
-                                          split='train', version='sentry')
-                self.add_data(reference_size, related_amount, non_target_domainnet.data, 'related')
+                # fill in the proper proportions of samples
+                self.samples = []
+                self.add_data(reference_size, target_amount, target_samples, 'target')
+                self.add_data(reference_size, source_amount, source_samples, 'source')
+                if related_amount > 0:
+                    # identify all non-target domains
+                    non_target_domains = list(set(valid_domainset) - set([target_domain]))
+                    non_target_domains = ','.join(non_target_domains)
+                    # collect all DomainNet non-target images
+                    non_target_domainnet = DomainNet(non_target_domains, root=data_path,
+                                                    split='train', version=version)
+                    self.add_data(reference_size, related_amount, non_target_domainnet.data, 'related')
+            else: # not UDA
+                domains = dataset_kwargs.get('domains')
+                ds = DomainNet(domains, root=data_path, split='train', version=version)
+                self.samples = ds.data
+                self.means = ds.means # same means/stds is used for all DomainNet domains
+                self.stds = ds.stds
 
             # for DomainNet, edit all the samples so the __getitem__ function is consistent
             func = lambda inp: (os.path.join(data_path, inp[0]), int(inp[1]))

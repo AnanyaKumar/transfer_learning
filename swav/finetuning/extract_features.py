@@ -110,7 +110,7 @@ def main():
     if os.path.exists(save_path):
         print(f'Feature/pickles exist already at {save_path}. Exiting...')
         exit(0)
-    os.makedirs(os.dirname(save_path), exist_ok=True)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
     args.use_cuda = not args.no_cuda
     if args.dataset == 'breeds':

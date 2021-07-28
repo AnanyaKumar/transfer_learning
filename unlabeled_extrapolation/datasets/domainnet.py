@@ -45,7 +45,7 @@ VALID_VERSIONS = ['full', 'sentry']
 ROOT = '/u/scr/nlp/domainnet'
 SENTRY_SPLITS_ROOT = '/u/scr/nlp/domainnet/SENTRY_splits'
 
-def load_dataset(data_dir, domains, split, version):
+def load_dataset(domains, split, version):
     if len(domains) == 1 and domains[0] == 'all':
         if version == 'sentry':
             domains = SENTRY_DOMAINS
@@ -57,14 +57,14 @@ def load_dataset(data_dir, domains, split, version):
         if version == 'sentry':
             idx_file = os.path.join(SENTRY_SPLITS_ROOT, f'{domain}_{split}_mini.txt')
         else:
-            idx_file = os.path.join(data_dir, f'{domain}_{split}.txt')
+            idx_file = os.path.join(ROOT, f'{domain}_{split}.txt')
         with open(idx_file, 'r') as f:
             data += [line.split() for line in f]
     return data
 
 class DomainNet(Dataset):
     def __init__(self, domain, split='train', root=ROOT,
-                 transform=None, unlabeled=False, verbose=False,
+                 transform=None, unlabeled=False, verbose=True,
                  version='sentry'):
         super().__init__()
 
@@ -85,7 +85,7 @@ class DomainNet(Dataset):
         self._version = version
 
         self._unlabeled = unlabeled
-        self.data = load_dataset(root, domain_list, split, version)
+        self.data = load_dataset(domain_list, split, version)
         self.means = [0.485, 0.456, 0.406]
         self.stds = [0.228, 0.224, 0.225]
         if verbose:

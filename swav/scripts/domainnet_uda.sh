@@ -12,6 +12,7 @@ show_help() {
     usage_string+="[--source_amount SOURCE_AMOUNT]"
     usage_string+="[--target_amount TARGET_AMOUNT]"
     usage_string+="[--related_amount RELATED_AMOUNT]"
+    usage_string+="[--use_sentry USE_SENTRY]"
     usage_string+="[-b|--batch_size BATCH_SIZE]"
     usage_string+="[-q|--queue_start QUEUE_START]"
     usage_string+="[--queue_length QUEUE_LENGTH]"
@@ -27,6 +28,7 @@ show_help() {
     usage_string+="\t--source_amount Amount of source data to use (as a fraction of min(source, target) size) (default: 0).\n"
     usage_string+="\t--target_amount Amount of target data to use (as a fraction of min(source, target) size) (default: 0).\n"
     usage_string+="\t--related_amount Amount of related data to use (as a fraction of min(source, target) size) (default: 0).\n"
+    usage_string+="\t--use_sentry Whether or not to use SENTRY splits (default: true).\n"
     usage_string+="\t-b|--batch_size Batch Size (default: 64)\n"
     usage_string+="\t-q|--queue_start Epoch to introduce queue (default: 15)\n"
     usage_string+="\t--queue_length Length of queue (default: 3840)\n"
@@ -43,6 +45,7 @@ target=""
 source_amount=0
 target_amount=0
 related_amount=0
+use_sentry=true
 epochs=200
 batch_size=64
 queue_start=15
@@ -97,6 +100,14 @@ while true; do
         shift
         else
         echo '--related_amount must be non-empty!'; exit 1
+        fi
+        ;;
+    --use_sentry)
+        if [ "$2" ]; then
+        use_sentry=$2
+        shift
+        else
+        echo '--use_sentry must be true or false!'; exit 1
         fi
         ;;
     --epochs)
@@ -193,7 +204,7 @@ if [[ $source_amount != 0 && $related_amount != 0 ]]; then
     exit 1
 fi
 
-printf "Running DomainNet (SENTRY) with source $source and target $target for $epochs epochs "
+printf "Running DomainNet (SENTRY splits: $use_sentry) with source $source and target $target for $epochs epochs "
 printf " with source amount $source_amount, target amount $target_amount, and related amount $related_amount"
 printf " with batch size $batch_size, introducing queue at epoch $queue_start "
 printf " epsilon $epsilon, arch $arch and nmb_prototypes $nmb_prototypes\n"
@@ -210,8 +221,8 @@ GLOBAL_DOMAINNET_PATH=/u/scr/nlp/domainnet/domainnet.zip
 ../../scripts/copy_dataset.sh domainnet
 
 DATASET_PATH=${LOCAL_DOMAINNET_PATH}
-echo "Using DomainNet data from $DATASET_PATH"
-experiment_name="domainnet_source${source}_target${target}"
+echo "Using DomainNet data from $DATASET_PATH, using SENTRY splits $use_sentry"
+experiment_name="domainnet_sentry${use_sentry}_source${source}_target${target}"
 experiment_name+="_sourceamount${source_amount}_targetamount${target_amount}_relatedamount${related_amount}"
 experiment_name+="_queue${queue_start}_epochs${epochs}"
 experiment_name+="_batchsize${batch_size}"
@@ -270,7 +281,8 @@ srun --output=${dump_path}/%j.out --error=${dump_path}/%j.err --label python -u 
 --dump_path $dump_path \
 --dataset_name domainnet \
 --dataset_kwargs source_domain=$source target_domain=$target \
-    source_amount=$source_amount target_amount=$target_amount related_amount=$related_amount
+    source_amount=$source_amount target_amount=$target_amount related_amount=$related_amount \
+    use_sentry=$use_sentry
 
 echo "Copying from $dump_path to $experiment_path"
 cp -r $dump_path/* $experiment_path
