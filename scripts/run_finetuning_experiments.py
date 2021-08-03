@@ -5,7 +5,7 @@ from copy import deepcopy
 
 
 def run_sbatch(cmd, job_name, args, exclude=None,
-               nodes=1, gres='gpu:1', cpus_per_task=2, mem='16G'):
+               nodes=1, gres='gpu:1', cpus_per_task=2, mem='16G', deps=[]):
     output_path = args.output_dir + '/' + job_name
     sbatch_script_path = args.scripts_dir + '/' + args.sbatch_script_name 
     slurm_cmd = f'sbatch --partition={args.partition} --job-name={job_name} --output={output_path} ' +\
@@ -17,15 +17,15 @@ def run_sbatch(cmd, job_name, args, exclude=None,
     subprocess.run(shlex.split(slurm_cmd))
 
 
-def run_codalab(cmd, args):
+def run_codalab(cmd, args, deps=[]):
     raise NotImplementedError
 
 
-def run_job(cmd, job_name, args):
+def run_job(cmd, job_name, args, deps=[]):
     if args.codalab:
-        run_codalab(cmd, args)
+        run_codalab(cmd, args, deps=deps)
     else:
-        run_sbatch(cmd, job_name, args)
+        run_sbatch(cmd, job_name, args, deps=deps)
 
 
 def format_value(v):
@@ -47,33 +47,40 @@ def get_python_cmd(code_path, python_path='python', kwargs=None):
     return python_cmd
 
 
-def get_baseline_experiment_cmd(config_path, run_name, group_name, project_name, kwargs, args):
+def group_run_to_log_path(group_name, run_name, args):
+	return args.log_dir + '/' + group_name + '/' + run_name
+
+
+def get_baseline_experiment_cmd(config_path, run_name, group_name, project_name, kwargs, args,
+                                run_saved=False):
     # config_path is relative to config_dir
     kwargs = deepcopy(kwargs)
+    # Sometimes we might want to run from a saved json config file, in a custom location.
+    # Saved files have full dataset paths, e.g. /scr/biggest/..., so no need to add root_prefix.
     kwargs['config'] = args.config_dir + '/' + config_path
+    if not(run_saved):
+        kwargs['root_prefix'] = args.data_dir
     if not(args.codalab):
-        kwargs['log_dir'] = args.log_dir + '/' + group_name + '/' + run_name
-        kwargs['tmp_par_ckp_dir'] = args.tmp_dir + '/' + run_name
+        kwargs['log_dir'] = group_run_to_log_path(group_name, run_name, args)
+        kwargs['tmp_par_ckp_dir'] = args.tmp_dir + '/' + group_name + '_' + run_name
     else:
         kwargs['log_dir'] = args.log_dir
-    kwargs['root_prefix'] = args.data_dir
     kwargs['project_name'] = project_name
     kwargs['group_name'] = group_name
     kwargs['run_name'] = run_name
     code_path = args.code_dir + '/' + 'baseline_train.py'
-    assert 'root_prefix' in kwargs and 'log_dir' in kwargs and 'config' in kwargs
     return get_python_cmd(code_path=code_path, python_path=args.python_path, kwargs=kwargs)
 
 
 def config_run(args, kwargs, config_path, run_name, group_name, project_name,
-               dataset_copy_cmd=None):
+               dataset_copy_cmd=None, run_saved=False, deps=[]):
     cmd = get_baseline_experiment_cmd(
         config_path=config_path, run_name=run_name, group_name=group_name,
-        project_name=project_name, kwargs=kwargs, args=args)
+        project_name=project_name, kwargs=kwargs, args=args, run_saved=run_saved)
     if dataset_copy_cmd is not None and not args.codalab:
         cmd = dataset_copy_cmd + ' && ' + cmd
     job_name = group_name + '_' + run_name
-    run_job(cmd, job_name, args)
+    run_job(cmd, job_name, args, deps=deps)
 
 
 def linprobe_run(args, rel_config_path, job_name, train_index, test_indices, num_reg_values=50,
@@ -491,7 +498,7 @@ if __name__ == "__main__":
     parser.add_argument('--scripts_dir', type=str, required=False, default='scripts/',
                         help='Path to dir where scripts are stored.')
     parser.add_argument('--output_dir', type=str, required=False, default='slurm_outputs/',
-                        help='Path to dir to store stdout for experiment.')
+                        help='(Slurm only) Path to dir to store stdout for experiment.')
     parser.add_argument('--log_dir', type=str, required=False, default='logs/',
                         help='Path to dir where we save logs and checkpoints.')
     parser.add_argument('--config_dir', type=str, required=False, default='configs/',

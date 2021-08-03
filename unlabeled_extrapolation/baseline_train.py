@@ -465,23 +465,33 @@ def setup():
         copy_folders(args.log_dir)
     # Setup logging.
     utils.setup_logging(log_dir, log_level)
-    # Open config, update with command line args.
-    config = quinine.Quinfig(args.config)
+    # Open config, update with command line args
+    if args.config.endswith('.json'):
+        # For json files, we just use it directly and don't process it, e.g. by adding
+        # root_prefix. Use this for loading saved configurations.
+        with open(args.config) as json_file:
+            config = json.load(json_file)
+    else:
+        config = quinine.Quinfig(args.config)
+    # Update config with command line arguments.
     utils.update_config(unparsed, config)
-    # If we don't specify a transform for some test datasets, but specify a default transform,
-    # then use the default transform for that dataset. For datasets that do specify a transform
-    # we use that and not the default transform.
-    update_test_transform_configs(config)
-    # If linear probing, by default we turn batch-norm off while training, if unspecified.
-    # If you want bach-norm even when lin probing then set use_net_val_mode to False in the config.
-    update_net_eval_mode(config)
-    # Datasets may be stored in different directories in different clusters and platforms.
-    # We allow specifying a root_prefix that gets prepended to any specified dataset roots.
-    # So if config['root_prefix'] is defined then we prepend it to dataset['args']['root'] for
-    # train and test datasets.
-    update_root_prefix(config)
-    # Note: copying config over is not that useful anymore with Quinine, so use json below.
-    shutil.copy(args.config, log_dir+'/original_config.yaml')
+    # If it's not a json config (e.g. if it's yaml) then process it. This makes specifying certain
+    # things more convenient, e.g. don't have to specify a transform for every test datset.
+    if not args.config.endswith('.json'):
+        # If we don't specify a transform for some test datasets, but specify a default transform,
+        # then use the default transform for that dataset. For datasets that do specify a transform
+        # we use that and not the default transform.
+        update_test_transform_configs(config)
+        # If linear probing, by default we turn batch-norm off while training, if unspecified.
+        # If you want bach-norm even when lin probing then set use_net_val_mode to False in the config.
+        update_net_eval_mode(config)
+        # Datasets may be stored in different directories in different clusters and platforms.
+        # We allow specifying a root_prefix that gets prepended to any specified dataset roots.
+        # So if config['root_prefix'] is defined then we prepend it to dataset['args']['root'] for
+        # train and test datasets.
+        update_root_prefix(config)
+        # # Note: copying config over is not that useful anymore with Quinine, so use json below.
+        # shutil.copy(args.config, log_dir+'/original_config.yaml')
     # Setup wandb.
     setup_wandb(args, config)
     # Set seed.
