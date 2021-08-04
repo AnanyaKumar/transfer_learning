@@ -16,14 +16,14 @@ def main(args):
             id_accs, ood_accs = pickle.load(f)
         # find best in-domain accuracy
         best_id_reg = np.argmax(id_accs)
-        result = {}
+        result = {'data_frac': data_frac}
         result[f'id_{args.id_domain}_acc'] = id_accs[best_id_reg]
         print(f'File:\t{path}')
         print(f'ID ({args.id_domain}):\t{result[f"id_{args.id_domain}_acc"]}')
         for ood_domain in args.ood_domains:
             result[f'ood_{ood_domain}_acc'] = ood_accs[ood_domain][best_id_reg]
             print(f'OOD ({ood_domain}):\t{result[f"ood_{ood_domain}_acc"]}')
-        results.append(result, ignore_index=True)
+        results = results.append(result, ignore_index=True)
     print('Printing copy-and-pastable csv to the terminal...')
     with io.StringIO() as buffer:
         results.to_csv(buffer, sep='\t', index=False)

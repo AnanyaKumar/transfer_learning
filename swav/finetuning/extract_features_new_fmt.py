@@ -1,8 +1,3 @@
-"""
-Eventually this should replace extract_features.py since it is more flexible, but atm
-it only supports domainnet
-"""
-
 import argparse
 import os
 import copy
@@ -101,31 +96,32 @@ def main():
     parser.add_argument('--num_workers', type=int, default=2, help='Number of workers.')
     parser.add_argument('--run_dir', type=str, required=True,
                         help='The (outer) run directory to use.')
-    parser.add_argument('--ckpt_name', type=str, required=True,
-                        help='The name of the checkpoint in the checkpoints/ folder.')
+    parser.add_argument('--ckpt_epoch', type=int, required=True,
+                        help='The epoch of the checkpoint in the checkpoints/ folder.')
     parser.add_argument('--dataset', type=str, required=True,
                         help='Dataset on which to calculate features.')
-    parser.add_argument('--domains', type=str, nargs='+',
-                        help='For DomainNet, the domain(s) to extract features for.')
+    parser.add_argument('--domains', type=str, required=True,
+                        help='For DomainNet, the domain(s) to extract features for (comma-separated).')
     parser.add_argument('--domainnet_version', choices=['full', 'sentry'], default='sentry')
+    parser.add_argument('--overwrite', action='store_true',
+                        help='If set, will overwrite pre-existing files.')
     args = parser.parse_args()
 
     os.makedirs(os.path.join(args.run_dir, 'finetuning'), exist_ok=True)
     file_prefix = 'features_and_labels'
     if args.dataset == 'domainnet':
-        file_prefix += '_' + args.domainnet_version
+        file_prefix += f'_{args.domainnet_version}'
+    file_prefix += f'_{args.ckpt_epoch}'
     file_path = os.path.join(args.run_dir, 'finetuning', f'{file_prefix}_new_fmt.pickle')
 
-    if os.path.exists(file_path):
+    if (not args.overwrite) and (os.path.exists(file_path)):
         with open(file_path, 'rb') as f:
             previous_data, previous_args = pickle.load(f)
-            if previous_args.ckpt_name != args.ckpt_name:
-                # TODO in future: allow for other checkpoints in the name
-                raise ValueError('Previous args used a different checkpoint than current. Exiting...')
     else:
         previous_data = {}
 
     # check if done already
+    args.domains = args.domains.split(',')
     if all((d in previous_data.keys()) for d in args.domains):
         print(f'All desired features have been extracted at {file_path}. Exiting...')
         exit(0)

@@ -73,17 +73,21 @@ def main():
                         help='Number of regularization values to sweep over.', required=False)
     parser.add_argument('--id_domain', type=str, required=True,
                         help='The source domain on which to train')
-    parser.add_argument('--ood_domains', type=str, nargs='+', required=True,
-                        help='The target domains on which to evaluate.')
+    parser.add_argument('--ood_domains', type=str, required=True,
+                        help='The target domains on which to evaluate (comma-separated).')
     parser.add_argument('--file_name', type=str, required=True,
                         help='Name of the pickle file (without directories, without .pickle).')
+    parser.add_argument('--overwrite', action='store_true',
+                        help='If set, will overwrite the existing files.')
     args = parser.parse_args()
 
     if args.file_name.endswith('.pickle'):
         args.file_name = args.file_name[:-len('.pickle')]
     load_path = os.path.join(args.run_dir, 'finetuning', f'{args.file_name}.pickle')
+    
+    args.ood_domains = args.ood_domains.split(',')
 
-    # check that done
+    # check that feature extraction done
     if not os.path.exists(load_path):
         raise ValueError(f'Must run extract_features_new_fmt.py first to get {load_path}. Exiting...')
     data, _ = pickle.load(open(load_path, 'rb'))
@@ -98,7 +102,7 @@ def main():
             raise NotImplementedError()
         save_file_name = f'lin_probe_{args.file_name}_{args.id_domain}_{",".join(args.ood_domains)}_{train_data_frac}.pickle'
         save_path = os.path.join(args.run_dir, 'finetuning', save_file_name)
-        if os.path.exists(save_path):
+        if (not args.overwrite) and (os.path.exists(save_path)):
             print(f'Already exists results at {save_path}. Skipping...')
             continue
         print(f'Using representations from {previous_args.dataset}, source {args.id_domain}, '
