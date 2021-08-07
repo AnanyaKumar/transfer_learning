@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 print_usage () {
-    USAGE_STRING="launch_clip_experiments_sbatch.sh [-t|--translate_features]"
-    USAGE_STRING="$USAGE_STRING [--slurm_dependency JOBID]"
-    USAGE_STRING="$USAGE_STRING experiment_type model"
-    USAGE_STRING="$USAGE_STRING [experiment_args]"
+    USAGE_STRING="Usage: launch_clip_experiments_sbatch.sh"
+    USAGE_STRING+=" [--translate_features] [--translate_target] [--big_jags]"
+    USAGE_STRING+=" [--slurm_dependency JOBID]"
+    USAGE_STRING+=" experiment_type model [experiment_args]"
     echo $USAGE_STRING
 }
 
@@ -12,6 +12,9 @@ launch_job () {
     python_args="$experiment_type $model"
     if [ $translate_features ]; then
 	python_args+=" --translate_features"
+    fi
+    if [ $translate_target ]; then
+	python_args+=" --translate_target"
     fi
     if [ "$experiment_args" ]; then
 	python_args+=" $experiment_args"
@@ -35,7 +38,9 @@ launch_job () {
     sbatch_cmd="$sbatch_cmd --parsable $SBATCH_SCRIPT '$python_args'"
     echo $sbatch_cmd
     job_number=$(eval $sbatch_cmd)
-    slurm_dependency=$job_number
+    if [ "$translate_features" ]; then
+	slurm_dependency=$job_number
+    fi
     echo "Submitted batch job $job_number"
     email_cmd="source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh"
     email_cmd="$email_cmd; conda deactivate; conda activate $(whoami)-ue"
@@ -45,6 +50,9 @@ launch_job () {
 	aggregate_cmd+=" ${DOMAINS[@]} --translate_features"
     else
 	aggregate_cmd+=" all"
+    fi
+    if [ $translate_target ]; then
+	aggregate_cmd+=" --translate_target"
     fi
 
     if [ "$experiment_args" ]; then
@@ -65,8 +73,15 @@ SBATCH_SCRIPT="run_clip_experiment_array.sh"
 
 while true; do
     case "$1" in
-	-t|--translate_features)
+	-h|--help)
+	    print_usage
+	    exit
+	    ;;
+	--translate_features)
 	    translate_features=true
+	    ;;
+	--translate_target)
+	    translate_target=true
 	    ;;
 	--slurm_dependency)
 	    if [ "$2" ]; then

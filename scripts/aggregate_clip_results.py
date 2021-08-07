@@ -36,6 +36,16 @@ def main(args):
             lambda folder: '_translatefeats' not in str(folder),
             results_folders
         )
+    if args.translate_target:
+        results_folders = filter(
+            lambda folder: '_translatetarget' in str(folder),
+            results_folders
+        )
+    else:
+        results_folders = filter(
+            lambda folder: '_translatetarget' not in str(folder),
+            results_folders
+        )
 
     df = pd.DataFrame(columns=DF_COLUMNS)
     for folder in results_folders:
@@ -68,6 +78,8 @@ if __name__ == '__main__':
                         help='Print folders of results in aggregation')
     parser.add_argument('--translate_features', action='store_true',
                         help='Experiment used feature translation')
+    parser.add_argument('--translate_target', action='store_true',
+                        help='Experiment used target domain translation')
     parser.add_argument('--include_source_val', action='store_true',
                         help='Include validation results for source domains')
     parser.add_argument('--include_domain_names', action='store_true',

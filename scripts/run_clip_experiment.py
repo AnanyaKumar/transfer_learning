@@ -72,6 +72,8 @@ def make_experiment_dir(args):
     experiment_name += f'_target{args.target_domain}'
     if args.translate_features:
         experiment_name += '_translatefeats'
+    if args.translate_target:
+        experiment_name += '_translatetarget'
 
     if args.experiment_type == 'finetune':
         experiment_name += f'_optimizer{args.optimizer_name}'
@@ -220,6 +222,9 @@ def linear_probe(args):
                                  root=DOMAINNET_ROOT, transform=preprocess)
         print(f'Generating test embeddings for {eval_domain}...')
         test_features, test_labels = get_features(test_dataset, clip_model)
+        if args.translate_target:
+            test_features = translate_features(test_features, eval_domain,
+                                               source_domain, clip_model)
         preds = probe.predict(test_features)
         per_cls_avg_acc = compute_per_class_avg_acc(preds, test_labels)
         print(f'{train_domain} -> {eval_domain}: {per_cls_avg_acc}')
@@ -409,6 +414,8 @@ if __name__ == '__main__':
     translate_group.add_argument('--translate_features',
                                  action='store_true',
                                  help='Use language to translate domains')
+    translate_group.add_argument('--translate_target', action='store_true',
+                                 help='Translate target domains')
     translate_group.add_argument('--translate_function', type=str,
                                  help='Function to perform translation')
 
