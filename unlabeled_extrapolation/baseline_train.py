@@ -7,6 +7,7 @@ import os.path
 import pandas as pd
 from pathlib import Path
 import shutil
+import socket
 import sys
 import torch
 import torchvision
@@ -75,7 +76,7 @@ def update_best_stats(stats, best_stats):
             best_stats[best_k] = v
 
 
-def get_test_loaders(config):
+def get_test_loaders(config, shuffle=True):
     test_loaders = {}
     max_test_examples = {}
     logging.info('Found %d testing datasets.', len(config['test_datasets']))
@@ -86,7 +87,7 @@ def get_test_loaders(config):
         test_data = utils.init_dataset(test_dataset_config)
         test_loader = torch.utils.data.DataLoader(
             test_data, batch_size=config['batch_size'],
-            shuffle=True, num_workers=config['num_workers'])
+            shuffle=shuffle, num_workers=config['num_workers'])
         test_config_name = test_dataset_config['name']
         test_loaders[test_config_name] = test_loader
         # Some test datasets like CINIC are huge so we only test part of the dataset.
@@ -101,6 +102,14 @@ def get_test_loaders(config):
         logging.info('test loader: ' + str(test_loader))
         logging.info('test transform: ' + str(test_dataset_config['transforms']))
     return test_loaders, max_test_examples
+
+
+def get_train_loader(config, shuffle=True):
+    train_data = utils.init_dataset(config['train_dataset'])
+    train_loader = torch.utils.data.DataLoader(
+        train_data, batch_size=config['batch_size'],
+        shuffle=shuffle, num_workers=config['num_workers'])
+    return train_loader
 
 
 def build_model(config):
@@ -133,6 +142,11 @@ def build_model(config):
             net.add_probe(probe_net)
         else:
             net.new_last_layer(config['num_classes'])
+        if ('linear_probe_checkpoint_path' in config and
+            config['linear_probe_checkpoint_path'] != ''):
+            linprobe_path = config['linear_probe_checkpoint_path']
+            coef, intercept, best_c, best_i = pickle.load(open(linprobe_path, "rb"))
+            net.set_last_layer(coef, intercept)
         num_trainable_params = count_parameters(net, True)
         num_params = count_parameters(net, False) + num_trainable_params
         logging.info(f'Fine Tuning {num_trainable_params} of {num_params} parameters.')
@@ -225,10 +239,7 @@ def get_params(layers):
 def main(config, log_dir, checkpoints_dir):
     # Set up datasets and loaders.
     logging.info("Entering main.")
-    train_data = utils.init_dataset(config['train_dataset'])
-    train_loader = torch.utils.data.DataLoader(
-        train_data, batch_size=config['batch_size'],
-        shuffle=True, num_workers=config['num_workers'])
+    train_loader = get_train_loader(config)  
     # Set up test loaders.
     test_loaders, max_test_examples = get_test_loaders(config)
     # Create model.
@@ -429,6 +440,25 @@ def set_random_seed(seed):
         np.random.seed(seed + 111)
 
 
+def preprocess_config(config, config_path):
+    # If it's not a json config (e.g. if it's yaml) then process it. 
+    if not config_path.endswith('.json'):
+        # If we don't specify a transform for some test datasets, but specify a default transform,
+        # then use the default transform for that dataset. For datasets that do specify a transform
+        # we use that and not the default transform.
+        update_test_transform_configs(config)
+        # If linear probing, by default we turn batch-norm off while training, if unspecified.
+        # If you want bach-norm even when lin probing then set use_net_val_mode to False in the config.
+        update_net_eval_mode(config)
+        # Datasets may be stored in different directories in different clusters and platforms.
+        # We allow specifying a root_prefix that gets prepended to any specified dataset roots.
+        # So if config['root_prefix'] is defined then we prepend it to dataset['args']['root'] for
+        # train and test datasets.
+        update_root_prefix(config)
+        # # Note: copying config over is not that useful anymore with Quinine, so use json below.
+        # shutil.copy(args.config, log_dir+'/original_config.yaml')
+
+
 def setup():
     parser = argparse.ArgumentParser(
         description='Run model')
@@ -465,6 +495,7 @@ def setup():
         copy_folders(args.log_dir)
     # Setup logging.
     utils.setup_logging(log_dir, log_level)
+    logging.info('Running on machine %s', socket.gethostname())
     # Open config, update with command line args
     if args.config.endswith('.json'):
         # For json files, we just use it directly and don't process it, e.g. by adding
@@ -475,23 +506,9 @@ def setup():
         config = quinine.Quinfig(args.config)
     # Update config with command line arguments.
     utils.update_config(unparsed, config)
-    # If it's not a json config (e.g. if it's yaml) then process it. This makes specifying certain
-    # things more convenient, e.g. don't have to specify a transform for every test datset.
-    if not args.config.endswith('.json'):
-        # If we don't specify a transform for some test datasets, but specify a default transform,
-        # then use the default transform for that dataset. For datasets that do specify a transform
-        # we use that and not the default transform.
-        update_test_transform_configs(config)
-        # If linear probing, by default we turn batch-norm off while training, if unspecified.
-        # If you want bach-norm even when lin probing then set use_net_val_mode to False in the config.
-        update_net_eval_mode(config)
-        # Datasets may be stored in different directories in different clusters and platforms.
-        # We allow specifying a root_prefix that gets prepended to any specified dataset roots.
-        # So if config['root_prefix'] is defined then we prepend it to dataset['args']['root'] for
-        # train and test datasets.
-        update_root_prefix(config)
-        # # Note: copying config over is not that useful anymore with Quinine, so use json below.
-        # shutil.copy(args.config, log_dir+'/original_config.yaml')
+    # This makes specifying certain things more convenient, e.g. don't have to specify a
+    # transform for every test datset.
+    preprocess_config(config, args.config) 
     # Setup wandb.
     setup_wandb(args, config)
     # Set seed.

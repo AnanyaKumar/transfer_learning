@@ -1,0 +1,60 @@
+
+root_prefix: '/scr/scr-with-most-space/'
+
+# Add augmentations, and change normalization a bit.
+# The difference is swav augmentation has a 0.228 instead of 0.229 (lol)
+# Probably doesn't make a difference.
+train_dataset:
+    name: 'source_train_living'
+    classname: datasets.breeds.Breeds
+    args:
+        source: True
+        split: 'train'
+        breeds_name: 'living17'
+        root: 'imagenet/'
+    transforms:
+        - classname: torchvision.transforms.RandomResizedCrop
+          args:
+              size: 224
+        - classname: torchvision.transforms.RandomHorizontalFlip
+        - classname: torchvision.transforms.ToTensor
+        - classname: torchvision.transforms.Normalize
+          args:
+              mean: [0.485, 0.456, 0.406]
+              std: [0.228, 0.224, 0.225]
+
+# Change transform (e.g. centercrop), and change normalization a bit.
+default_test_transforms:
+    - classname: torchvision.transforms.Resize
+      args:
+          size: 256
+    - classname: torchvision.transforms.CenterCrop
+      args:
+          size: 224
+    - classname: torchvision.transforms.ToTensor
+    - classname: torchvision.transforms.Normalize
+      args:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.228, 0.224, 0.225]
+
+test_datasets:
+    - name: 'source_val_living'
+      classname: datasets.breeds.Breeds
+      args:
+          source: True
+          split: 'val'
+          breeds_name: 'living17'
+          root: 'imagenet/'
+    - name: 'target_val_living'
+      classname: datasets.breeds.Breeds
+      args:
+          source: False
+          target: True
+          split: 'val'
+          breeds_name: 'living17'
+          root: 'imagenet/'
+
+early_stop_dataset_names:
+    - 'source_val_living'
+    - 'target_val_living'
+

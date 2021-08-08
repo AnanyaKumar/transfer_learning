@@ -103,7 +103,7 @@ def setup_logging(log_dir, level=logging.DEBUG):
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
         datefmt='%Y-%m-%d:%H:%M:%S', level=level,
-        filename=log_dir+'/logs.txt')
+        filename=log_dir+'/logs.txt', force=True)
 
 
 def update_config(unparsed, config):

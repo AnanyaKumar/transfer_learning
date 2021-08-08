@@ -4,6 +4,7 @@ import torchvision.models as models
 from torchvision.models import resnet50
 import torch
 from torch import nn
+from . import model_utils
 try:
     from models import swav_resnet50
 except:
@@ -82,7 +83,10 @@ class ResNet50(nn.Module):
 
     def get_last_layer(self):
         return self._model.fc
- 
+
+    def set_last_layer(self, coef, intercept):
+        model_utils.set_linear_layer(self._model.fc, coef, intercept) 
+    
     def get_feature_extractor(self):
         return nn.Sequential(*list(self._model.children())[:-1])
 

@@ -2,6 +2,7 @@
 import torchvision
 import torch
 from torch import nn
+from . import model_utils
 
 
 class WildsVisionModel(nn.Module):
@@ -57,6 +58,10 @@ class WildsVisionModel(nn.Module):
     def get_last_layer(self):
         return getattr(self._model, self._last_layer_name)
     
+    def set_last_layer(self, coef, intercept):
+        last_layer = getattr(self._model, self._last_layer_name) 
+        model_utils.set_linear_layer(last_layer, coef, intercept)
+
     def get_feature_extractor(self):
         return nn.Sequential(*list(self._model.children())[:-1])
 
