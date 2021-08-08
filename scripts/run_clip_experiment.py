@@ -1,10 +1,11 @@
 import argparse
+import ast
 import clip
 import torch
 import numpy as np
 import pandas as pd
 import pathlib
-from sklearn.linear_model import LogisticRegression
+import sklearn
 from sklearn.metrics import confusion_matrix
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -16,7 +17,7 @@ DOMAINNET_CLASSNAMES_FILE = '/u/scr/nlp/domainnet/SENTRY_splits/classnames.txt'
 IMAGENET_CLASSNAMES_FILE = 'imagenet_classes.txt'
 DF_COLUMNS = ['SourceDomain', 'TargetDomain', 'AvgPerClassAcc']
 DOMAINS = ['sketch', 'clipart', 'painting', 'real']
-EXPERIMENT_TYPES = ['linear-probe', 'zero-shot', 'finetune', 'evaluate']
+EXPERIMENT_TYPES = ['probe', 'zero-shot', 'finetune', 'evaluate']
 IMAGENET_PROMPTS_FILE = 'imagenet_prompts.txt'
 RESULTS_DIR = pathlib.Path(__file__).parent.resolve().parent / 'results'
 
@@ -49,20 +50,7 @@ class ParseKwargs(argparse.Action):
         setattr(namespace, self.dest, dict())
         for value in values:
             key, value_str = value.split('=')
-            if value_str.replace('-', '').isnumeric():
-                processed_val = int(value_str)
-            elif value_str.replace('-', '').replace('.', '').isnumeric():
-                processed_val = float(value_str)
-            elif value_str in ['True', 'true']:
-                processed_val = True
-            elif value_str in ['False', 'false']:
-                processed_val = False
-            else:
-                try:
-                    processed_val = float(value_str)
-                except ValueError:
-                    processed_val = value_str
-
+            processed_val = ast.literal_eval(value_str)
             getattr(namespace, self.dest)[key] = processed_val
 
 
@@ -79,8 +67,11 @@ def make_experiment_dir(args):
         experiment_name += f'_optimizer{args.optimizer_name}'
         experiment_name += f'_lr{args.lr}_encoderlr{args.encoder_lr}'
         experiment_name += f'_batchsize{args.batch_size}'
-    elif args.experiment_type == 'linear-probe':
-        experiment_name += f'_C{args.C}'
+    elif args.experiment_type == 'probe':
+        experiment_name += f'_sklearn{args.sklearn_classifier_name}'
+        for key in sorted(args.sklearn_classifier_kwargs):
+            val = args.sklearn_classifier_kwargs[key]
+            experiment_name += f'_{key.replace("-", "")}{val}'
 
     experiment_name += f'_{args.experiment_type.replace("-", "")}'
     experiment_name = experiment_name.replace('/', '')
@@ -94,6 +85,11 @@ def make_experiment_dir(args):
         else:
             experiment_dir.mkdir(parents=True, exist_ok=True)
     return experiment_dir
+
+
+def init_sklearn_classifier(classifier_name, classifier_kwargs):
+    sklearn_classifiers = dict(sklearn.utils.all_estimators('classifier'))
+    return sklearn_classifiers[classifier_name](**classifier_kwargs)
 
 
 class ClipClassifier(torch.nn.Module):
@@ -184,7 +180,7 @@ def translate_features(src_features, src_domain, tgt_domain, model):
     return translated_features
 
 
-def linear_probe(args):
+def probe(args):
     experiment_dir = make_experiment_dir(args)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     clip_model, preprocess = clip.load(args.model, device)
@@ -196,8 +192,9 @@ def linear_probe(args):
     if args.translate_features:
         train_features = translate_features(train_features, train_domain,
                                             args.target_domain, clip_model)
-    probe = LogisticRegression(random_state=0, C=args.C, max_iter=10000)
-    print(f'Training linear probe on {train_domain}...')
+    probe = init_sklearn_classifier(args.sklearn_classifier_name,
+                                    args.sklearn_classifier_kwargs)
+    print(f'Training {probe} probe on {train_domain}...')
     probe.fit(train_features, train_labels)
 
     df = pd.DataFrame(columns=DF_COLUMNS)
@@ -388,7 +385,7 @@ def finetune(args):
         df.to_pickle(str(experiment_dir / 'results.pkl'))
 
 
-if __name__ == '__main__':
+def parse_args(args=None):
     parser = argparse.ArgumentParser(description='Run CLIP DA Experiments')
     parser.add_argument('source_domain', type=str, choices=DOMAINS,
                         help='Source domain')
@@ -406,10 +403,13 @@ if __name__ == '__main__':
     parser.add_argument('--no_save', action='store_true',
                         help='Don\'t save results')
 
-    linear_probe_group = parser.add_argument_group('Linear Probing Arguments')
-    linear_probe_group.add_argument('--C', default=0.316, type=float,
-                                    help='Inverse regularization')
-
+    probe_group = parser.add_argument_group('Probe Training Arguments')
+    probe_group.add_argument('--sklearn_classifier_name',
+                             default='LogisticRegression', type=str,
+                             help='Name of sklearn classifier')
+    probe_group.add_argument('--sklearn_classifier_kwargs', action=ParseKwargs,
+                             nargs='*', default=dict(),
+                             help='Keyword arguments for sklearn classifier')
     translate_group = parser.add_argument_group('Language Translation Args')
     translate_group.add_argument('--translate_features',
                                  action='store_true',
@@ -443,18 +443,22 @@ if __name__ == '__main__':
                                  help='Learning rate for encoder')
     optimizer_group.add_argument('--optimizer_kwargs', nargs='*',
                                  action=ParseKwargs, default={})
-    args = parser.parse_args()
+    return parser.parse_args(args)
+
+
+if __name__ == '__main__':
+    args = parse_args()
     if args.translate_features and args.target_domain == 'all':
         raise ValueError('If --translate_features is passed then only a single'
                          ' target domain must be used.')
 
-    if args.experiment_type == 'linear-probe':
+    if args.experiment_type == 'probe':
         if args.model == 'all':
             for model_name in clip.available_models():
                 args.model = model_name
-                linear_probe(args)
+                probe(args)
         else:
-            linear_probe(args)
+            probe(args)
     elif args.experiment_type == 'zero-shot':
         if args.model == 'all':
             for model_name in clip.available_models():
