@@ -1,57 +1,36 @@
 from run_clip_experiment import DF_COLUMNS
-from run_clip_experiment import RESULTS_DIR
-from run_clip_experiment import EXPERIMENT_TYPES
-from run_clip_experiment import ParseKwargs
+from run_clip_experiment import make_experiment_dir
+from run_clip_experiment import parse_args
 import argparse
-import clip
 import pandas as pd
+import shlex
 
 
 DOMAIN_ORDER = ['real', 'clipart', 'painting', 'sketch']
 
 
 def main(args):
-    experiment = args.experiment_type.replace('-', '')
-    model = args.model.replace('/', '')
-    results_folders = RESULTS_DIR.glob(f'clip_domainnet_{model}_*_{experiment}')
-    for key, value in args.experiment_kwargs.items():
-        filter_key = f'{key.replace("_", "")}{value}'
-        results_folders = filter(
-            lambda folder, filter_key=filter_key: filter_key in str(folder),
-            results_folders
-        )
-
-    domains = args.target_domains
-    results_folders = filter(
-        lambda folder: any(f'target{domain}' in str(folder) for domain in domains),
-        results_folders
-    )
-    if args.translate_features:
-        results_folders = filter(
-            lambda folder: '_translatefeats' in str(folder),
-            results_folders
-        )
-    else:
-        results_folders = filter(
-            lambda folder: '_translatefeats' not in str(folder),
-            results_folders
-        )
-    if args.translate_target:
-        results_folders = filter(
-            lambda folder: '_translatetarget' in str(folder),
-            results_folders
-        )
-    else:
-        results_folders = filter(
-            lambda folder: '_translatetarget' not in str(folder),
-            results_folders
-        )
-
     df = pd.DataFrame(columns=DF_COLUMNS)
-    for folder in results_folders:
-        if args.print_folders:
-            print(folder)
-        df = pd.concat((df, pd.read_pickle(folder / 'results.pkl')))
+    experiment_args = shlex.split(args.experiment_str)
+    parsed_args = None
+    if 'all' in args.source_domains:
+        args.source_domains = DOMAIN_ORDER
+    if 'all' in args.target_domains:
+        args.target_domains = ['all']
+    for src_domain in args.source_domains:
+        for tgt_domain in args.target_domains:
+            if parsed_args is None:
+                experiment_args = [src_domain, tgt_domain] + experiment_args
+                parsed_args = parse_args(experiment_args)
+            else:
+                parsed_args.source_domain = src_domain
+                parsed_args.target_domain = tgt_domain
+
+            experiment_dir = make_experiment_dir(parsed_args)
+            if args.print_folders:
+                print(experiment_dir)
+            experiment_df = pd.read_pickle(experiment_dir / 'results.pkl')
+            df = pd.concat((df, experiment_df))
 
     df = df.drop_duplicates()
     df.SourceDomain = pd.Categorical(df.SourceDomain, DOMAIN_ORDER)
@@ -66,27 +45,20 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Aggregate CLIP Experiments')
-    parser.add_argument('experiment_type', choices=EXPERIMENT_TYPES,
-                        help='Experiment type of results to aggregate')
-    parser.add_argument('model', type=str,
-                        choices=clip.available_models(),
-                        help='CLIP Model')
-    parser.add_argument('target_domains', nargs='*', default='all',
+    parser.add_argument('source_domains', nargs='+', default='all',
+                        choices=DOMAIN_ORDER + ['all'],
+                        help='Source domains of results to aggregate')
+    parser.add_argument('target_domains', nargs='+', default='all',
                         choices=DOMAIN_ORDER + ['all'],
                         help='Target domains of results to aggregate')
+    parser.add_argument('experiment_str', type=str,
+                        help='Rest of args passed to run_clip_experiment.py')
     parser.add_argument('--print_folders', action='store_true',
                         help='Print folders of results in aggregation')
-    parser.add_argument('--translate_features', action='store_true',
-                        help='Experiment used feature translation')
-    parser.add_argument('--translate_target', action='store_true',
-                        help='Experiment used target domain translation')
     parser.add_argument('--include_source_val', action='store_true',
                         help='Include validation results for source domains')
     parser.add_argument('--include_domain_names', action='store_true',
                         help='Print domain names')
-    parser.add_argument('--experiment_kwargs', nargs='*',
-                        action=ParseKwargs, default={},
-                        help='Other fields to filter results')
 
     args = parser.parse_args()
     main(args)
