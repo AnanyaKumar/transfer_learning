@@ -54,6 +54,22 @@ class ParseKwargs(argparse.Action):
             getattr(namespace, self.dest)[key] = processed_val
 
 
+def stringify_argument_group(args, group_title):
+    group_strings = []
+    group_args = sorted(args.groups[group_title])
+    for arg in group_args:
+        val = getattr(args, arg)
+        if isinstance(val, dict):
+            kwargs = val
+            kwargs_strings = []
+            for key in sorted(kwargs):
+                kwargs_strings.append(f'{key.replace("_", "")}{kwargs[key]}')
+            group_strings.append('_'.join(kwargs_strings))
+        else:
+            group_strings.append(f'{arg.replace("_", "")}{val}')
+    return '_'.join(group_strings)
+
+
 def make_experiment_dir(args):
     experiment_name = f'clip_domainnet_{args.model}'
     experiment_name += f'_source{args.source_domain}'
@@ -64,14 +80,10 @@ def make_experiment_dir(args):
         experiment_name += '_translatetarget'
 
     if args.experiment_type == 'finetune':
-        experiment_name += f'_optimizer{args.optimizer_name}'
-        experiment_name += f'_lr{args.lr}_encoderlr{args.encoder_lr}'
-        experiment_name += f'_batchsize{args.batch_size}'
+        experiment_name += f'_{stringify_argument_group(args, "finetune")}'
+        experiment_name += f'_{stringify_argument_group(args, "optimizer")}'
     elif args.experiment_type == 'probe':
-        experiment_name += f'_sklearn{args.sklearn_classifier_name}'
-        for key in sorted(args.sklearn_classifier_kwargs):
-            val = args.sklearn_classifier_kwargs[key]
-            experiment_name += f'_{key.replace("-", "")}{val}'
+        experiment_name += f'_{stringify_argument_group(args, "probe")}'
 
     experiment_name += f'_{args.experiment_type.replace("-", "")}'
     experiment_name = experiment_name.replace('/', '')
@@ -111,29 +123,13 @@ class ClipClassifier(torch.nn.Module):
         return self.classifier(embeddings)
 
 
-def get_features(dataset, model, source_domain=None, target_domain=None,
-                 adapt=False):
-
+def get_features(dataset, model):
     all_features = []
     all_labels = []
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    classnames = load_classnames()
     with torch.no_grad():
-        if source_domain:
-            source_text_inputs = torch.cat(
-                [clip.tokenize(f'a {source_domain} image of a {c}') for c in classnames]
-            ).to(device)
-            source_text_features = model.encode_text(source_text_inputs)
-        if target_domain:
-            target_text_inputs = torch.cat(
-                [clip.tokenize(f'a {target_domain} image of a {c}') for c in classnames]
-            ).to(device)
-            target_text_features = model.encode_text(target_text_inputs)
         for images, labels in tqdm(DataLoader(dataset, batch_size=128)):
             features = model.encode_image(images.to(device))
-            if adapt:
-                features += target_text_features[labels] - source_text_features[labels]
-
             all_features.append(features)
             all_labels.append(labels)
 
@@ -403,23 +399,24 @@ def parse_args(args=None):
     parser.add_argument('--no_save', action='store_true',
                         help='Don\'t save results')
 
-    probe_group = parser.add_argument_group('Probe Training Arguments')
+    probe_group = parser.add_argument_group('probe')
     probe_group.add_argument('--sklearn_classifier_name',
                              default='LogisticRegression', type=str,
                              help='Name of sklearn classifier')
     probe_group.add_argument('--sklearn_classifier_kwargs', action=ParseKwargs,
                              nargs='*', default=dict(),
                              help='Keyword arguments for sklearn classifier')
-    translate_group = parser.add_argument_group('Language Translation Args')
-    translate_group.add_argument('--translate_features',
-                                 action='store_true',
-                                 help='Use language to translate domains')
-    translate_group.add_argument('--translate_target', action='store_true',
-                                 help='Translate target domains')
-    translate_group.add_argument('--translate_function', type=str,
-                                 help='Function to perform translation')
 
-    finetuning_group = parser.add_argument_group('Finetuning Arguments')
+    language_group = parser.add_argument_group('language')
+    language_group.add_argument('--translate_features',
+                                action='store_true',
+                                help='Use language to translate domains')
+    language_group.add_argument('--translate_target', action='store_true',
+                                help='Translate target domains')
+    language_group.add_argument('--translate_function', type=str,
+                                help='Function to perform translation')
+
+    finetuning_group = parser.add_argument_group('finetune')
     finetuning_group.add_argument('--epochs', default=10, type=int,
                                   help='Number of epochs for finetuning')
     finetuning_group.add_argument('--batch_size', default=128, type=int,
@@ -429,12 +426,12 @@ def parse_args(args=None):
     finetuning_group.add_argument('--skip_source_eval', action='store_true',
                                   help='Don\'t test on source domain')
 
-    randaugment_group = parser.add_argument_group('RandAugment Arguments')
+    randaugment_group = parser.add_argument_group('randaugment')
     randaugment_group.add_argument('--randaugment_M', default=0, type=int,
                                    help='Value of M for RandAugment')
     randaugment_group.add_argument('--randaugment_N', default=0, type=int,
                                    help='Value of N for RandAugment')
-    optimizer_group = parser.add_argument_group('PyTorch Optimizer Arguments')
+    optimizer_group = parser.add_argument_group('optimizer')
     optimizer_group.add_argument('--optimizer_name', default='SGD', type=str,
                                  help='Classname of PyTorch optimizer to use')
     optimizer_group.add_argument('--lr', default=1e-3, type=float,
@@ -443,10 +440,19 @@ def parse_args(args=None):
                                  help='Learning rate for encoder')
     optimizer_group.add_argument('--optimizer_kwargs', nargs='*',
                                  action=ParseKwargs, default={})
-    return parser.parse_args(args)
+
+    parsed_args = parser.parse_args(args)
+    argument_groups = {}
+    for group in parser._action_groups:
+        if group.title in ('positional arguments', 'optional arguments'):
+            continue
+        group_args = [arg.dest for arg in group._group_actions]
+        argument_groups[group.title] = group_args
+    setattr(parsed_args, 'groups', argument_groups)
+    return parsed_args
 
 
-if __name__ == '__main__':
+if __name__ == '__in__':
     args = parse_args()
     if args.translate_features and args.target_domain == 'all':
         raise ValueError('If --translate_features is passed then only a single'
