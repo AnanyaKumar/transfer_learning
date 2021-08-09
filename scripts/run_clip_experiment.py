@@ -5,6 +5,7 @@ import torch
 import numpy as np
 import pandas as pd
 import pathlib
+import pickle
 import sklearn
 from sklearn.metrics import confusion_matrix
 from torch.utils.data import DataLoader
@@ -14,6 +15,7 @@ from unlabeled_extrapolation.datasets.domainnet import DomainNet
 
 DOMAINNET_ROOT = '/scr/biggest/domainnet'
 DOMAINNET_CLASSNAMES_FILE = '/u/scr/nlp/domainnet/SENTRY_splits/classnames.txt'
+FEATURES_ROOT = pathlib.Path('/scr/biggest/rmjones/clip_features/domainnet')
 IMAGENET_CLASSNAMES_FILE = 'imagenet_classes.txt'
 DF_COLUMNS = ['SourceDomain', 'TargetDomain', 'AvgPerClassAcc']
 DOMAINS = ['sketch', 'clipart', 'painting', 'real']
@@ -22,24 +24,44 @@ IMAGENET_PROMPTS_FILE = 'imagenet_prompts.txt'
 RESULTS_DIR = pathlib.Path(__file__).parent.resolve().parent / 'results'
 
 
-translate_functions = dict()
+language_transforms = dict()
 
 
-def register_translate_function(function):  # Decorator
-    translate_functions[function.__name__] = function
+def register_language_transform(function):  # Decorator
+    language_transforms[function.__name__] = function
     return function
 
 
-@register_translate_function
-def translate_domain_names(img_encodings, src_domain, tgt_domain, clip_model):
+@register_language_transform
+def subtract_source_add_target(img_encodings, src_domain, tgt_domain,
+                               clip_model):
+
     assert src_domain in DOMAINS and tgt_domain in DOMAINS
-    device = img_encodings.device
+    src_domain = 'photo' if src_domain == 'real' else src_domain
+    tgt_domain = 'photo' if tgt_domain == 'real' else tgt_domain
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     src_token = clip.tokenize(src_domain).to(device)
     tgt_token = clip.tokenize(tgt_domain).to(device)
     with torch.no_grad():
         src_embed = clip_model.encode_text(src_token)
         tgt_embed = clip_model.encode_text(tgt_token)
         translation = torch.flatten(tgt_embed - src_embed)
+        if isinstance(img_encodings, np.ndarray):
+            translation = translation.cpu().numpy()
+        translated_features = img_encodings + translation
+    return translated_features
+
+
+@register_language_transform
+def add_target(img_encodings, src_domain, tgt_domain, clip_model):
+    assert src_domain in DOMAINS and tgt_domain in DOMAINS
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    tgt_token = clip.tokenize(tgt_domain).to(device)
+    with torch.no_grad():
+        tgt_embed = clip_model.encode_text(tgt_token)
+        translation = torch.flatten(tgt_embed)
+        if isinstance(img_encodings, np.ndarray):
+            translation = translation.cpu().numpy()
         translated_features = img_encodings + translation
     return translated_features
 
@@ -123,10 +145,22 @@ class ClipClassifier(torch.nn.Module):
         return self.classifier(embeddings)
 
 
-def get_features(dataset, model):
+def get_features(domain, split, model, preprocess):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    dataset = DomainNet(domain, split, root=DOMAINNET_ROOT,
+                        transform=preprocess)
+
+    features_filename = f'{domain}_{split}.pkl'
+    features_dir = FEATURES_ROOT / model.name.replace('/', '')
+    features_dir.mkdir(parents=True, exist_ok=True)
+    features_path = features_dir / features_filename
+    if features_path.exists():
+        print(f'Loading {split} embeddings for {domain}')
+        return pickle.load(open(features_path, 'rb'))
+
     all_features = []
     all_labels = []
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f'Generating {split} embeddings for {domain}...')
     with torch.no_grad():
         for images, labels in tqdm(DataLoader(dataset, batch_size=128)):
             features = model.encode_image(images.to(device))
@@ -135,6 +169,7 @@ def get_features(dataset, model):
 
     features = torch.cat(all_features).cpu().numpy()
     labels = torch.cat(all_labels).cpu().numpy()
+    pickle.dump((features, labels), open(features_path, 'wb'))
     return features, labels
 
 
@@ -176,58 +211,95 @@ def translate_features(src_features, src_domain, tgt_domain, model):
     return translated_features
 
 
+def init_results_df(args, *group_names):
+    columns = [
+        'source_domain', 'target_domain', 'model', 'per_class_avg_acc', 'date',
+        'source_language_transform', 'target_language_transform'
+    ]
+    for group_name in group_names:
+        columns += args.groups[group_name]
+    return pd.DataFrame(columns=columns)
+
+
 def probe(args):
-    experiment_dir = make_experiment_dir(args)
+    results_df_path = RESULTS_DIR / 'probe.pkl'
+    if not results_df_path.exists():
+        results_df = init_results_df(args, 'probe')
+    else:
+        results_df = pd.read_pickle(RESULTS_DIR / 'probe.pkl')
+
+    experiment_params = {
+        'source_domain': args.source_domain,
+        'model': args.model,
+        'date': pd.Timestamp.now(),
+        'source_language_transform': args.source_language_transform,
+        'target_language_transform': args.target_language_transform
+    }
+    for arg in args.groups['probe']:
+        experiment_params[arg] = getattr(args, arg)
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     clip_model, preprocess = clip.load(args.model, device)
+    setattr(clip_model, 'name', args.model)
     train_domain = args.source_domain
-    train_dataset = DomainNet(train_domain, root=DOMAINNET_ROOT,
-                              transform=preprocess)
-    print(f'Generating training embeddings for {train_domain}...')
-    train_features, train_labels = get_features(train_dataset, clip_model)
-    if args.translate_features:
-        train_features = translate_features(train_features, train_domain,
+    train_features, train_labels = get_features(train_domain, 'train',
+                                                clip_model, preprocess)
+    source_language_transform = args.source_language_transform
+    if source_language_transform:
+        language_transform = language_transforms[source_language_transform]
+        train_features = language_transform(train_features, train_domain,
                                             args.target_domain, clip_model)
+
     probe = init_sklearn_classifier(args.sklearn_classifier_name,
                                     args.sklearn_classifier_kwargs)
     print(f'Training {probe} probe on {train_domain}...')
     probe.fit(train_features, train_labels)
 
-    df = pd.DataFrame(columns=DF_COLUMNS)
     source_domain = args.source_domain
     if not args.skip_source_eval:
-        test_dataset = DomainNet(source_domain, split='test',
-                                 root=DOMAINNET_ROOT, transform=preprocess)
-        print(f'Generating test embeddings for {source_domain}...')
-        test_features, test_labels = get_features(test_dataset, clip_model)
+        test_features, test_labels = get_features(source_domain, 'test',
+                                                  clip_model, preprocess)
+        if args.source_language_transform:
+            language_transform = language_transforms[source_language_transform]
+            test_features = language_transform(test_features, source_domain,
+                                               args.target_domain, clip_model)
+
         preds = probe.predict(test_features)
-        per_cls_avg_acc = compute_per_class_avg_acc(preds, test_labels)
-        print(f'{source_domain} test accuracy: {per_cls_avg_acc}')
-        df.loc[len(df)] = (source_domain, source_domain, per_cls_avg_acc)
+        per_class_avg_acc = compute_per_class_avg_acc(preds, test_labels)
+        print(f'{source_domain} test accuracy: {per_class_avg_acc}')
+        row = experiment_params
+        row['target_domain'] = source_domain
+        row['per_class_avg_acc'] = per_class_avg_acc
+        results_df.loc[len(results_df)] = row
 
     if args.target_domain == 'all':
         eval_domains = DOMAINS
     else:
         eval_domains = [args.target_domain]
 
+    target_language_transform = args.target_language_transform
     for eval_domain in eval_domains:
-        test_dataset = DomainNet(eval_domain, split='test',
-                                 root=DOMAINNET_ROOT, transform=preprocess)
-        print(f'Generating test embeddings for {eval_domain}...')
-        test_features, test_labels = get_features(test_dataset, clip_model)
-        if args.translate_target:
-            test_features = translate_features(test_features, eval_domain,
-                                               source_domain, clip_model)
+        if eval_domain == source_domain and not args.skip_source_eval:
+            continue
+
+        test_features, test_labels = get_features(eval_domain, 'test',
+                                                  clip_model, preprocess)
+        if target_language_transform:
+            language_transform = language_transforms[target_language_transform]
+            test_features = language_transform(test_features, source_domain,
+                                               eval_domain, clip_model)
+
         preds = probe.predict(test_features)
-        per_cls_avg_acc = compute_per_class_avg_acc(preds, test_labels)
-        print(f'{train_domain} -> {eval_domain}: {per_cls_avg_acc}')
-        df.loc[len(df)] = (source_domain, eval_domain, per_cls_avg_acc)
+        per_class_avg_acc = compute_per_class_avg_acc(preds, test_labels)
+        print(f'{train_domain} -> {eval_domain}: {per_class_avg_acc}')
+        row = experiment_params
+        row['target_domain'] = eval_domain
+        row['per_class_avg_acc'] = per_class_avg_acc
+        results_df.loc[len(results_df)] = row
 
     # Format results for easy copy-paste
-    print(f'CLIP {args.model} Avg. Per-Class Acc.')
-    print(df.AvgPerClassAcc.to_string(index=False))
     if not args.no_save:
-        df.to_pickle(str(experiment_dir / 'results.pkl'))
+        results_df.to_pickle(RESULTS_DIR / 'probe.pkl')
 
 
 def compute_per_class_avg_acc(preds, labels):
@@ -394,8 +466,6 @@ def parse_args(args=None):
                         help='CLIP Model')
     parser.add_argument('--overwrite', action='store_true',
                         help='Overwrite previously saved results')
-    parser.add_argument('--num_selftrain_iters', default=0, type=int,
-                        help='Number of self-training iterations')
     parser.add_argument('--no_save', action='store_true',
                         help='Don\'t save results')
 
@@ -408,13 +478,10 @@ def parse_args(args=None):
                              help='Keyword arguments for sklearn classifier')
 
     language_group = parser.add_argument_group('language')
-    language_group.add_argument('--translate_features',
-                                action='store_true',
-                                help='Use language to translate domains')
-    language_group.add_argument('--translate_target', action='store_true',
-                                help='Translate target domains')
-    language_group.add_argument('--translate_function', type=str,
-                                help='Function to perform translation')
+    language_group.add_argument('--source_language_transform', type=str,
+                                help='Language transform for source features')
+    language_group.add_argument('--target_language_transform', type=str,
+                                help='Language transform for target features')
 
     finetuning_group = parser.add_argument_group('finetune')
     finetuning_group.add_argument('--epochs', default=10, type=int,
@@ -452,12 +519,8 @@ def parse_args(args=None):
     return parsed_args
 
 
-if __name__ == '__in__':
+if __name__ == '__main__':
     args = parse_args()
-    if args.translate_features and args.target_domain == 'all':
-        raise ValueError('If --translate_features is passed then only a single'
-                         ' target domain must be used.')
-
     if args.experiment_type == 'probe':
         if args.model == 'all':
             for model_name in clip.available_models():
