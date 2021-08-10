@@ -221,6 +221,30 @@ def init_results_df(args, *group_names):
     return pd.DataFrame(columns=columns)
 
 
+def init_results_fields(args, experiment_type, include_date=True):
+    results_fields = {
+        'source_language_transform': args.source_language_transform,
+        'target_language_transform': args.target_language_transform
+    }
+    if hasattr(args, 'source_domain'):
+        results_fields['source_domain'] = args.source_domain
+    if hasattr(args, 'model'):
+        results_fields['model'] = args.model
+    if include_date:
+        results_fields['date'] = pd.Timestamp.now(),
+
+    arg_groups = []
+    if experiment_type == 'probe':
+        arg_groups.append(args.groups['probe'])
+    else:
+        raise ValueError(f'{experiment_type} not implemented yet!')
+
+    for group in arg_groups:
+        for arg in group:
+            results_fields[arg] = getattr(args, arg)
+    return results_fields
+
+
 def probe(args):
     results_df_path = RESULTS_DIR / 'probe.pkl'
     if not results_df_path.exists():
@@ -228,16 +252,7 @@ def probe(args):
     else:
         results_df = pd.read_pickle(RESULTS_DIR / 'probe.pkl')
 
-    experiment_params = {
-        'source_domain': args.source_domain,
-        'model': args.model,
-        'date': pd.Timestamp.now(),
-        'source_language_transform': args.source_language_transform,
-        'target_language_transform': args.target_language_transform
-    }
-    for arg in args.groups['probe']:
-        experiment_params[arg] = getattr(args, arg)
-
+    results_fields = init_results_fields(args, 'probe')
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     clip_model, preprocess = clip.load(args.model, device)
     setattr(clip_model, 'name', args.model)
@@ -267,7 +282,7 @@ def probe(args):
         preds = probe.predict(test_features)
         per_class_avg_acc = compute_per_class_avg_acc(preds, test_labels)
         print(f'{source_domain} test accuracy: {per_class_avg_acc}')
-        row = experiment_params
+        row = results_fields.copy()
         row['target_domain'] = source_domain
         row['per_class_avg_acc'] = per_class_avg_acc
         results_df.loc[len(results_df)] = row
@@ -292,7 +307,7 @@ def probe(args):
         preds = probe.predict(test_features)
         per_class_avg_acc = compute_per_class_avg_acc(preds, test_labels)
         print(f'{train_domain} -> {eval_domain}: {per_class_avg_acc}')
-        row = experiment_params
+        row = results_fields.copy()
         row['target_domain'] = eval_domain
         row['per_class_avg_acc'] = per_class_avg_acc
         results_df.loc[len(results_df)] = row
@@ -453,23 +468,14 @@ def finetune(args):
         df.to_pickle(str(experiment_dir / 'results.pkl'))
 
 
-def parse_args(args=None):
-    parser = argparse.ArgumentParser(description='Run CLIP DA Experiments')
-    parser.add_argument('source_domain', type=str, choices=DOMAINS,
-                        help='Source domain')
-    parser.add_argument('target_domain', type=str, choices=DOMAINS + ['all'],
-                        help='Target domain')
-    parser.add_argument('experiment_type', type=str, choices=EXPERIMENT_TYPES,
-                        help='Experiment to run')
-    parser.add_argument('model', type=str,
-                        choices=clip.available_models() + ['all'],
-                        help='CLIP Model')
-    parser.add_argument('--overwrite', action='store_true',
-                        help='Overwrite previously saved results')
-    parser.add_argument('--no_save', action='store_true',
-                        help='Don\'t save results')
+def parse_args(args=None, optionals_only=False):
+    optionals_parser = argparse.ArgumentParser(add_help=False)
+    optionals_parser.add_argument('--overwrite', action='store_true',
+                                  help='Overwrite previously saved results')
+    optionals_parser.add_argument('--no_save', action='store_true',
+                                  help='Don\'t save results')
 
-    probe_group = parser.add_argument_group('probe')
+    probe_group = optionals_parser.add_argument_group('probe')
     probe_group.add_argument('--sklearn_classifier_name',
                              default='LogisticRegression', type=str,
                              help='Name of sklearn classifier')
@@ -477,13 +483,13 @@ def parse_args(args=None):
                              nargs='*', default=dict(),
                              help='Keyword arguments for sklearn classifier')
 
-    language_group = parser.add_argument_group('language')
+    language_group = optionals_parser.add_argument_group('language')
     language_group.add_argument('--source_language_transform', type=str,
                                 help='Language transform for source features')
     language_group.add_argument('--target_language_transform', type=str,
                                 help='Language transform for target features')
 
-    finetuning_group = parser.add_argument_group('finetune')
+    finetuning_group = optionals_parser.add_argument_group('finetune')
     finetuning_group.add_argument('--epochs', default=10, type=int,
                                   help='Number of epochs for finetuning')
     finetuning_group.add_argument('--batch_size', default=128, type=int,
@@ -493,12 +499,12 @@ def parse_args(args=None):
     finetuning_group.add_argument('--skip_source_eval', action='store_true',
                                   help='Don\'t test on source domain')
 
-    randaugment_group = parser.add_argument_group('randaugment')
+    randaugment_group = optionals_parser.add_argument_group('randaugment')
     randaugment_group.add_argument('--randaugment_M', default=0, type=int,
                                    help='Value of M for RandAugment')
     randaugment_group.add_argument('--randaugment_N', default=0, type=int,
                                    help='Value of N for RandAugment')
-    optimizer_group = parser.add_argument_group('optimizer')
+    optimizer_group = optionals_parser.add_argument_group('optimizer')
     optimizer_group.add_argument('--optimizer_name', default='SGD', type=str,
                                  help='Classname of PyTorch optimizer to use')
     optimizer_group.add_argument('--lr', default=1e-3, type=float,
@@ -507,6 +513,21 @@ def parse_args(args=None):
                                  help='Learning rate for encoder')
     optimizer_group.add_argument('--optimizer_kwargs', nargs='*',
                                  action=ParseKwargs, default={})
+
+    parser = argparse.ArgumentParser(description='Run CLIP DA Experiments',
+                                     parents=[optionals_parser])
+    parser.add_argument('source_domain', type=str, choices=DOMAINS,
+                        help='Source domain')
+    parser.add_argument('target_domain', type=str, choices=DOMAINS + ['all'],
+                        help='Target domain')
+    parser.add_argument('experiment_type', type=str, choices=EXPERIMENT_TYPES,
+                        help='Experiment to run')
+    parser.add_argument('model', type=str,
+                        choices=clip.available_models() + ['all'],
+                        help='CLIP Model')
+
+    if optionals_only:
+        parser = optionals_parser
 
     parsed_args = parser.parse_args(args)
     argument_groups = {}
