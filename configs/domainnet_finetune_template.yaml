@@ -35,7 +35,7 @@ default_test_transforms:
 
 test_datasets:
     - name: 'id_test'
-      max_test_examples: 5000
+      max_test_examples: 2000
       classname: *domainnet_class
       args:
           domain: *id_domain
@@ -49,8 +49,8 @@ early_stop_dataset_names:
 
 log_interval: 5000
 use_cuda: True
-save_freq: 50
-epochs: &epochs 150
+save_freq: 25
+epochs: &epochs EPOCHS_REPLACE
 batch_size: 128
 num_workers: 2
 save_all_checkpoints: False
@@ -58,7 +58,7 @@ save_all_checkpoints: False
 num_classes: NUM_CLASSES_REPLACE
 
 finetune: True
-linear_probe: False
+linear_probe: False # freezes all layers up to the last
 use_net_val_mode: False
 
 optimizer:
@@ -69,14 +69,16 @@ optimizer:
     weight_decay: 0.0001
 
 scheduler:
-  classname: torch.optim.lr_scheduler.MultiStepLR
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
   args:
-    milestones: [60, 120]
+    T_max: *epochs
 
 model:
   classname: models.imnet_resnet.ResNet50
   args:
-    pretrained: False
+    pretrained: True
+    pretrain_style: 'swav'
+    checkpoint_path: 'CHECKPOINT_PATH_REPLACE'
 
 criterion:
   classname: torch.nn.CrossEntropyLoss

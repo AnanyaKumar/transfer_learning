@@ -24,7 +24,8 @@ def subsample_features(data_dict, id_domain, train_frac):
     num_samples = len(train_data_dict[0]) # id domain, train split, features
     idx = np.random.choice(num_samples, size=int(train_frac * num_samples), replace=False)
     data_dict[id_domain]['train'] = [train_data_dict[0][idx], train_data_dict[1][idx]]
-    print(f'Subsampled to {len(data_dict[id_domain]["train"][0])} features for training.')
+    subsample_size = len(data_dict[id_domain]['train'][0])
+    print(f'Subsampled to {subsample_size} features for training.')
 
 
 def normalize_features(data_dict, id_domain, all_domains):
@@ -106,7 +107,7 @@ def main():
             print(f'Already exists results at {save_path}. Skipping...')
             continue
         print(f'Using representations from {previous_args.dataset}, source {args.id_domain}, '
-            f'targets {",".join(args.ood_domains)}, using model {previous_args.ckpt_name} from {args.run_dir}, '
+            f'targets {",".join(args.ood_domains)}, using ckpt epoch {previous_args.ckpt_epoch} from {args.run_dir}, '
             f'now using a training data fraction {train_data_frac}.')
         subsample_features(data, args.id_domain, train_data_frac)
         normalize_features(data, args.id_domain, args.all_domains)

@@ -1,6 +1,14 @@
 #!/bin/bash
 
-avoid_jags="16,20,25-29"
+if [ "--prevent_excess_jobs" == $1 ]
+then
+    echo "Preventing queueing excess feature extraction jobs! (Make sure you know what this does)"
+    prevent_excess_jobs=1
+else
+    prevent_excess_jobs=0
+fi
+
+avoid_jags="14,15,16,19,20,25-29"
 
 # this runs first
 extract_features() {
@@ -13,6 +21,15 @@ extract_features() {
     cmd="python swav/finetuning/extract_features_new_fmt.py --dataset domainnet"
     cmd+=" --run_dir $run_dir --domainnet_version $version"
     cmd+=" --domains $1 --ckpt_epoch $swav_ckp_num"
+    if [ "$prevent_excess_jobs" == 1 ]
+    then
+        # check if it's done running. If it is, then do not queue up a new job
+        file_name="$run_dir/finetuning/features_and_labels_${version}_${swav_ckp_num}_new_fmt.pickle"
+        if test -f "$file_name"; then
+            run_1_slurm_id=-1
+            return
+        fi
+    fi
     run_1_slurm_id=$(sbatch --parsable -p jag-standard -x "jagupard[$avoid_jags]" sl_scripts/run_sbatch_kendrick_gpu.sh "$cmd")
     echo "Feature extraction: $run_1_slurm_id"
 }
@@ -32,7 +49,13 @@ linear_probe() {
     args+=" --id_domain $1 --ood_domains $2"
     cmd_1="python swav/finetuning/log_reg_sk.py $args"
     cmd_2="python swav/finetuning/summarize_results.py $args"
-    run_2_slurm_id=$(sbatch --parsable --dependency=afterok:$run_1_slurm_id sl_scripts/run_sbatch_kendrick.sh "$cmd_1" "$cmd_2")
+    if [ "$run_1_slurm_id" == -1 ]
+    then
+        dependency=""
+    else
+        dependency="--dependency=afterok:$run_1_slurm_id"
+    fi
+    run_2_slurm_id=$(sbatch --parsable $dependency sl_scripts/run_sbatch_kendrick.sh "$cmd_1" "$cmd_2")
     echo "Linear probing: $run_2_slurm_id"
 }
 
@@ -41,10 +64,10 @@ linear_probe() {
 #### SENTRY VERSIONS ####
 version="sentry"
 
-# # SENTRY VERSION, SOURCE-ONLY REAL
-# run_dir=""
-# extract_features "real,sketch"
-# linear_probe "real" "sketch"
+# SENTRY VERSION, SOURCE-ONLY REAL
+run_dir="/juice/scr/kshen6/unlabeled_extrapolation/swav/checkpoints/domainnet_sentrytrue_real_queue500_epochs400_batchsize128_epsilon0.03_archresnet50_prototypes400"
+extract_features "real,sketch"
+linear_probe "real" "sketch"
 
 # SENTRY VERSION, SOURCE-ONLY SKETCH
 run_dir="/juice/scr/kshen6/unlabeled_extrapolation/swav/checkpoints/domainnet_sourcereal_targetsketch_sourceamount0_targetamount1.0_relatedamount0_queue15_epochs400_batchsize128_epsilon0.03_archresnet50_prototypes400"
@@ -62,11 +85,11 @@ extract_features "real,sketch"
 linear_probe "real" "sketch"
 linear_probe "sketch" "real"
 
-# # SENTRY VERSION, SKETCH + PAINTING
-# run_dir=""
-# extract_features "sketch,painting"
-# linear_probe "sketch" "painting"
-# linear_probe "painting" "sketch"
+# SENTRY VERSION, SKETCH + PAINTING
+run_dir="/juice/scr/kshen6/unlabeled_extrapolation/swav/checkpoints/domainnet_sentrytrue_sketch-painting_queue500_epochs400_batchsize128_epsilon0.03_archresnet50_prototypes400"
+extract_features "sketch,painting"
+linear_probe "sketch" "painting"
+linear_probe "painting" "sketch"
 
 # SENTRY VERSION, ALL DOMAINNET
 run_dir="/juice/scr/kshen6/unlabeled_extrapolation/swav/checkpoints/domainnet_sentrytrue_all_queue500_epochs400_batchsize128_epsilon0.03_archresnet50_prototypes400"
@@ -120,15 +143,15 @@ version="full"
 # linear_probe "quickdraw" "sketch"
 
 # FULL VERSION, ALL DOMAINNET, NO QUEUE
-run_dir="/juice/scr/kshen6/unlabeled_extrapolation/swav/checkpoints/domainnet_sentryfalse_all_queue500_epochs400_batchsize128_epsilon0.03_archresnet50_prototypes3000"
-extract_features "real,sketch,quickdraw"
-linear_probe "real" "sketch"
-linear_probe "sketch" "real,quickdraw"
-linear_probe "quickdraw" "sketch"
+# run_dir="/juice/scr/kshen6/unlabeled_extrapolation/swav/checkpoints/domainnet_sentryfalse_all_queue500_epochs400_batchsize128_epsilon0.03_archresnet50_prototypes3000"
+# extract_features "real,sketch,quickdraw"
+# linear_probe "real" "sketch"
+# linear_probe "sketch" "real,quickdraw"
+# linear_probe "quickdraw" "sketch"
 
 # FULL VERSION, ALL DOMAINNET, QUEUE
-run_dir="/juice/scr/kshen6/unlabeled_extrapolation/swav/checkpoints/domainnet_sentryfalse_all_queue60_epochs400_batchsize128_epsilon0.03_archresnet50_prototypes3000"
-extract_features "real,sketch,quickdraw" 350
-linear_probe "real" "sketch" 350
-linear_probe "sketch" "real,quickdraw" 350
-linear_probe "quickdraw" "sketch" 350
+# run_dir="/juice/scr/kshen6/unlabeled_extrapolation/swav/checkpoints/domainnet_sentryfalse_all_queue60_epochs400_batchsize128_epsilon0.03_archresnet50_prototypes3000"
+# extract_features "real,sketch,quickdraw" 350
+# linear_probe "real" "sketch" 350
+# linear_probe "sketch" "real,quickdraw" 350
+# linear_probe "quickdraw" "sketch" 350

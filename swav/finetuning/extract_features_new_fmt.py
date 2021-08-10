@@ -34,7 +34,7 @@ DOMAINNET_ROOT = '/scr/biggest/domainnet'
 
 
 def load_feat_model(args):
-    ckpt_path = os.path.join(args.run_dir, 'checkpoints', args.ckpt_name)
+    ckpt_path = os.path.join(args.run_dir, 'checkpoints', f'ckp-{args.ckpt_epoch}.pth')
     model = ResNet50(pretrained=True, pretrain_style='swav', checkpoint_path=ckpt_path)
     feat_model = model.get_feature_extractor()
     feat_model = feat_model.cuda()
