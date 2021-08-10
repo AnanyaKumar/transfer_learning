@@ -1,58 +1,63 @@
-from run_clip_experiment import DF_COLUMNS
-from run_clip_experiment import RESULTS_DIR
 from run_clip_experiment import EXPERIMENT_TYPES
-from run_clip_experiment import ParseKwargs
+from run_clip_experiment import RESULTS_DIR
+from run_clip_experiment import parse_args
+from run_clip_experiment import init_results_fields
 import argparse
-import clip
 import pandas as pd
+import shlex
 
 
 DOMAIN_ORDER = ['real', 'clipart', 'painting', 'sketch']
 
 
 def main(args):
-    experiment = args.experiment_type.replace('-', '')
-    model = args.model.replace('/', '')
-    results_folders = RESULTS_DIR.glob(f'clip_domainnet_{model}*{experiment}')
-    for key, value in args.experiment_kwargs.items():
-        filter_key = f'{key}{value}'
-        results_folders = filter(
-            lambda folder, filter_key=filter_key: filter_key in str(folder),
-            results_folders
-        )
+    results_filepath = RESULTS_DIR / f'{args.experiment_type}.pkl'
+    df = pd.read_pickle(results_filepath)
+    experiment_args = shlex.split(args.experiment_str)
+    parsed_args = parse_args(experiment_args, optionals_only=True)
+    results_fields = init_results_fields(parsed_args, args.experiment_type,
+                                         include_date=False)
+    if 'all' in args.source_domains:
+        args.source_domains = DOMAIN_ORDER
+    if 'all' in args.target_domains:
+        args.target_domains = DOMAIN_ORDER
 
-    results_folders = filter(lambda folder: 'targetall' in str(folder),
-                             results_folders)
-
-    df = pd.DataFrame(columns=DF_COLUMNS)
-    for folder in results_folders:
-        df = pd.concat((df, pd.read_pickle(folder / 'results.pkl')))
-
-    df = df.drop_duplicates()
-    df.SourceDomain = pd.Categorical(df.SourceDomain, DOMAIN_ORDER)
-    df.TargetDomain = pd.Categorical(df.TargetDomain, DOMAIN_ORDER)
-    df = df.sort_values(['SourceDomain', 'TargetDomain'])
+    df = df[df.source_domain.isin(args.source_domains)]
+    df = df[df.target_domain.isin(args.target_domains)]
+    df = df[df.model == args.model]
+    mask = (df[list(results_fields)] == pd.Series(results_fields)).any(axis=1)
+    df = df.loc[mask]
+    df = df.loc[df.astype(str).drop_duplicates().index]
+    df.source_domain = pd.Categorical(df.source_domain, DOMAIN_ORDER)
+    df.target_domain = pd.Categorical(df.target_domain, DOMAIN_ORDER)
+    df = df.sort_values(['source_domain', 'target_domain'])
     if not args.include_source_val:
-        df = df[df.SourceDomain != df.TargetDomain]
-    if not args.include_domain_names:
-        df = df.drop(columns=['SourceDomain', 'TargetDomain'])
-    print(df.to_string(index=False))
+        df = df[df.source_domain != df.target_domain]
+    columns = ['per_class_avg_acc']
+    if args.include_domain_names:
+        columns = ['source_domain', 'target_domain'] + columns
+    print(df[columns].to_string(index=False))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Aggregate CLIP Experiments')
-    parser.add_argument('experiment_type', choices=EXPERIMENT_TYPES,
-                        help='Experiment type of results to aggregate')
-    parser.add_argument('model', type=str,
-                        choices=clip.available_models(),
-                        help='CLIP Model')
+    parser.add_argument('experiment_type', type=str, choices=EXPERIMENT_TYPES,
+                        help='CLIP experiment type')
+    parser.add_argument('model', type=str, help='CLIP model')
+    parser.add_argument('experiment_str', type=str,
+                        help='Rest of args passed to run_clip_experiment.py')
+    parser.add_argument('--source_domains', nargs='+', default=['all'],
+                        choices=DOMAIN_ORDER + ['all'],
+                        help='Source domains of results to aggregate')
+    parser.add_argument('--target_domains', nargs='+', default=['all'],
+                        choices=DOMAIN_ORDER + ['all'],
+                        help='Target domains of results to aggregate')
+    parser.add_argument('--print_folders', action='store_true',
+                        help='Print folders of results in aggregation')
     parser.add_argument('--include_source_val', action='store_true',
-                        help='Include validation results for souce domain')
+                        help='Include validation results for source domains')
     parser.add_argument('--include_domain_names', action='store_true',
                         help='Print domain names')
-    parser.add_argument('--experiment_kwargs', nargs='*',
-                        action=ParseKwargs, default={},
-                        help='Other fields to filter results')
 
     args = parser.parse_args()
     main(args)

@@ -3,7 +3,7 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --partition=jag-standard
 #SBATCH --exclude=jagupard[28-29]
-#SBATCH --mem=16GB
+#SBATCH --mem=8GB
 #SBATCH --gres=gpu:1
 #SBATCH --requeue
 
