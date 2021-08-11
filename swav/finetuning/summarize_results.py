@@ -6,9 +6,8 @@ import io
 
 def main(args):
     results = pd.DataFrame()
-    ood_domain_string = ",".join(args.ood_domains)
     for data_frac in args.train_data_fracs:
-        file_name = f'lin_probe_{args.file_name}_{args.id_domain}_{ood_domain_string}_{data_frac}.pickle'
+        file_name = f'lin_probe_{args.file_name}_{args.id_domain}_{args.ood_domain_str}_{data_frac}.pickle'
         path = os.path.join(args.run_dir, 'finetuning', file_name)
         if not os.path.exists(path):
             print(f'No file at {path}. Skipping...')
@@ -43,6 +42,11 @@ if __name__ == '__main__':
                         help='Name of the pickle file (without directories, without .pickle).')
     parser.add_argument('--train_data_fracs', type=float, nargs='+',
                         help='Train data fraction checkpoints to summarize.')
+    parser.add_argument('--is_breeds', action='store_true')
     args = parser.parse_args()
+    args.ood_domain_str = args.ood_domains
     args.ood_domains = args.ood_domains.split(',')
+    if args.is_breeds:
+        args.id_domain = (args.id_domain, True)
+        args.ood_domains = [(d, False) for d in args.ood_domains]
     main(args)
