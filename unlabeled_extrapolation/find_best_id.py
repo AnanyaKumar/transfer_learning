@@ -1,14 +1,19 @@
 import argparse
 import pandas as pd
+import os
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--stats_tsvs', type=str, nargs='+', required=True)
+parser.add_argument('stats_tsvs', type=str, nargs='+')
 
 if __name__ == '__main__':
     args = parser.parse_args()
     for stats_tsv in args.stats_tsvs:
         print('*' * 30)
         print('Now doing', stats_tsv)
+        print('Command:')
+        with open(os.path.join(os.path.dirname(stats_tsv), 'command.txt'), 'r') as f:
+            cmd = f.read()
+            print(cmd)
         stats = pd.read_csv(stats_tsv, sep='\t')
         best_epoch = stats['test_acc/id_test'].argmax()
         columns = list(stats.columns)

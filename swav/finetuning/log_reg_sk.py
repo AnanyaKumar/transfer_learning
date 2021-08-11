@@ -6,9 +6,9 @@ import os
 
 def get_max_iters(dataset, domain_task):
     if dataset == 'breeds':
-        if domain_task == 'entity30':
-            return 100
-        if domain_task == 'living17':
+        if domain_task[0] == 'entity30':
+            return 150
+        if domain_task[0] == 'living17':
             return 200
         raise NotImplementedError('Other Breeds tasks not supported.')
     if dataset == 'domainnet':
@@ -24,7 +24,8 @@ def subsample_features(data_dict, id_domain, train_frac):
     num_samples = len(train_data_dict[0]) # id domain, train split, features
     idx = np.random.choice(num_samples, size=int(train_frac * num_samples), replace=False)
     data_dict[id_domain]['train'] = [train_data_dict[0][idx], train_data_dict[1][idx]]
-    print(f'Subsampled to {len(data_dict[id_domain]["train"][0])} features for training.')
+    subsample_size = len(data_dict[id_domain]['train'][0])
+    print(f'Subsampled to {subsample_size} features for training.')
 
 
 def normalize_features(data_dict, id_domain, all_domains):
@@ -79,13 +80,18 @@ def main():
                         help='Name of the pickle file (without directories, without .pickle).')
     parser.add_argument('--overwrite', action='store_true',
                         help='If set, will overwrite the existing files.')
+    parser.add_argument('--is_breeds', action='store_true', help='Set if is breeds task.')
     args = parser.parse_args()
 
     if args.file_name.endswith('.pickle'):
         args.file_name = args.file_name[:-len('.pickle')]
     load_path = os.path.join(args.run_dir, 'finetuning', f'{args.file_name}.pickle')
     
+    args.ood_domain_str = args.ood_domains
     args.ood_domains = args.ood_domains.split(',')
+    if args.is_breeds: # use source for ID, target for OOD
+        args.id_domain = (args.id_domain, True)
+        args.ood_domains = [(d, False) for d in args.ood_domains]
 
     # check that feature extraction done
     if not os.path.exists(load_path):
@@ -98,15 +104,13 @@ def main():
 
     for train_data_frac in args.train_data_fracs:
         data, previous_args = pickle.load(open(load_path, 'rb'))
-        if previous_args.dataset == 'breeds':
-            raise NotImplementedError()
-        save_file_name = f'lin_probe_{args.file_name}_{args.id_domain}_{",".join(args.ood_domains)}_{train_data_frac}.pickle'
+        save_file_name = f'lin_probe_{args.file_name}_{args.id_domain}_{args.ood_domain_str}_{train_data_frac}.pickle'
         save_path = os.path.join(args.run_dir, 'finetuning', save_file_name)
         if (not args.overwrite) and (os.path.exists(save_path)):
             print(f'Already exists results at {save_path}. Skipping...')
             continue
         print(f'Using representations from {previous_args.dataset}, source {args.id_domain}, '
-            f'targets {",".join(args.ood_domains)}, using model {previous_args.ckpt_name} from {args.run_dir}, '
+            f'targets {args.ood_domain_str}, using ckpt epoch {previous_args.ckpt_epoch} from {args.run_dir}, '
             f'now using a training data fraction {train_data_frac}.')
         subsample_features(data, args.id_domain, train_data_frac)
         normalize_features(data, args.id_domain, args.all_domains)

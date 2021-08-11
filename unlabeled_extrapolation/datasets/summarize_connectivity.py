@@ -16,7 +16,7 @@ parser.add_argument('--target', type=str, default=None,
                     help='Name of target dataset. If not provided, will be set to the '
                     'same as --source')
 parser.add_argument('--test_between', required=True, choices=['classes', 'domains'])
-parser.add_argument('--transform', type=str, choices=['imagenet', 'simclr'], required=True)
+parser.add_argument('--transform', type=str, choices=['imagenet', 'simclr'], default='simclr')
 parser.add_argument('--num_iters', default=15, type=int,
                     help='If doing class-comparison, the number of random pairs to choose.')
 parser.add_argument('--seed', default=20, type=int, help='Seed for choosing pairs of classes.')
@@ -99,8 +99,9 @@ if __name__ == '__main__':
             results.append([class_1, class_mapping[int(class_1)], class_2, class_mapping[int(class_2)],
                             final_source_train_acc, final_source_test_acc, final_target_train_acc, final_target_test_acc])
     df = pd.DataFrame(results)
+    df.loc['mean'] = df.mean()
     print('Printing copy-and-pastable csv to the terminal...')
     with io.StringIO() as buffer:
-        df.to_csv(buffer, sep='\t', index=False)
+        df.to_csv(buffer, sep='\t')
         print(buffer.getvalue())
 

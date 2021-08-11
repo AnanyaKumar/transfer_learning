@@ -1,5 +1,5 @@
     - name: 'OOD_DOMAIN_REPLACE_test'
-      max_test_examples: 5000
+      max_test_examples: 2000
       classname: *domainnet_class
       args:
           domain: 'OOD_DOMAIN_REPLACE'

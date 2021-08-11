@@ -2,13 +2,13 @@
 # https://github.com/pytorch/examples/blob/master/imagenet/main.py
 
 train_dataset:
-    classname: &domainnet_class datasets.domainnet.DomainNet
+    classname: &breeds_class datasets.breeds.Breeds
     args:
-        domain: &id_domain 'ID_DOMAIN_REPLACE'
+        source: True
+        target: False
         split: 'train'
-        root: &domainnet_root '/scr/biggest/domainnet'
-        verbose: True
-        version: &domainnet_version 'DOMAINNET_VERSION_REPLACE'
+        breeds_name: &breeds_name 'BREEDS_NAME_REPLACE'
+        root: &breeds_root '/scr/biggest/imagenet/'
     transforms:
         - classname: torchvision.transforms.RandomResizedCrop
           args:
@@ -34,23 +34,32 @@ default_test_transforms:
           std: *norm_std
 
 test_datasets:
-    - name: 'id_test'
-      max_test_examples: 5000
-      classname: *domainnet_class
+    - name: 'source_val'
+      max_test_examples: 2000
+      classname: *breeds_class
       args:
-          domain: *id_domain
-          split: 'test'
-          root: *domainnet_root
-          version: *domainnet_version
-# ADD OOD HERE
+          source: True
+          target: False
+          split: 'val'
+          breeds_name: *breeds_name
+          root: *breeds_root
+    - name: 'target_val'
+      max_test_examples: 2000
+      classname: *breeds_class
+      args:
+          source: False
+          target: True
+          split: 'val'
+          breeds_name: *breeds_name
+          root: *breeds_root
 
 early_stop_dataset_names:
-  - 'id_test'
+  - 'source_val'
 
 log_interval: 5000
 use_cuda: True
-save_freq: 50
-epochs: &epochs 150
+save_freq: 25
+epochs: &epochs EPOCHS_REPLACE
 batch_size: 128
 num_workers: 2
 save_all_checkpoints: False
@@ -58,7 +67,7 @@ save_all_checkpoints: False
 num_classes: NUM_CLASSES_REPLACE
 
 finetune: True
-linear_probe: False
+linear_probe: False # freezes all layers up to the last
 use_net_val_mode: False
 
 optimizer:
@@ -69,14 +78,16 @@ optimizer:
     weight_decay: 0.0001
 
 scheduler:
-  classname: torch.optim.lr_scheduler.MultiStepLR
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
   args:
-    milestones: [60, 120]
+    T_max: *epochs
 
 model:
   classname: models.imnet_resnet.ResNet50
   args:
-    pretrained: False
+    pretrained: True
+    pretrain_style: 'swav'
+    checkpoint_path: 'CHECKPOINT_PATH_REPLACE'
 
 criterion:
   classname: torch.nn.CrossEntropyLoss

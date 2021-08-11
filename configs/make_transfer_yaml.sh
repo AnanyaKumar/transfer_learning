@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=40G
-#SBATCH --partition=jag-hi
+#SBATCH --partition=jag-standard
 #SBATCH --exclude=jagupard[11-14,16,17,19,20,24]
 
 source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
@@ -61,6 +61,12 @@ if [[ $version != "sentry" && $version != "full" ]]; then
     exit 1
 fi
 
+if [[ $version == "sentry" ]]; then
+    num_classes=40
+else
+    num_classes=345
+fi
+
 # get UUID, make a new file
 uuid=$(uuidgen)
 base_dir="/juice/scr/kshen6/unlabeled_extrapolation/configs"
@@ -71,6 +77,7 @@ cp $base_file $new_config
 # replace everything that should be replaced
 sed -i "s/ID_DOMAIN_REPLACE/${id_domain}/" $new_config
 sed -i "s/DOMAINNET_VERSION_REPLACE/${version}/" $new_config
+sed -i "s/NUM_CLASSES_REPLACE/${num_classes}/" $new_config
 
 ood_template="${base_dir}/ood_template.txt"
 # parse the ood domains, edit the config
@@ -89,9 +96,16 @@ run_name+="_${version}"
 replace_marker="# ADD OOD HERE"
 sed -i "s/${replace_marker}//" $new_config
 
+# make sure that REPLACE is not found in new config. Otherwise fail.
+left_to_replace=$(grep -c "REPLACE" "$new_config")
+if (( $left_to_replace > 0 )); then
+    echo "Improperly edited the template, still fields to replace"
+    exit 0
+fi
+
 python unlabeled_extrapolation/baseline_train.py \
     --config $new_config \
-    --log_dir logs/dn_erm \
+    --log_dir logs/$uuid \
     --project_name dn_erm \
     --group_name single_source \
     --run_name $run_name
