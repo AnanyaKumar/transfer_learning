@@ -1,6 +1,7 @@
 import argparse
 import ast
 import clip
+import json
 import torch
 import numpy as np
 import pandas as pd
@@ -8,6 +9,7 @@ import pathlib
 import pickle
 import sklearn
 from sklearn.metrics import confusion_matrix
+import sqlalchemy
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from unlabeled_extrapolation.datasets.domainnet import DomainNet
@@ -18,11 +20,15 @@ DOMAINNET_CLASSNAMES_FILE = '/u/scr/nlp/domainnet/SENTRY_splits/classnames.txt'
 FEATURES_ROOT = pathlib.Path('/scr/biggest/rmjones/clip_features/domainnet')
 IMAGENET_CLASSNAMES_FILE = 'imagenet_classes.txt'
 DF_COLUMNS = ['SourceDomain', 'TargetDomain', 'AvgPerClassAcc']
+DEFAULT_COLUMNS = [
+    ('source_domain', str), ('target_domain', str), ('model', str),
+    ('avg_per_class_acc', float), ('date', pd.Timestamp)
+]
 DOMAINS = ['sketch', 'clipart', 'painting', 'real']
-EXPERIMENT_TYPES = ['probe', 'zero-shot', 'finetune', 'evaluate']
+EXPERIMENT_TYPES = ['probe', 'zero-shot', 'finetune']
 IMAGENET_PROMPTS_FILE = 'imagenet_prompts.txt'
 RESULTS_DIR = pathlib.Path(__file__).parent.resolve().parent / 'results'
-
+RESULTS_DB_URL = f'sqlite:///{RESULTS_DIR / "results.db"}'
 
 language_transforms = dict()
 
@@ -212,12 +218,9 @@ def translate_features(src_features, src_domain, tgt_domain, model):
 
 
 def init_results_df(args, *group_names):
-    columns = [
-        'source_domain', 'target_domain', 'model', 'per_class_avg_acc', 'date',
-        'source_language_transform', 'target_language_transform'
-    ]
+    columns = [column[0] for column in DEFAULT_COLUMNS]
     for group_name in group_names:
-        columns += args.groups[group_name]
+        columns += [arg.dest for arg in args.groups[group_name]]
     return pd.DataFrame(columns=columns)
 
 
@@ -231,7 +234,7 @@ def init_results_fields(args, experiment_type, include_date=True):
     if hasattr(args, 'model'):
         results_fields['model'] = args.model
     if include_date:
-        results_fields['date'] = pd.Timestamp.now(),
+        results_fields['date'] = pd.Timestamp.now()
 
     arg_groups = []
     if experiment_type == 'probe':
@@ -241,17 +244,15 @@ def init_results_fields(args, experiment_type, include_date=True):
 
     for group in arg_groups:
         for arg in group:
-            results_fields[arg] = getattr(args, arg)
+            val = getattr(args, arg.dest)
+            if isinstance(val, dict):
+                val = json.dumps(val)
+            results_fields[arg.dest] = val
     return results_fields
 
 
 def probe(args):
-    results_df_path = RESULTS_DIR / 'probe.pkl'
-    if not results_df_path.exists():
-        results_df = init_results_df(args, 'probe')
-    else:
-        results_df = pd.read_pickle(RESULTS_DIR / 'probe.pkl')
-
+    results_df = init_results_df(args, 'probe', 'language')
     results_fields = init_results_fields(args, 'probe')
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     clip_model, preprocess = clip.load(args.model, device)
@@ -284,7 +285,7 @@ def probe(args):
         print(f'{source_domain} test accuracy: {per_class_avg_acc}')
         row = results_fields.copy()
         row['target_domain'] = source_domain
-        row['per_class_avg_acc'] = per_class_avg_acc
+        row['avg_per_class_acc'] = per_class_avg_acc
         results_df.loc[len(results_df)] = row
 
     if args.target_domain == 'all':
@@ -309,12 +310,13 @@ def probe(args):
         print(f'{train_domain} -> {eval_domain}: {per_class_avg_acc}')
         row = results_fields.copy()
         row['target_domain'] = eval_domain
-        row['per_class_avg_acc'] = per_class_avg_acc
+        row['avg_per_class_acc'] = per_class_avg_acc
         results_df.loc[len(results_df)] = row
 
     # Format results for easy copy-paste
     if not args.no_save:
-        results_df.to_pickle(RESULTS_DIR / 'probe.pkl')
+        engine = sqlalchemy.create_engine(RESULTS_DB_URL, echo=True)
+        results_df.to_sql('probe', engine, if_exists='append')
 
 
 def compute_per_class_avg_acc(preds, labels):
@@ -468,10 +470,53 @@ def finetune(args):
         df.to_pickle(str(experiment_dir / 'results.pkl'))
 
 
+def setup(args):
+    quiet = args.quiet
+
+    def print_if_verbose(msg):
+        if not quiet:
+            print(msg)
+
+    def type_to_sqlalchemy(python_type, argparse_action=None):
+        if python_type == str:
+            return sqlalchemy.types.Text
+        elif python_type == float:
+            return sqlalchemy.types.Float
+        elif python_type == pd.Timestamp:
+            return sqlalchemy.types.DateTime
+        elif isinstance(argparse_action, ParseKwargs): # dictionary
+            return sqlalchemy.types.JSON
+        else:
+            raise ValueError(f'Unsupported type {python_type}')
+
+    print_if_verbose('Setting up databases...')
+    engine = sqlalchemy.create_engine(RESULTS_DB_URL, echo=not quiet)
+    if_exists = 'replace' if args.overwrite else 'append'
+    dtypes = {
+        column[0]: type_to_sqlalchemy(column[1]) for column in DEFAULT_COLUMNS
+    }
+
+    # Setup probe table
+    print_if_verbose('Setting up probe table')
+    group_names = ['probe', 'language']
+    for group_name in group_names:
+        arg_group = args.groups[group_name]
+        group_dtypes = {
+            arg.dest: type_to_sqlalchemy(arg.type, arg) for arg in arg_group
+        }
+        dtypes.update(group_dtypes)
+    mock_df = init_results_df(args, *group_names)
+    mock_df.to_sql('probe', engine, if_exists=if_exists, dtype=dtypes)
+
+    print_if_verbose('Finished with setup')
+
+
 def parse_args(args=None, optionals_only=False):
     optionals_parser = argparse.ArgumentParser(add_help=False)
-    optionals_parser.add_argument('--overwrite', action='store_true',
-                                  help='Overwrite previously saved results')
+    optionals_parser.add_argument(
+        '--overwrite', action='store_true',
+        help='Overwrite previously saved results'
+    )
     optionals_parser.add_argument('--no_save', action='store_true',
                                   help='Don\'t save results')
 
@@ -514,27 +559,40 @@ def parse_args(args=None, optionals_only=False):
     optimizer_group.add_argument('--optimizer_kwargs', nargs='*',
                                  action=ParseKwargs, default={})
 
-    parser = argparse.ArgumentParser(description='Run CLIP DA Experiments',
-                                     parents=[optionals_parser])
-    parser.add_argument('source_domain', type=str, choices=DOMAINS,
-                        help='Source domain')
-    parser.add_argument('target_domain', type=str, choices=DOMAINS + ['all'],
-                        help='Target domain')
-    parser.add_argument('experiment_type', type=str, choices=EXPERIMENT_TYPES,
-                        help='Experiment to run')
-    parser.add_argument('model', type=str,
-                        choices=clip.available_models() + ['all'],
-                        help='CLIP Model')
+    parser = argparse.ArgumentParser(
+        description='CLIP Domain Adaptation Experiments',
+    )
 
+    subparsers = parser.add_subparsers(
+        dest='subcommand', help='Sub-Command Help'
+    )
+    parser_exp = subparsers.add_parser(
+        'experiment', parents=[optionals_parser], help='Experiment Help'
+    )
+    parser_exp.add_argument('source_domain', type=str, choices=DOMAINS,
+                            help='Source domain')
+    parser_exp.add_argument('target_domain', type=str,
+                            choices=DOMAINS + ['all'], help='Target domain')
+    parser_exp.add_argument('experiment_type', type=str,
+                            choices=EXPERIMENT_TYPES, help='Experiment to run')
+    parser_exp.add_argument('model', type=str,
+                            choices=clip.available_models() + ['all'],
+                            help='CLIP Model')
+
+    parser_setup = subparsers.add_parser('setup', help='Setup Help')
+    parser_setup.add_argument('--overwrite', action='store_true',
+                              help='Overwrite existing tables')
+    parser_setup.add_argument('-q', '--quiet', action='store_true',
+                              help='Don\'t print progress during setup')
     if optionals_only:
         parser = optionals_parser
 
     parsed_args = parser.parse_args(args)
     argument_groups = {}
-    for group in parser._action_groups:
+    for group in optionals_parser._action_groups:
         if group.title in ('positional arguments', 'optional arguments'):
             continue
-        group_args = [arg.dest for arg in group._group_actions]
+        group_args = [arg for arg in group._group_actions]
         argument_groups[group.title] = group_args
     setattr(parsed_args, 'groups', argument_groups)
     return parsed_args
@@ -542,7 +600,9 @@ def parse_args(args=None, optionals_only=False):
 
 if __name__ == '__main__':
     args = parse_args()
-    if args.experiment_type == 'probe':
+    if args.subcommand == 'setup':
+        setup(args)
+    elif args.experiment_type == 'probe':
         if args.model == 'all':
             for model_name in clip.available_models():
                 args.model = model_name
