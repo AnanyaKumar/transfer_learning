@@ -138,7 +138,7 @@ def main():
         if 'default_test_transforms' not in config:
             raise ValueError('Specify default test transforms if not using train transform.')
         config['train_dataset']['transforms'] = config['default_test_transforms']
-    else if args.use_test_transforms_for_train != 'False':
+    elif args.use_test_transforms_for_train != 'False':
         raise ValueError('use_test_transforms_for_train must be True or False.')
     train_loader = get_train_loader(config)
     
