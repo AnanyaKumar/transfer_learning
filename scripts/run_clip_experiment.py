@@ -9,6 +9,7 @@ import pathlib
 import pickle
 import sklearn
 from sklearn.metrics import confusion_matrix
+from sklearn.preprocessing import normalize
 import sqlalchemy
 from sqlalchemy.orm import Session
 from torch.utils.data import DataLoader
@@ -205,7 +206,7 @@ class ClipClassifier(torch.nn.Module):
         return self.classifier(embeddings)
 
 
-def get_features(domain, split, model, preprocess):
+def get_features(domain, split, model, preprocess, normalize_features=False):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     dataset = DomainNet(domain, split, root=DOMAINNET_ROOT,
                         transform=preprocess)
@@ -216,20 +217,23 @@ def get_features(domain, split, model, preprocess):
     features_path = features_dir / features_filename
     if features_path.exists():
         print(f'Loading {split} embeddings for {domain}')
-        return pickle.load(open(features_path, 'rb'))
+        features, labels = pickle.load(open(features_path, 'rb'))
+    else:
+        all_features = []
+        all_labels = []
+        print(f'Generating {split} embeddings for {domain}...')
+        with torch.no_grad():
+            for images, labels in tqdm(DataLoader(dataset, batch_size=128)):
+                features = model.encode_image(images.to(device))
+                all_features.append(features)
+                all_labels.append(labels)
 
-    all_features = []
-    all_labels = []
-    print(f'Generating {split} embeddings for {domain}...')
-    with torch.no_grad():
-        for images, labels in tqdm(DataLoader(dataset, batch_size=128)):
-            features = model.encode_image(images.to(device))
-            all_features.append(features)
-            all_labels.append(labels)
+        features = torch.cat(all_features).cpu().numpy()
+        labels = torch.cat(all_labels).cpu().numpy()
+        pickle.dump((features, labels), open(features_path, 'wb'))
 
-    features = torch.cat(all_features).cpu().numpy()
-    labels = torch.cat(all_labels).cpu().numpy()
-    pickle.dump((features, labels), open(features_path, 'wb'))
+    if normalize_features:
+        features = normalize(features)
     return features, labels
 
 
@@ -341,8 +345,9 @@ def probe(args):
     clip_model, preprocess = clip.load(args.model, device)
     setattr(clip_model, 'name', args.model)
     train_domain = args.source_domain
-    train_features, train_labels = get_features(train_domain, 'train',
-                                                clip_model, preprocess)
+    train_features, train_labels = get_features(
+        train_domain, 'train', clip_model, preprocess, args.normalize_features
+    )
     source_language_transform = args.source_language_transform
     if source_language_transform:
         language_transform = language_transforms[source_language_transform]
@@ -356,8 +361,10 @@ def probe(args):
 
     source_domain = args.source_domain
     if not args.skip_source_eval:
-        test_features, test_labels = get_features(source_domain, 'test',
-                                                  clip_model, preprocess)
+        test_features, test_labels = get_features(
+            source_domain, 'test', clip_model, preprocess,
+            args.normalize_features
+        )
         if args.source_language_transform:
             language_transform = language_transforms[source_language_transform]
             test_features = language_transform(test_features, source_domain,
@@ -381,8 +388,10 @@ def probe(args):
         if eval_domain == source_domain and not args.skip_source_eval:
             continue
 
-        test_features, test_labels = get_features(eval_domain, 'test',
-                                                  clip_model, preprocess)
+        test_features, test_labels = get_features(
+            eval_domain, 'test', clip_model, preprocess,
+            args.normalize_features
+        )
         if target_language_transform:
             language_transform = language_transforms[target_language_transform]
             test_features = language_transform(test_features, source_domain,
@@ -677,6 +686,8 @@ def parse_args(args=None):
                                   help='Don\'t save results')
 
     probe_group = optionals_parser.add_argument_group('probe')
+    probe_group.add_argument('--normalize_features', action='store_true',
+                             help='L2 normalize probe features')
     probe_group.add_argument('--sklearn_classifier_name',
                              default='LogisticRegression', type=str,
                              help='Name of sklearn classifier')
