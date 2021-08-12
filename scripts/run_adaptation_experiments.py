@@ -441,6 +441,12 @@ cifar_stl = Dataset(
     slurm_data_dir='/u/scr/ananya/',
     eval_config_rel_path='adaptation/cifar_stl_eval.yaml')
 
+names_to_datasets = {
+    'living17': living17,
+    'entity30': entity30,
+    'cifar_stl': cifar_stl,
+}
+
 
 ############################################
 ## Models.
@@ -510,40 +516,59 @@ def append_to_each(hyperparams_list, more_hyperparams):
 ## Main experiments.
 ############################################
 
-def fine_tuning_experiments(args):
-    # TODO: enable all datasets.
-    # datasets = [cifar_stl, living17, entity30]
-    datasets = [cifar_stl]
+SWEEP_LRS = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
+
+def get_datasets(args):
+    if args.datasets is None:
+        datasets = list(names_to_datasets.values())
+    else:
+        datasets = [names_to_datasets[n] for n in args.datasets]
+
+
+def fine_tuning_experiments(args, num_replications=5):
+    datasets = get_datasets(args)
     model = moco_resnet50
-    # Fine-tuning (can optionally add 3e-2, 1e-1 if you want)
-    # hyperparams_list = range_hyper('optimizer.args.lr', [3e-5, 1e-4])
-    hyperparams_list = range_hyper('optimizer.args.lr', [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2])
+    if args.run_only_once:
+        hyperparams_list = range_hyper('optimizer.args.lr', [SWEEP_LRS[0]])
+        num_replications = 0
+    else:
+        hyperparams_list = range_hyper('optimizer.args.lr', SWEEP_LRS)
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
+    if args.no_replications:
+        num_replications = 0
     for dataset in datasets:
         _, all_ids = adaptation_experiment(
             adapt_name='full_ft', dataset=dataset, model=model, hyperparams_list=hyperparams_list,
-            num_replications=5, args=args)
+            num_replications=num_replications, args=args)
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
-def linprobe_experiments(args):
-    datasets = [cifar_stl, living17, entity30]
+def linprobe_experiments(args, num_replications=5):
+    datasets = get_datasets(args)
     model = moco_resnet50
+    if args.no_replications or args.run_only_once:
+        num_replications = 1
     for dataset in datasets:
         _, all_ids = linprobe_experiment(
-            adapt_name='linprobe', dataset=dataset, model=model, num_replications=5, args=args)
+            adapt_name='linprobe', dataset=dataset, model=model, num_replications=num_replications,
+            args=args)
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
-def lp_then_ft_experiments(args):
+
+def lp_then_ft_experiments(args, num_replications=5):
     # datasets = [cifar_stl, living17, entity30]
     adapt_name = 'lp_then_ft'
     num_replications = 5
-    datasets = [cifar_stl]
+    datasets = get_datasets(args)
     model = moco_resnet50
-    # Fine-tuning (can optionally add 3e-2, 1e-1 if you want)
-    hyperparams_list = range_hyper('optimizer.args.lr', [3e-5, 1e-4])
-    # hyperparams_list = range_hyper('optimizer.args.lr', [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2])
+    if args.run_only_once:
+        hyperparams_list = range_hyper('optimizer.args.lr', [SWEEP_LRS[0]])
+        num_replications = 0
+    else:
+        hyperparams_list = range_hyper('optimizer.args.lr', SWEEP_LRS)
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
+    if args.no_replications:
+        num_replications = 0
     for dataset in datasets:
         cur_hyperparams_list = deepcopy(hyperparams_list)
         group_path = get_group_dir_path(adapt_name, dataset.name, model.name, args)
@@ -650,7 +675,13 @@ if __name__ == "__main__":
                         help='(Slurm only) Directory where tmp files are stored.')
     parser.add_argument('--sbatch_script_name', type=str, required=False, default='run_sbatch.sh',
                         help='(Slurm only) sbatch script')
+    parser.add_argument('--datasets', type=str, nargs='+',
+                        help='Datasets to test on (if unspecified, run on all).', required=False)
+    parser.add_argument('--only_one_run', action='store_true',
+                        help=('Only run one hyperparameter setting, e.g. for debugging'
+                              '(also do not run replications).'), required=False)
+    parser.add_argument('--no_replications', action='store_true',
+                        help='Don\'t run replication runs, only sweep.', required=False)
     args, unparsed = parser.parse_known_args()
     fill_platform_specific_default_args(args)
     main(args)
-
