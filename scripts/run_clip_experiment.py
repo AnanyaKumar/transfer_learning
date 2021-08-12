@@ -25,8 +25,10 @@ DEFAULT_COLUMNS = [
     ('avg_per_class_acc', float), ('date', pd.Timestamp)
 ]
 DOMAINS = ['sketch', 'clipart', 'painting', 'real']
+DOMAIN_ORDER = ['real', 'clipart', 'painting', 'sketch'] # For printing
 EXPERIMENT_TYPES = ['probe', 'zero-shot', 'finetune']
 IMAGENET_PROMPTS_FILE = 'imagenet_prompts.txt'
+MODEL_ORDER = ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'ViT-B/32', 'ViT-B/16']
 RESULTS_DIR = pathlib.Path(__file__).parent.resolve().parent / 'results'
 RESULTS_DB_URL = f'sqlite:///{RESULTS_DIR / "results.db"}'
 
@@ -470,6 +472,68 @@ def finetune(args):
         df.to_pickle(str(experiment_dir / 'results.pkl'))
 
 
+def results(args):
+    '''
+    Aggregates experimental results based on supplied filters and prints to the
+    command line.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Command line arguments for results command.
+    '''
+    engine = sqlalchemy.create_engine(RESULTS_DB_URL, echo=args.show_sql)
+    meta = sqlalchemy.MetaData()
+    if args.experiment_type == 'probe':
+        group_names = ['probe', 'language']
+        table = sqlalchemy.Table('probe', meta, autoload_with=engine)
+    else:
+        raise ValueError(f'Can\'t query for {args.experiment_type} results')
+
+    select_columns = [
+        table.c.source_domain, table.c.target_domain, table.c.model,
+        table.c.avg_per_class_acc
+    ]
+
+    select = sqlalchemy.select(*select_columns)
+    if args.model != 'all':
+        select = select.where(table.c.model == args.model)
+    source_domains, target_domains = args.source_domains, args.target_domains
+    if 'all' in source_domains:
+        source_domains = DOMAINS
+    if 'all' in target_domains:
+        target_domains = DOMAINS
+    if len(set(source_domains)) < len(DOMAINS):
+        select = select.where(table.source_domain.in_(source_domains))
+    if len(set(target_domains)) < len(DOMAINS):
+        select = select.where(table.target_domain.in_(target_domains))
+
+    for group_name in group_names:
+        arg_group = args.groups[group_name]
+        for arg in arg_group:
+            column = table.c[arg.dest]
+            arg_val = getattr(args, arg.dest)
+            select = select.where(column == arg_val)
+
+    df = pd.read_sql(select, engine)
+    if not args.include_source_val:
+        df = df[df.source_domain != df.target_domain]
+    df.source_domain = pd.Categorical(df.source_domain, DOMAIN_ORDER)
+    df.target_domain = pd.Categorical(df.target_domain, DOMAIN_ORDER)
+    df = df.sort_values(['source_domain', 'target_domain'])
+    if args.model == 'all':
+        df = df.pivot(
+            index=('source_domain', 'target_domain'), columns='model',
+            values='avg_per_class_acc'
+        )
+        df = df.reindex(MODEL_ORDER, axis=1)
+        print(df.to_csv(sep=args.sep, index=False))
+    else:
+        if not args.include_domain_names:
+            df = df.drop(columns=['source_domain', 'target_domain'])
+        print(df.to_string(index=False))
+
+
 def setup(args):
     quiet = args.quiet
 
@@ -511,7 +575,7 @@ def setup(args):
     print_if_verbose('Finished with setup')
 
 
-def parse_args(args=None, optionals_only=False):
+def parse_args(args=None):
     optionals_parser = argparse.ArgumentParser(add_help=False)
     optionals_parser.add_argument(
         '--overwrite', action='store_true',
@@ -569,23 +633,60 @@ def parse_args(args=None, optionals_only=False):
     parser_exp = subparsers.add_parser(
         'experiment', parents=[optionals_parser], help='Experiment Help'
     )
-    parser_exp.add_argument('source_domain', type=str, choices=DOMAINS,
-                            help='Source domain')
-    parser_exp.add_argument('target_domain', type=str,
-                            choices=DOMAINS + ['all'], help='Target domain')
     parser_exp.add_argument('experiment_type', type=str,
                             choices=EXPERIMENT_TYPES, help='Experiment to run')
     parser_exp.add_argument('model', type=str,
                             choices=clip.available_models() + ['all'],
                             help='CLIP Model')
+    parser_exp.add_argument('source_domain', type=str, choices=DOMAINS,
+                            help='Source domain')
+    parser_exp.add_argument('target_domain', type=str,
+                            choices=DOMAINS + ['all'], help='Target domain')
 
     parser_setup = subparsers.add_parser('setup', help='Setup Help')
     parser_setup.add_argument('--overwrite', action='store_true',
                               help='Overwrite existing tables')
     parser_setup.add_argument('-q', '--quiet', action='store_true',
                               help='Don\'t print progress during setup')
-    if optionals_only:
-        parser = optionals_parser
+
+    parser_results = subparsers.add_parser(
+        'results', parents=[optionals_parser], help='Results Help'
+    )
+    parser_results.add_argument(
+        'experiment_type', type=str, choices=EXPERIMENT_TYPES,
+        help='CLIP experiment type'
+    )
+    parser_results.add_argument('model', type=str, help='CLIP model')
+    parser_results.add_argument(
+        '--source_domains', nargs='*', default=['all'],
+        choices=DOMAINS + ['all'],
+        help='Source domains of results to aggregate'
+    )
+    parser_results.add_argument(
+        '--target_domains', nargs='*', default=['all'],
+        choices=DOMAINS + ['all'],
+        help='Target domains of results to aggregate'
+    )
+    parser_results.add_argument(
+        '--print_folders', action='store_true',
+        help='Print folders of results in aggregation'
+    )
+    parser_results.add_argument(
+        '--include_source_val', action='store_true',
+        help='Include validation results for source domains'
+    )
+    parser_results.add_argument(
+        '--include_domain_names', action='store_true',
+        help='Print domain names'
+    )
+    parser_results.add_argument(
+        '--show_sql', action='store_true',
+        help='Show Database activity during queries'
+    )
+    parser_results.add_argument(
+        '--sep', type=str, default='\t',
+        help='Separator char between results columns'
+    )
 
     parsed_args = parser.parse_args(args)
     argument_groups = {}
@@ -602,23 +703,26 @@ if __name__ == '__main__':
     args = parse_args()
     if args.subcommand == 'setup':
         setup(args)
-    elif args.experiment_type == 'probe':
-        if args.model == 'all':
-            for model_name in clip.available_models():
-                args.model = model_name
+    elif args.subcommand == 'results':
+        results(args)
+    elif args.subcommand == 'experiment':
+        if args.experiment_type == 'probe':
+            if args.model == 'all':
+                for model_name in clip.available_models():
+                    args.model = model_name
+                    probe(args)
+            else:
                 probe(args)
-        else:
-            probe(args)
-    elif args.experiment_type == 'zero-shot':
-        if args.model == 'all':
-            for model_name in clip.available_models():
-                zero_shot(model_name)
-        else:
-            zero_shot(args.model)
-    elif args.experiment_type == 'finetune':
-        if args.model == 'all':
-            for model_name in clip.available_models():
-                args.model = model_name
+        elif args.experiment_type == 'zero-shot':
+            if args.model == 'all':
+                for model_name in clip.available_models():
+                    zero_shot(model_name)
+            else:
+                zero_shot(args.model)
+        elif args.experiment_type == 'finetune':
+            if args.model == 'all':
+                for model_name in clip.available_models():
+                    args.model = model_name
+                    finetune(args)
+            else:
                 finetune(args)
-        else:
-            finetune(args)
