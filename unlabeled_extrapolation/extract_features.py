@@ -113,6 +113,8 @@ def main():
                         help='YAML config', required=True)
     parser.add_argument('--save_path', type=str, metavar='s',
                         help='Path to save extracted features.', required=True)
+    parser.add_argument('--use_test_transforms_for_train', action='store_true',
+                        help='no augmentations when training.')
     args, unparsed = parser.parse_known_args()
     config = quinine.Quinfig(args.config)
     utils.update_config(unparsed, config) 
@@ -131,6 +133,10 @@ def main():
     test_name_loaders = sorted(list(test_loaders.items()))
     test_names = [k for k, v in test_name_loaders]
     loader_names = [config.train_dataset.name] + test_names
+    if args.use_test_transforms_for_train:
+        if 'default_test_transforms' not in config:
+            raise ValueError('Specify default test transforms if not using train transform.')
+        config['train_dataset']['transforms'] = config['default_test_transforms']
     train_loader = get_train_loader(config)
     
     # Get features and labels.

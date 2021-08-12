@@ -54,17 +54,22 @@ def run_job(cmd, job_name, args, deps=[]):
         return run_sbatch(cmd, job_name, args, deps=deps)
 
 
-def format_value(v):
+def format_key_value(k, v):
     if type(v) == list:
         if type(v[0]) == list:
             raise ValueError('We only support 1D lists.')
-        return ' ' + ' '.join([str(e) for e in v])
-    return '=' + str(v)
+        return f'--{k} ' + ' '.join([str(e) for e in v])
+    if type(v) == bool:
+        if v:
+            return f'--{k}'
+        return ''
+    return f'--{k}=' + str(v)
 
 
 def get_python_cmd(code_path, python_path='python', kwargs=None, args=None):
     if kwargs is not None:
-        opts = ''.join([f"--{k}{format_value(v)} " for k, v in kwargs.items()])
+        # Make sure to keep the space at the end.
+        opts = ''.join([f"{format_key_value(k, v)} " for k, v in kwargs.items()])
         # opts += ''.join([f"--{k} " for k, v in kwargs.items() if isinstance(v, bool) and v and '.' not in k])
     else:
         opts = ''
@@ -277,12 +282,14 @@ def adaptation_experiment(adapt_name, dataset, model, hyperparams_list, num_repl
 
 
 def linprobe_run(args, job_name, model, seed, config_path, features_save_path, results_save_path,
-                 weights_save_path, val_metric, num_reg_values=50, deps=[], rerun=False):
+                 weights_save_path, val_metric, num_reg_values=50, deps=[], rerun=False, aug=True):
     extract_code_path = args.code_dir + '/extract_features.py'
     kwargs = {}
     add_model_to_kwargs(kwargs, args, model)
     kwargs['config'] = config_path
     kwargs['save_path'] = features_save_path
+    if not(aug):
+        kwargs['use_test_transforms_for_train'] = True
     extract_cmd = get_python_cmd(code_path=extract_code_path, python_path=args.python_path,
                                  kwargs=kwargs, args=args)
     log_reg_code_path = args.code_dir + '/log_reg_sk.py'
@@ -302,7 +309,8 @@ def linprobe_run(args, job_name, model, seed, config_path, features_save_path, r
     return run_job(cmd, job_name, args, deps=deps)
 
 
-def run_linprobe_replication(adapt_name, dataset, model, seed, args, deps=[], rerun=False):
+def run_linprobe_replication(adapt_name, dataset, model, seed, args, deps=[], rerun=False,
+                             aug=True):
     group_dir_path = get_group_dir_path(adapt_name, dataset.name, model.name, args)
     config_path = get_config_path(args, dataset.config_rel_path)
     features_save_path = group_dir_path + '/features_' + str(seed)
@@ -314,14 +322,15 @@ def run_linprobe_replication(adapt_name, dataset, model, seed, args, deps=[], re
     deps = add_dataset_model_deps(deps, args, dataset, model)
     return linprobe_run(
         args, job_name, model, seed, config_path, features_save_path, results_save_path,
-        weights_save_path, val_metric, deps=deps, rerun=rerun)
+        weights_save_path, val_metric, deps=deps, rerun=rerun, aug=aug)
 
 
-def linprobe_experiment(adapt_name, dataset, model, num_replications, args, deps=[], rerun=False):
+def linprobe_experiment(adapt_name, dataset, model, num_replications, args, deps=[], rerun=False,
+                        aug=True):
     replication_ids = []
     for i in range(num_replications):
         job_id = run_linprobe_replication(adapt_name, dataset, model, seed=i, args=args,
-                                          deps=deps, rerun=rerun)
+                                          deps=deps, rerun=rerun, aug=aug)
         replication_ids.append(job_id)
     summarize_id = summarize_linprobe(adapt_name, dataset, model, args, deps=replication_ids)
     all_ids = replication_ids + [summarize_id]
@@ -526,6 +535,7 @@ def get_datasets(args):
 
 
 def fine_tuning_experiments(args, num_replications=5):
+    adapt_name = 'full_ft'
     datasets = get_datasets(args)
     model = moco_resnet50
     if args.run_only_once:
@@ -538,21 +548,28 @@ def fine_tuning_experiments(args, num_replications=5):
         num_replications = 0
     for dataset in datasets:
         _, all_ids = adaptation_experiment(
-            adapt_name='full_ft', dataset=dataset, model=model, hyperparams_list=hyperparams_list,
+            adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
             num_replications=num_replications, args=args)
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
-def linprobe_experiments(args, num_replications=5):
+def linprobe_experiments(args, num_replications=5, aug=True):
+    adapt_name = 'linprobe'
+    if not(aug):
+        adapt_name += '_noaug'
     datasets = get_datasets(args)
     model = moco_resnet50
     if args.no_replications or args.run_only_once:
         num_replications = 1
     for dataset in datasets:
         _, all_ids = linprobe_experiment(
-            adapt_name='linprobe', dataset=dataset, model=model, num_replications=num_replications,
-            args=args)
+            adapt_name=adapt_name, dataset=dataset, model=model, num_replications=num_replications,
+            args=args, aug=aug)
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
+
+
+def linprobe_experiments_no_aug(args, num_replications=5):
+    linprobe_experiments(args, num_replications=num_replications, aug=False) 
 
 
 def lp_then_ft_experiments(args, num_replications=5):
@@ -622,6 +639,7 @@ def main(args):
         'spray_domainnet_jags': spray_domainnet_jags,
         'fine_tuning_experiments': fine_tuning_experiments,
         'linprobe_experiments': linprobe_experiments,
+        'linprobe_experiments_no_aug': linprobe_experiments_no_aug,
         'lp_then_ft_experiments': lp_then_ft_experiments,
     }
     if args.experiment in experiment_to_fns:
