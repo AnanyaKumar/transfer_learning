@@ -533,6 +533,8 @@ def get_datasets(args):
         datasets = list(names_to_datasets.values())
     else:
         datasets = [names_to_datasets[n] for n in args.datasets]
+    print(datasets)
+    return datasets
 
 
 def fine_tuning_experiments(args, num_replications=5):
