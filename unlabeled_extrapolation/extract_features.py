@@ -135,9 +135,11 @@ def main():
     test_names = [k for k, v in test_name_loaders]
     loader_names = [config.train_dataset.name] + test_names
     if args.use_test_transforms_for_train == 'True':
+        print('Using test transform')
         if 'default_test_transforms' not in config:
             raise ValueError('Specify default test transforms if not using train transform.')
         config['train_dataset']['transforms'] = config['default_test_transforms']
+        print(config['train_dataset'])
     elif args.use_test_transforms_for_train != 'False':
         raise ValueError('use_test_transforms_for_train must be True or False.')
     train_loader = get_train_loader(config)
