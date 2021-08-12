@@ -59,10 +59,11 @@ def format_key_value(k, v):
         if type(v[0]) == list:
             raise ValueError('We only support 1D lists.')
         return f'--{k} ' + ' '.join([str(e) for e in v])
-    if type(v) == bool:
-        if v:
-            return f'--{k}'
-        return ''
+    # I wanted to do this, but this messes up with update_config in utils.py, and hard to fix that.
+    # if type(v) == bool:
+    #     if v:
+    #         return f'--{k}'
+    #     return ''
     return f'--{k}=' + str(v)
 
 
@@ -288,8 +289,7 @@ def linprobe_run(args, job_name, model, seed, config_path, features_save_path, r
     add_model_to_kwargs(kwargs, args, model)
     kwargs['config'] = config_path
     kwargs['save_path'] = features_save_path
-    if not(aug):
-        kwargs['use_test_transforms_for_train'] = True
+    kwargs['use_test_transforms_for_train'] = True
     extract_cmd = get_python_cmd(code_path=extract_code_path, python_path=args.python_path,
                                  kwargs=kwargs, args=args)
     log_reg_code_path = args.code_dir + '/log_reg_sk.py'
