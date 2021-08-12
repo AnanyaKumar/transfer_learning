@@ -538,7 +538,7 @@ def fine_tuning_experiments(args, num_replications=5):
     adapt_name = 'full_ft'
     datasets = get_datasets(args)
     model = moco_resnet50
-    if args.run_only_once:
+    if args.only_one_run:
         hyperparams_list = range_hyper('optimizer.args.lr', [SWEEP_LRS[0]])
         num_replications = 0
     else:
@@ -559,7 +559,7 @@ def linprobe_experiments(args, num_replications=5, aug=True):
         adapt_name += '_noaug'
     datasets = get_datasets(args)
     model = moco_resnet50
-    if args.no_replications or args.run_only_once:
+    if args.no_replications or args.only_one_run:
         num_replications = 1
     for dataset in datasets:
         _, all_ids = linprobe_experiment(
@@ -578,7 +578,7 @@ def lp_then_ft_experiments(args, num_replications=5):
     num_replications = 5
     datasets = get_datasets(args)
     model = moco_resnet50
-    if args.run_only_once:
+    if args.only_one_run:
         hyperparams_list = range_hyper('optimizer.args.lr', [SWEEP_LRS[0]])
         num_replications = 0
     else:
