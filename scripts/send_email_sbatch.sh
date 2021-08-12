@@ -1,3 +1,5 @@
+#!/usr/bin/env sh
+
 print_usage () {
     USAGE_STRING="Usage: send_email_sbatch.sh [-h|--help]"
     USAGE_STRING="$USAGE_STRING [--slurm_dependency JOBID]"
@@ -6,8 +8,8 @@ print_usage () {
     echo $USAGE_STRING
 }
 
+set -e
 recipient=$(whoami)@cs.stanford.edu
-
 while true; do
     case "$1" in
 	-h|--help) # Print help
@@ -52,11 +54,10 @@ subject=$1
 email_generation=$2
 email_text_or_command=$3
 
-cmd='sbatch'
+cmd="sbatch"
 if [ "$slurm_dependency" ]; then
     cmd="$cmd --dependency=afterok:$slurm_dependency --kill-on-invalid-dep=yes"
 fi
-
-cmd="$cmd send_email.sh -r $recipient '$subject'"
-cmd="$cmd $email_generation '$email_text_or_command'"
+cmd="$cmd send_email.sh -r \"$recipient\" \"$subject\""
+cmd="$cmd \"$email_generation\" \"$email_text_or_command\""
 eval "$cmd"
