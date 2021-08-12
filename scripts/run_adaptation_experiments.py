@@ -289,7 +289,7 @@ def linprobe_run(args, job_name, model, seed, config_path, features_save_path, r
     add_model_to_kwargs(kwargs, args, model)
     kwargs['config'] = config_path
     kwargs['save_path'] = features_save_path
-    kwargs['use_test_transforms_for_train'] = True
+    kwargs['use_test_transforms_for_train'] = aug
     extract_cmd = get_python_cmd(code_path=extract_code_path, python_path=args.python_path,
                                  kwargs=kwargs, args=args)
     log_reg_code_path = args.code_dir + '/log_reg_sk.py'
