@@ -528,6 +528,7 @@ def append_to_each(hyperparams_list, more_hyperparams):
 SWEEP_LRS = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
 
 def get_datasets(args):
+    print(args.datasets)
     if args.datasets is None:
         datasets = list(names_to_datasets.values())
     else:
