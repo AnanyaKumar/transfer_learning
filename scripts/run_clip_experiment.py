@@ -128,7 +128,10 @@ class ParseKwargs(argparse.Action):
         setattr(namespace, self.dest, dict())
         for value in values:
             key, value_str = value.split('=')
-            processed_val = ast.literal_eval(value_str)
+            try:
+                processed_val = ast.literal_eval(value_str)
+            except ValueError:
+                processed_val = value_str
             getattr(namespace, self.dest)[key] = processed_val
 
 
