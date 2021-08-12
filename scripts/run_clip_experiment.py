@@ -10,6 +10,7 @@ import pickle
 import sklearn
 from sklearn.metrics import confusion_matrix
 import sqlalchemy
+from sqlalchemy.orm import Session
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from unlabeled_extrapolation.datasets.domainnet import DomainNet
@@ -25,7 +26,7 @@ DEFAULT_COLUMNS = [
     ('avg_per_class_acc', float), ('date', pd.Timestamp)
 ]
 DOMAINS = ['sketch', 'clipart', 'painting', 'real']
-DOMAIN_ORDER = ['real', 'clipart', 'painting', 'sketch'] # For printing
+DOMAIN_ORDER = ['real', 'clipart', 'painting', 'sketch']  # For printing
 EXPERIMENT_TYPES = ['probe', 'zero-shot', 'finetune']
 IMAGENET_PROMPTS_FILE = 'imagenet_prompts.txt'
 MODEL_ORDER = ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'ViT-B/32', 'ViT-B/16']
@@ -299,14 +300,43 @@ def init_results_fields(args, experiment_type, include_date=True):
         for arg in group:
             val = getattr(args, arg.dest)
             if isinstance(val, dict):
-                val = json.dumps(val)
+                val = json.dumps(val, sort_keys=True)
             results_fields[arg.dest] = val
     return results_fields
+
+
+def check_duplicate_exp(args, results_fields, overwrite):
+    engine = sqlalchemy.create_engine(RESULTS_DB_URL)
+    meta = sqlalchemy.MetaData()
+    table = sqlalchemy.Table(args.experiment_type, meta, autoload_with=engine)
+    select = sqlalchemy.select(table)
+    for column_name, column_value in results_fields.items():
+        if column_name == 'date':
+            continue
+        select = select.where(table.c[column_name] == column_value)
+    if args.target_domain == 'all':
+        select = select.where(table.c.target_domain.in_(DOMAINS))
+    else:
+        select = select.where(table.c.target_domain == args.target_domain)
+
+    with Session(engine) as session:
+        is_duplicate = session.query(select.exists()).scalar()
+
+    if is_duplicate:
+        if overwrite:
+            raise NotImplementedError('--overwrite not implemented yet')
+        else:
+            raise ValueError(
+                'Experiment already exists! Use --overwrite to overwrite.'
+            )
 
 
 def probe(args):
     results_df = init_results_df(args, 'probe', 'language')
     results_fields = init_results_fields(args, 'probe')
+    if not args.no_save:
+        check_duplicate_exp(args, results_fields, args.overwrite)
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     clip_model, preprocess = clip.load(args.model, device)
     setattr(clip_model, 'name', args.model)
@@ -555,9 +585,9 @@ def results(args):
     if 'all' in target_domains:
         target_domains = DOMAINS
     if len(set(source_domains)) < len(DOMAINS):
-        select = select.where(table.source_domain.in_(source_domains))
+        select = select.where(table.c.source_domain.in_(source_domains))
     if len(set(target_domains)) < len(DOMAINS):
-        select = select.where(table.target_domain.in_(target_domains))
+        select = select.where(table.c.target_domain.in_(target_domains))
 
     for group_name in group_names:
         arg_group = args.groups[group_name]
@@ -608,8 +638,10 @@ def setup(args):
             return sqlalchemy.Float
         elif python_type == pd.Timestamp:
             return sqlalchemy.DateTime
-        elif isinstance(argparse_action, ParseKwargs): # dictionary
+        elif isinstance(argparse_action, ParseKwargs):  # dictionary
             return sqlalchemy.JSON
+        elif isinstance(argparse_action, argparse._StoreTrueAction):
+            return sqlalchemy.Boolean
         else:
             raise ValueError(f'Unsupported type {python_type}')
 
