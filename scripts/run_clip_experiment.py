@@ -61,8 +61,56 @@ def subtract_source_add_target(img_encodings, src_domain, tgt_domain,
 
 
 @register_language_transform
+def subtract_target_add_source(img_encodings, src_domain, tgt_domain,
+                               clip_model):
+
+    assert src_domain in DOMAINS and tgt_domain in DOMAINS
+    src_domain = 'photo' if src_domain == 'real' else src_domain
+    tgt_domain = 'photo' if tgt_domain == 'real' else tgt_domain
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    src_token = clip.tokenize(src_domain).to(device)
+    tgt_token = clip.tokenize(tgt_domain).to(device)
+    with torch.no_grad():
+        src_embed = clip_model.encode_text(src_token)
+        tgt_embed = clip_model.encode_text(tgt_token)
+        translation = torch.flatten(src_embed - tgt_embed)
+        if isinstance(img_encodings, np.ndarray):
+            translation = translation.cpu().numpy()
+        translated_features = img_encodings + translation
+    return translated_features
+
+
+@register_language_transform
 def add_target(img_encodings, src_domain, tgt_domain, clip_model):
     assert src_domain in DOMAINS and tgt_domain in DOMAINS
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    tgt_token = clip.tokenize(tgt_domain).to(device)
+    with torch.no_grad():
+        tgt_embed = clip_model.encode_text(tgt_token)
+        translation = torch.flatten(tgt_embed)
+        if isinstance(img_encodings, np.ndarray):
+            translation = translation.cpu().numpy()
+        translated_features = img_encodings + translation
+    return translated_features
+
+
+@register_language_transform
+def subtract_source(img_encodings, src_domain, tgt_domain, clip_model):
+    assert src_domain in DOMAINS
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    src_token = clip.tokenize(src_domain).to(device)
+    with torch.no_grad():
+        src_embed = clip_model.encode_text(src_token)
+        translation = torch.flatten(src_embed)
+        if isinstance(img_encodings, np.ndarray):
+            translation = translation.cpu().numpy()
+        translated_features = img_encodings + translation
+    return translated_features
+
+
+@register_language_transform
+def subtract_target(img_encodings, src_domain, tgt_domain, clip_model):
+    assert tgt_domain in DOMAINS
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     tgt_token = clip.tokenize(tgt_domain).to(device)
     with torch.no_grad():
