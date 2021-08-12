@@ -586,6 +586,15 @@ def results(args):
 
 
 def setup(args):
+    '''
+    Sets up databases to store results. This function must be called before any
+    experiments are run.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Command line arguments for setup command.
+    '''
     quiet = args.quiet
 
     def print_if_verbose(msg):
@@ -594,13 +603,13 @@ def setup(args):
 
     def type_to_sqlalchemy(python_type, argparse_action=None):
         if python_type == str:
-            return sqlalchemy.types.Text
+            return sqlalchemy.Text
         elif python_type == float:
-            return sqlalchemy.types.Float
+            return sqlalchemy.Float
         elif python_type == pd.Timestamp:
-            return sqlalchemy.types.DateTime
+            return sqlalchemy.DateTime
         elif isinstance(argparse_action, ParseKwargs): # dictionary
-            return sqlalchemy.types.JSON
+            return sqlalchemy.JSON
         else:
             raise ValueError(f'Unsupported type {python_type}')
 
