@@ -46,10 +46,10 @@ if __name__ == '__main__':
     parser.add_argument('model', type=str, help='CLIP model')
     parser.add_argument('experiment_str', type=str,
                         help='Rest of args passed to run_clip_experiment.py')
-    parser.add_argument('--source_domains', nargs='+', default=['all'],
+    parser.add_argument('--source_domains', nargs='*', default=['all'],
                         choices=DOMAIN_ORDER + ['all'],
                         help='Source domains of results to aggregate')
-    parser.add_argument('--target_domains', nargs='+', default=['all'],
+    parser.add_argument('--target_domains', nargs='*', default=['all'],
                         choices=DOMAIN_ORDER + ['all'],
                         help='Target domains of results to aggregate')
     parser.add_argument('--print_folders', action='store_true',
