@@ -206,17 +206,55 @@ class ClipClassifier(torch.nn.Module):
 
         super(ClipClassifier, self).__init__()
         self.dtype = clip_model.dtype
-        self.encoder = clip_model.visual.float()
-        self.classifier = torch.nn.Linear(self.encoder.output_dim, output_dim)
+        self.clip_model = clip_model
+        self.clip_model.visual = self.clip_model.visual.float()
+        self.classifier = torch.nn.Linear(
+            self.clip_model.visual.output_dim, output_dim
+        )
         self.preprocess = preprocess
         if freeze_encoder:
             for param in self.encoder.parameters():
                 param.requires_grad = False
 
+        self.source_language_transform = None
+        self.target_language_transform = None
+
     def forward(self, x):
-        embeddings = self.encoder(x.type(self.dtype))
+        embeddings = self.clip_model.encode_image(x)
         embeddings = embeddings / embeddings.norm(dim=-1, keepdim=True)
+        if self.training():
+            if self.source_language_transform is not None:
+                embeddings = self.source_language_transform(
+                    embeddings, self.source_domain, self.target_domain, True
+                )
+        else:
+            if self.target_language_transform is not None:
+                embeddings = self.source_language_transform(
+                    embeddings, self.source_domain, self.target_domain, True
+                )
         return self.classifier(embeddings)
+
+    def set_source_language_transform(self, transform, src_domain, tgt_domain):
+        if callable(transform):
+            self.source_language_transform = transform
+        elif isinstance(transform, str):
+            self.source_language_transform = language_transforms[transform]
+        else:
+            raise ValueError(f'Unexpected type: {type(transform)}')
+
+        self.source_domain = src_domain
+        self.target_domain = tgt_domain
+
+    def set_target_language_transform(self, transform, src_domain, tgt_domain):
+        if callable(transform):
+            self.target_language_transform = transform
+        elif isinstance(transform, str):
+            self.target_language_transform = language_transforms[transform]
+        else:
+            raise ValueError(f'Unexpected type: {type(transform)}')
+
+        self.source_domain = src_domain
+        self.target_domain = tgt_domain
 
 
 def get_features(domain, split, model, preprocess, normalize_features=False):
@@ -267,7 +305,10 @@ def init_optimizer(args, model):
     optimizer_args = [{'params': model.classifier.parameters(), 'lr': args.lr}]
     if not args.freeze:
         optimizer_args.append(
-            {'params': model.encoder.parameters(), 'lr': args.encoder_lr}
+            {
+                'params': model.clip_model.visual.parameters(),
+                'lr': args.encoder_lr
+            }
         )
     return optimizer_class(optimizer_args, **args.optimizer_kwargs)
 
@@ -506,6 +547,11 @@ def train(args):
 
     num_classes = train_dataset.get_num_classes()
     model = ClipClassifier(clip_model, preprocess, num_classes, args.freeze)
+    if args.source_language_transform:
+        model.set_source_language_transform(
+            args.source_language_transform,
+            args.source_domain, args.target_domain
+        )
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model.to(device)
     model.train()
