@@ -150,51 +150,6 @@ class ParseKwargs(argparse.Action):
             getattr(namespace, self.dest)[key] = processed_val
 
 
-def stringify_argument_group(args, group_title):
-    group_strings = []
-    group_args = sorted(args.groups[group_title])
-    for arg in group_args:
-        val = getattr(args, arg)
-        if isinstance(val, dict):
-            kwargs = val
-            kwargs_strings = []
-            for key in sorted(kwargs):
-                kwargs_strings.append(f'{key.replace("_", "")}{kwargs[key]}')
-            group_strings.append('_'.join(kwargs_strings))
-        else:
-            group_strings.append(f'{arg.replace("_", "")}{val}')
-    return '_'.join(group_strings)
-
-
-def make_experiment_dir(args):
-    experiment_name = f'clip_domainnet_{args.model}'
-    experiment_name += f'_source{args.source_domain}'
-    experiment_name += f'_target{args.target_domain}'
-    if args.translate_features:
-        experiment_name += '_translatefeats'
-    if args.translate_target:
-        experiment_name += '_translatetarget'
-
-    if args.experiment_type == 'finetune':
-        experiment_name += f'_{stringify_argument_group(args, "finetune")}'
-        experiment_name += f'_{stringify_argument_group(args, "optimizer")}'
-    elif args.experiment_type == 'probe':
-        experiment_name += f'_{stringify_argument_group(args, "probe")}'
-
-    experiment_name += f'_{args.experiment_type.replace("-", "")}'
-    experiment_name = experiment_name.replace('/', '')
-    experiment_dir = RESULTS_DIR / experiment_name
-    if not args.no_save:
-        results_file = experiment_dir / 'results.pkl'
-        if results_file.exists() and not args.overwrite:
-            error_string = f'Experiment {experiment_name} already exists!'
-            error_string += ' Use --overwrite option to replace'
-            raise ValueError(error_string)
-        else:
-            experiment_dir.mkdir(parents=True, exist_ok=True)
-    return experiment_dir
-
-
 def init_sklearn_classifier(classifier_name, classifier_kwargs):
     sklearn_classifiers = dict(sklearn.utils.all_estimators('classifier'))
     return sklearn_classifiers[classifier_name](**classifier_kwargs)
