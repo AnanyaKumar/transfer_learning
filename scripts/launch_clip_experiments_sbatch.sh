@@ -128,6 +128,10 @@ model=$2
 shift 2
 experiment_args="$@"
 
+if [ ! $test_all ]; then
+    experiment_args+=" --skip_source_eval"
+fi
+
 slurm_dependency_list=""
 if [ "$model" = all ]; then
     for model in ${MODELS[@]}; do
