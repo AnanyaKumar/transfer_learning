@@ -584,7 +584,6 @@ def results(args):
         table.c.source_domain, table.c.target_domain, table.c.model,
         table.c.avg_per_class_acc
     ]
-
     select = sqlalchemy.select(*select_columns)
     if args.model != 'all':
         select = select.where(table.c.model == args.model)
@@ -603,7 +602,16 @@ def results(args):
         for arg in arg_group:
             column = table.c[arg.dest]
             arg_val = getattr(args, arg.dest)
+            if isinstance(arg_val, dict):
+                arg_val = json.dumps(arg_val, sort_keys=True)
             select = select.where(column == arg_val)
+
+    if args.delete:
+        with Session(engine) as session:
+            delete = sqlalchemy.delete(table).where(select.whereclause)
+            session.execute(delete)
+            session.commit()
+        return
 
     df = pd.read_sql(select, engine)
     if not args.include_source_val:
@@ -617,7 +625,7 @@ def results(args):
             values='avg_per_class_acc'
         )
         df = df.reindex(MODEL_ORDER, axis=1)
-        print(df.to_csv(sep=args.sep, index=False))
+        print(df.to_csv(sep=args.sep, index=args.include_domain_names))
     else:
         if not args.include_domain_names:
             df = df.drop(columns=['source_domain', 'target_domain'])
@@ -760,6 +768,8 @@ def parse_args(args=None):
         help='CLIP experiment type'
     )
     parser_results.add_argument('model', type=str, help='CLIP model')
+    parser_results.add_argument('--delete', action='store_true',
+                                help='Delete results')
     parser_results.add_argument(
         '--source_domains', nargs='*', default=['all'],
         choices=DOMAINS + ['all'],
