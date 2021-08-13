@@ -222,15 +222,17 @@ class ClipClassifier(torch.nn.Module):
     def forward(self, x):
         embeddings = self.clip_model.encode_image(x)
         embeddings = embeddings / embeddings.norm(dim=-1, keepdim=True)
-        if self.training():
+        if self.training:
             if self.source_language_transform is not None:
                 embeddings = self.source_language_transform(
-                    embeddings, self.source_domain, self.target_domain, True
+                    embeddings, self.source_domain, self.target_domain,
+                    self.clip_model, True
                 )
         else:
             if self.target_language_transform is not None:
                 embeddings = self.source_language_transform(
-                    embeddings, self.source_domain, self.target_domain, True
+                    embeddings, self.source_domain, self.target_domain,
+                    self.clip_model, True
                 )
         return self.classifier(embeddings)
 
@@ -329,38 +331,23 @@ def translate_features(src_features, src_domain, tgt_domain, model):
     return translated_features
 
 
-def init_results_df(args, *group_names):
+def init_results(args, *group_names):
     columns = [column[0] for column in DEFAULT_COLUMNS]
     for group_name in group_names:
         columns += [arg.dest for arg in args.groups[group_name]]
-    return pd.DataFrame(columns=columns)
-
-
-def init_results_fields(args, experiment_type, include_date=True):
-    results_fields = {
-        'source_language_transform': args.source_language_transform,
-        'target_language_transform': args.target_language_transform
-    }
-    if hasattr(args, 'source_domain'):
-        results_fields['source_domain'] = args.source_domain
-    if hasattr(args, 'model'):
-        results_fields['model'] = args.model
-    if include_date:
-        results_fields['date'] = pd.Timestamp.now()
-
-    arg_groups = []
-    if experiment_type == 'probe':
-        arg_groups.append(args.groups['probe'])
-    else:
-        raise ValueError(f'{experiment_type} not implemented yet!')
-
-    for group in arg_groups:
-        for arg in group:
-            val = getattr(args, arg.dest)
+    results_df = pd.DataFrame(columns=columns)
+    results_fields = dict()
+    for column in columns:
+        if column == 'avg_per_class_acc':
+            continue
+        elif column == 'date':
+            results_fields['date'] = pd.Timestamp.now()
+        else:
+            val = getattr(args, column)
             if isinstance(val, dict):
                 val = json.dumps(val, sort_keys=True)
-            results_fields[arg.dest] = val
-    return results_fields
+            results_fields[column] = val
+    return results_df, results_fields
 
 
 def check_duplicate_exp(args, results_fields, overwrite):
@@ -390,8 +377,9 @@ def check_duplicate_exp(args, results_fields, overwrite):
 
 
 def probe(args):
-    results_df = init_results_df(args, 'probe', 'language')
-    results_fields = init_results_fields(args, 'probe')
+    results_df, results_fields = init_results(
+        args, 'probe', 'language'
+    )
     if not args.no_save:
         check_duplicate_exp(args, results_fields, args.overwrite)
 
@@ -598,14 +586,20 @@ def evaluate(model, eval_domain, args):
 
 
 def finetune(args):
-    experiment_dir = make_experiment_dir(args)
-    df = pd.DataFrame(columns=DF_COLUMNS)
+    results_df, results_fields = init_results(
+        args, 'finetune', 'language', 'optimizer'
+    )
+    if not args.no_save:
+        check_duplicate_exp(args, results_fields, args.overwrite)
     source_domain = args.source_domain
     model = train(args)
     if not args.skip_source_eval:
-        per_cls_avg_acc = evaluate(model, args.source_domain, args)
-        print(f'{source_domain} test accuracy: {per_cls_avg_acc}')
-        df.loc[len(df)] = (source_domain, source_domain, per_cls_avg_acc)
+        avg_per_class_acc = evaluate(model, args.source_domain, args)
+        print(f'{source_domain} test accuracy: {avg_per_class_acc}')
+        row = results_fields.copy()
+        row['target_domain'] = args.source_domain
+        row['avg_per_class_acc'] = avg_per_class_acc
+        results_df.loc[len(results_df)] = row
 
     if args.target_domain == 'all':
         eval_domains = DOMAINS
@@ -613,15 +607,18 @@ def finetune(args):
         eval_domains = [args.target_domain]
 
     for eval_domain in eval_domains:
-        per_cls_avg_acc = evaluate(model, eval_domain, args)
-        print(f'{source_domain} -> {eval_domain}: {per_cls_avg_acc}')
-        df.loc[len(df)] = (source_domain, eval_domain, per_cls_avg_acc)
+        avg_per_class_acc = evaluate(model, eval_domain, args)
+        print(f'{source_domain} -> {eval_domain}: {avg_per_class_acc}')
+        row = results_fields.copy()
+        row['target_domain'] = eval_domain
+        row['avg_per_class_acc'] = avg_per_class_acc
+        results_df.loc[len(results_df)] = row
 
-    # Format results for easy copy-paste
     print(f'CLIP {args.model} Avg. Per-Class Acc.')
-    print(df.AvgPerClassAcc.to_string(index=False))
+    print(results_df.avg_per_class_acc.to_string(index=False))
     if not args.no_save:
-        df.to_pickle(str(experiment_dir / 'results.pkl'))
+        engine = sqlalchemy.create_engine(RESULTS_DB_URL, echo=True)
+        results_df.to_sql('finetune', engine, if_exists='append')
 
 
 def results(args):
@@ -744,7 +741,7 @@ def setup(args):
                 arg.dest: type_to_sqlalchemy(arg.type, arg) for arg in group
             }
             dtypes.update(group_dtypes)
-        mock_df = init_results_df(args, *group_names)
+        mock_df, _ = init_results(args, *group_names)
         if_exists = 'replace' if args.overwrite else 'append'
         mock_df.to_sql(table_name, engine, if_exists=if_exists, dtype=dtypes)
 
