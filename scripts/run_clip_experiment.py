@@ -717,6 +717,8 @@ def setup(args):
             return sqlalchemy.Float
         elif python_type == pd.Timestamp:
             return sqlalchemy.DateTime
+        elif python_type == int:
+            return sqlalchemy.Integer
         elif isinstance(argparse_action, ParseKwargs):  # dictionary
             return sqlalchemy.JSON
         elif isinstance(argparse_action, argparse._StoreTrueAction):
@@ -724,25 +726,32 @@ def setup(args):
         else:
             raise ValueError(f'Unsupported type {python_type}')
 
+    def setup_table(args, table_name, engine):
+        dtypes = {
+            col[0]: type_to_sqlalchemy(col[1]) for col in DEFAULT_COLUMNS
+        }
+        print_if_verbose(f'Setting up {table_name} table')
+        if table_name == 'probe':
+            group_names = ['probe', 'language']
+        elif table_name == 'finetune':
+            group_names = ['finetune', 'language', 'optimizer']
+        else:
+            raise ValueError(f'Table {table_name} not implemented!')
+
+        for group_name in group_names:
+            group = args.groups[group_name]
+            group_dtypes = {
+                arg.dest: type_to_sqlalchemy(arg.type, arg) for arg in group
+            }
+            dtypes.update(group_dtypes)
+        mock_df = init_results_df(args, *group_names)
+        if_exists = 'replace' if args.overwrite else 'append'
+        mock_df.to_sql(table_name, engine, if_exists=if_exists, dtype=dtypes)
+
     print_if_verbose('Setting up databases...')
     engine = sqlalchemy.create_engine(RESULTS_DB_URL, echo=not quiet)
-    if_exists = 'replace' if args.overwrite else 'append'
-    dtypes = {
-        column[0]: type_to_sqlalchemy(column[1]) for column in DEFAULT_COLUMNS
-    }
-
-    # Setup probe table
-    print_if_verbose('Setting up probe table')
-    group_names = ['probe', 'language']
-    for group_name in group_names:
-        arg_group = args.groups[group_name]
-        group_dtypes = {
-            arg.dest: type_to_sqlalchemy(arg.type, arg) for arg in arg_group
-        }
-        dtypes.update(group_dtypes)
-    mock_df = init_results_df(args, *group_names)
-    mock_df.to_sql('probe', engine, if_exists=if_exists, dtype=dtypes)
-
+    setup_table(args, 'probe', engine)
+    setup_table(args, 'finetune', engine)
     print_if_verbose('Finished with setup')
 
 
@@ -771,15 +780,15 @@ def parse_args(args=None):
     language_group.add_argument('--target_language_transform', type=str,
                                 help='Language transform for target features')
 
-    finetuning_group = optionals_parser.add_argument_group('finetune')
-    finetuning_group.add_argument('--epochs', default=10, type=int,
-                                  help='Number of epochs for finetuning')
-    finetuning_group.add_argument('--batch_size', default=128, type=int,
-                                  help='Batch size for finetuning')
-    finetuning_group.add_argument('--freeze', action='store_true',
-                                  help='Freeze encoder during finetuning')
-    finetuning_group.add_argument('--skip_source_eval', action='store_true',
-                                  help='Don\'t test on source domain')
+    finetune_group = optionals_parser.add_argument_group('finetune')
+    finetune_group.add_argument('--epochs', default=10, type=int,
+                                help='Number of epochs for finetuning')
+    finetune_group.add_argument('--batch_size', default=128, type=int,
+                                help='Batch size for finetuning')
+    finetune_group.add_argument('--freeze', action='store_true',
+                                help='Freeze encoder during finetuning')
+    finetune_group.add_argument('--skip_source_eval', action='store_true',
+                                help='Don\'t test on source domain')
 
     randaugment_group = optionals_parser.add_argument_group('randaugment')
     randaugment_group.add_argument('--randaugment_M', default=0, type=int,
