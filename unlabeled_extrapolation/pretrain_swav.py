@@ -31,7 +31,6 @@ def cli_main():
     from pl_bolts.callbacks.ssl_online import SSLOnlineEvaluator
     from pl_bolts.datamodules import CIFAR10DataModule, ImagenetDataModule, STL10DataModule
     from pl_bolts.models.self_supervised.swav.transforms import SwAVEvalDataTransform, SwAVTrainDataTransform
-    from unlabeled_extrapolation.datasets.domainnet import DomainNetDataModule
 
     parser = ArgumentParser()
 
@@ -102,6 +101,7 @@ def cli_main():
         args.num_samples = dm.num_samples
         args.input_height = dm.size()[-1]
     elif args.dataset == 'domainnet':
+        raise NotImplementedError('DomainNetDataModule has been removed')
         # copy imagenet params
         args.maxpool1 = True
         args.first_conv = True
@@ -128,7 +128,7 @@ def cli_main():
         args.nmb_prototypes = 3000
         args.online_ft = True
 
-        dm = DomainNetDataModule(batch_size=args.batch_size, num_workers=args.num_workers, train_domain=args.domain, test_domain=args.domain, data_dir=args.data_dir)
+        # dm = DomainNetDataModule(batch_size=args.batch_size, num_workers=args.num_workers, train_domain=args.domain, test_domain=args.domain, data_dir=args.data_dir)
         args.num_samples = dm.num_unlabeled_samples
         args.input_height = dm.size()[-1]
 
