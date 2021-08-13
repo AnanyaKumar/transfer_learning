@@ -44,7 +44,7 @@ def register_language_transform(function):  # Decorator
 
 @register_language_transform
 def subtract_source_add_target(img_encodings, src_domain, tgt_domain,
-                               clip_model):
+                               clip_model, normalize_features=False):
 
     assert src_domain in DOMAINS and tgt_domain in DOMAINS
     src_domain = 'photo' if src_domain == 'real' else src_domain
@@ -56,6 +56,8 @@ def subtract_source_add_target(img_encodings, src_domain, tgt_domain,
         src_embed = clip_model.encode_text(src_token)
         tgt_embed = clip_model.encode_text(tgt_token)
         translation = torch.flatten(tgt_embed - src_embed)
+        if normalize_features and translation.norm() > 0:
+            translation /= translation.norm()
         if isinstance(img_encodings, np.ndarray):
             translation = translation.cpu().numpy()
         translated_features = img_encodings + translation
@@ -64,7 +66,7 @@ def subtract_source_add_target(img_encodings, src_domain, tgt_domain,
 
 @register_language_transform
 def subtract_target_add_source(img_encodings, src_domain, tgt_domain,
-                               clip_model):
+                               clip_model, normalize_features=False):
 
     assert src_domain in DOMAINS and tgt_domain in DOMAINS
     src_domain = 'photo' if src_domain == 'real' else src_domain
@@ -76,6 +78,8 @@ def subtract_target_add_source(img_encodings, src_domain, tgt_domain,
         src_embed = clip_model.encode_text(src_token)
         tgt_embed = clip_model.encode_text(tgt_token)
         translation = torch.flatten(src_embed - tgt_embed)
+        if normalize_features and translation.norm() > 0:
+            translation /= translation.norm()
         if isinstance(img_encodings, np.ndarray):
             translation = translation.cpu().numpy()
         translated_features = img_encodings + translation
@@ -83,13 +87,16 @@ def subtract_target_add_source(img_encodings, src_domain, tgt_domain,
 
 
 @register_language_transform
-def add_target(img_encodings, src_domain, tgt_domain, clip_model):
+def add_target(img_encodings, src_domain, tgt_domain, clip_model,
+               normalize_features=False):
     assert src_domain in DOMAINS and tgt_domain in DOMAINS
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     tgt_token = clip.tokenize(tgt_domain).to(device)
     with torch.no_grad():
         tgt_embed = clip_model.encode_text(tgt_token)
         translation = torch.flatten(tgt_embed)
+        if normalize_features and translation.norm() > 0:
+            translation /= translation.norm()
         if isinstance(img_encodings, np.ndarray):
             translation = translation.cpu().numpy()
         translated_features = img_encodings + translation
@@ -97,13 +104,16 @@ def add_target(img_encodings, src_domain, tgt_domain, clip_model):
 
 
 @register_language_transform
-def subtract_source(img_encodings, src_domain, tgt_domain, clip_model):
+def subtract_source(img_encodings, src_domain, tgt_domain, clip_model,
+                    normalize_features=False):
     assert src_domain in DOMAINS
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     src_token = clip.tokenize(src_domain).to(device)
     with torch.no_grad():
         src_embed = clip_model.encode_text(src_token)
         translation = torch.flatten(src_embed)
+        if normalize_features and translation.norm() > 0:
+            translation /= translation.norm()
         if isinstance(img_encodings, np.ndarray):
             translation = translation.cpu().numpy()
         translated_features = img_encodings + translation
@@ -111,13 +121,16 @@ def subtract_source(img_encodings, src_domain, tgt_domain, clip_model):
 
 
 @register_language_transform
-def subtract_target(img_encodings, src_domain, tgt_domain, clip_model):
+def subtract_target(img_encodings, src_domain, tgt_domain, clip_model,
+                    normalize_features=False):
     assert tgt_domain in DOMAINS
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     tgt_token = clip.tokenize(tgt_domain).to(device)
     with torch.no_grad():
         tgt_embed = clip_model.encode_text(tgt_token)
         translation = torch.flatten(tgt_embed)
+        if normalize_features and translation.norm() > 0:
+            translation /= translation.norm()
         if isinstance(img_encodings, np.ndarray):
             translation = translation.cpu().numpy()
         translated_features = img_encodings + translation
@@ -352,7 +365,8 @@ def probe(args):
     if source_language_transform:
         language_transform = language_transforms[source_language_transform]
         train_features = language_transform(train_features, train_domain,
-                                            args.target_domain, clip_model)
+                                            args.target_domain, clip_model,
+                                            args.normalize_features)
 
     probe = init_sklearn_classifier(args.sklearn_classifier_name,
                                     args.sklearn_classifier_kwargs)
@@ -368,7 +382,8 @@ def probe(args):
         if args.source_language_transform:
             language_transform = language_transforms[source_language_transform]
             test_features = language_transform(test_features, source_domain,
-                                               args.target_domain, clip_model)
+                                               args.target_domain, clip_model,
+                                               args.normalize_features)
 
         preds = probe.predict(test_features)
         per_class_avg_acc = compute_per_class_avg_acc(preds, test_labels)
@@ -395,7 +410,8 @@ def probe(args):
         if target_language_transform:
             language_transform = language_transforms[target_language_transform]
             test_features = language_transform(test_features, source_domain,
-                                               eval_domain, clip_model)
+                                               eval_domain, clip_model,
+                                               args.normalize_features)
 
         preds = probe.predict(test_features)
         per_class_avg_acc = compute_per_class_avg_acc(preds, test_labels)
