@@ -1,0 +1,66 @@
+
+root_prefix: '/u/scr/ananya/'
+
+# The train and test transforms are taken from Sentry.
+train_dataset:
+    name: 'sketch_train'
+    classname: unlabeled_extrapolation.datasets.domainnet.DomainNet
+    args:
+        domain: 'sketch'
+        split: 'train'
+        root: 'domainnet/'
+        version: 'sentry'
+        verbose: False
+    transforms:
+        - classname: torchvision.transforms.Resize
+          args:
+              size: [256, 256]
+        - classname: torchvision.transforms.RandomCrop
+          args:
+              size: 224
+        - classname: torchvision.transforms.RandomHorizontalFlip
+        - classname: torchvision.transforms.ToTensor
+
+default_test_transforms:
+    - classname: torchvision.transforms.Resize
+      args:
+          size: [224, 224]
+    - classname: torchvision.transforms.ToTensor
+
+test_datasets:
+    - name: 'sketch_val'
+      classname: unlabeled_extrapolation.datasets.domainnet.DomainNet
+      args:
+          domain: 'sketch'
+          split: 'test'
+          root: 'domainnet/'
+          version: 'sentry'
+          verbose: False
+    - name: 'real_val'
+      classname: unlabeled_extrapolation.datasets.domainnet.DomainNet
+      args:
+          domain: 'real'
+          split: 'test'
+          root: 'domainnet/'
+          version: 'sentry'
+          verbose: False
+    - name: 'painting_val'
+      classname: unlabeled_extrapolation.datasets.domainnet.DomainNet
+      args:
+          domain: 'painting'
+          split: 'test'
+          root: 'domainnet/'
+          version: 'sentry'
+          verbose: False
+    - name: 'clipart_val'
+      classname: unlabeled_extrapolation.datasets.domainnet.DomainNet
+      args:
+          domain: 'clipart'
+          split: 'test'
+          root: 'domainnet/'
+          version: 'sentry'
+          verbose: False
+
+early_stop_dataset_names:
+    - 'sketch-test'
+    - 'real-test'

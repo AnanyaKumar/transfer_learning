@@ -190,12 +190,12 @@ def get_best_config_path(adapt_name, dataset, model, args):
 
 
 def add_model_to_kwargs(kwargs, args, model):
-    kwargs['model.classname'] = model.classname
-    kwargs['model.args.pretrained'] = model.pretrained
-    kwargs['model.args.pretrain_style'] = model.pretrain_style
-    if model.checkpoint_rel_path is not None:
-        kwargs['model.args.checkpoint_path'] = (
-            args.pretrained_checkpoints_dir + '/' + model.checkpoint_rel_path)
+    assert 'classname' in model.kwargs
+    for k, v in model.kwargs.items():
+        if k == 'checkpoint_rel_path' and v is not None:
+            kwargs['model.args.checkpoint_path'] = args.pretrained_checkpoints_dir + '/' + v
+        else:
+            kwargs['model.' + k] = v
 
 
 def run_adapt_sweep(adapt_name, dataset, model, hyperparams, args, deps=[], rerun=False):
@@ -451,10 +451,26 @@ cifar_stl = Dataset(
     slurm_data_dir='/u/scr/ananya/',
     eval_config_rel_path='adaptation/cifar_stl_eval.yaml')
 
+domainnet = Dataset(
+    name='domainnet',
+    val_metric='test_acc/sketch_val',
+    secondary_val_metrics=['test_acc/real_val', 'test_acc/painting_val', 'test_acc/clipart_val', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/sketch_val',
+        'test_acc/real_val', 'test_acc/painting_val', 'test_acc/clipart_val'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/sketch_val',
+        'test_acc/real_val', 'test_acc/painting_val', 'test_acc/clipart_val'],
+    config_rel_path='adaptation/domainnet.yaml',
+    bundles=['domainnet'],
+    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh domainnet',
+    slurm_data_dir='/scr/biggest',
+    eval_config_rel_path='adaptation/domainnet_eval.yaml')
+
 names_to_datasets = {
     'living17': living17,
     'entity30': entity30,
     'cifar_stl': cifar_stl,
+    'domainnet': domainnet,
 }
 
 
@@ -462,33 +478,48 @@ names_to_datasets = {
 ## Models.
 ############################################
 
-Model = namedtuple(
-    'Model',
-    ['name', 'classname', 'pretrained', 'pretrain_style', 'checkpoint_rel_path', 'bundles'])
+Model = namedtuple('Model', ['name', 'kwargs', 'bundles'])
 
 moco_resnet50 = Model(
     name='resnet50',
-    classname='models.imnet_resnet.ResNet50',
-    pretrained=True,
-    pretrain_style='mocov2',
-    checkpoint_rel_path='moco_v2_800ep_pretrain.pth.tar',
-    bundles=['simclr_weights'])
+    kwargs={
+        'classname': 'models.imnet_resnet.ResNet50',
+        'pretrained': True,
+        'pretrain_style': 'mocov2',
+        'checkpoint_rel_path': 'moco_v2_800ep_pretrain.pth.tar'
+    },
+    bundles=['simclr_weights']
+)
 
 swav_resnet50 = Model(
     name='swav_resnet50',
-    classname='models.imnet_resnet.ResNet50',
-    pretrained=True,
-    pretrain_style='swav',
-    checkpoint_rel_path='swav_800ep_pretrain.pth.tar',
-    bundles=['simclr_weights'])
+    kwargs={
+        'classname': 'models.imnet_resnet.ResNet50',
+        'pretrained': True,
+        'pretrain_style': 'swav',
+        'checkpoint_rel_path': 'swav_800ep_pretrain.pth.tar'
+    },
+    bundles=['simclr_weights']
+)
 
 sup_resnet50 = Model(
     name='sup_resnet50',
-    classname='models.imnet_resnet.ResNet50',
-    pretrained=True,
-    pretrain_style='supervised',
-    checkpoint_rel_path=None,
-    bundles=[])
+    kwargs={
+        'classname': 'models.imnet_resnet.ResNet50',
+        'pretrained': True,
+        'pretrain_style': 'supervised',
+    },
+    bundles=[]
+)
+
+clip_resnet50 = Model(
+    name='clip_resnet50',
+    kwargs={
+        'classname': 'models.clip_model.ClipModel',
+        'model_name': 'RN50',
+    },
+    bundles=[]
+)
 
 ############################################
 ## Functions to specify hyperparameter sweeps.

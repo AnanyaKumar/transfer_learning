@@ -1,9 +1,7 @@
 
 root_prefix: '/scr/scr-with-most-space/'
 
-# Add augmentations, and change normalization a bit.
-# The difference is swav augmentation has a 0.228 instead of 0.229 (lol)
-# Probably doesn't make a difference.
+# The train and test transforms are taken from the Swav fine-tuning script.
 train_dataset:
     name: 'source_train_living'
     classname: datasets.breeds.Breeds
@@ -23,7 +21,6 @@ train_dataset:
               mean: [0.485, 0.456, 0.406]
               std: [0.228, 0.224, 0.225]
 
-# Change transform (e.g. centercrop), and change normalization a bit.
 default_test_transforms:
     - classname: torchvision.transforms.Resize
       args:

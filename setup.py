@@ -31,4 +31,7 @@ setup(name='unlabeled_extrapolation',
         'networkx',
         'cvxpy',
         'pytorch-lightning-bolts',
+        'ftfy',
+        'regex',     
         ])
+# Make sure to also install clip using pip install git+https://github.com/openai/CLIP.git

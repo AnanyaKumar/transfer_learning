@@ -33,6 +33,9 @@ class ClipModel(nn.Module):
     def set_requires_grad(self, val):
         for param in self._model.parameters():
             param.requires_grad = val
+        if self._classifier is not None:
+            for param in self._classifier.parameters():
+                param.requires_grad = val
 
     def new_last_layer(self, num_classes):
         num_in_features = self._model.visual.output_dim
