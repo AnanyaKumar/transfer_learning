@@ -736,7 +736,7 @@ if __name__ == "__main__":
                         help='(Slurm only) sbatch script')
     parser.add_argument('--datasets', type=str, nargs='+',
                         help='Datasets to test on (if unspecified, run on all).', required=False)
-    parser.add_argument('--model_name', type=str, default='resnet',  # This is moco resnet.
+    parser.add_argument('--model_name', type=str, default='resnet50',  # This is moco resnet.
                         help='Model to use', required=False)
     parser.add_argument('--only_one_run', action='store_true',
                         help=('Only run one hyperparameter setting, e.g. for debugging'

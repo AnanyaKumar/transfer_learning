@@ -16,11 +16,6 @@ optimizer:
     lr: 0.03
     momentum: 0.9
 
-model:
-  classname: models.imnet_resnet.ResNet50
-  args:
-    pretrained: True
-
 criterion:
   classname: torch.nn.CrossEntropyLoss
   args:
