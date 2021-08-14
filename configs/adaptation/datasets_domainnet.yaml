@@ -1,5 +1,5 @@
 
-root_prefix: '/u/scr/ananya/'
+root_prefix: '/scr/biggest/'
 
 # The train and test transforms are taken from Sentry.
 train_dataset:

@@ -283,12 +283,14 @@ def adaptation_experiment(adapt_name, dataset, model, hyperparams_list, num_repl
 
 
 def linprobe_run(args, job_name, model, seed, config_path, features_save_path, results_save_path,
-                 weights_save_path, val_metric, num_reg_values=50, deps=[], rerun=False, aug=True):
+                 weights_save_path, val_metric, num_reg_values=50, deps=[], rerun=False, aug=True,
+                 root_prefix=''):
     extract_code_path = args.code_dir + '/extract_features.py'
     kwargs = {}
     add_model_to_kwargs(kwargs, args, model)
     kwargs['config'] = config_path
     kwargs['save_path'] = features_save_path
+    kwargs['root_prefix'] = root_prefix
     # If no augmentation, then use test transform for train.
     kwargs['use_test_transforms_for_train'] = not(aug)
     extract_cmd = get_python_cmd(code_path=extract_code_path, python_path=args.python_path,
@@ -321,9 +323,13 @@ def run_linprobe_replication(adapt_name, dataset, model, seed, args, deps=[], re
     val_metric = dataset.val_metric
     job_name = get_group_name(adapt_name, dataset.name, args.model_name) + '_' + str(seed)
     deps = add_dataset_model_deps(deps, args, dataset, model)
+    if not(args.codalab):
+        root_prefix = dataset.slurm_data_dir
+    else:
+        root_prefix = args.codalab_data_dir
     return linprobe_run(
         args, job_name, model, seed, config_path, features_save_path, results_save_path,
-        weights_save_path, val_metric, deps=deps, rerun=rerun, aug=aug)
+        weights_save_path, val_metric, deps=deps, rerun=rerun, aug=aug, root_prefix=root_prefix)
 
 
 def linprobe_experiment(adapt_name, dataset, model, num_replications, args, deps=[], rerun=False,
@@ -463,7 +469,7 @@ domainnet = Dataset(
     config_rel_path='adaptation/domainnet.yaml',
     bundles=['domainnet'],
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh domainnet',
-    slurm_data_dir='/scr/biggest',
+    slurm_data_dir='/scr/biggest/',
     eval_config_rel_path='adaptation/domainnet_eval.yaml')
 
 names_to_datasets = {
