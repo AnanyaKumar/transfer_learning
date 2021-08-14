@@ -609,6 +609,8 @@ def linprobe_experiments_no_aug(args, num_replications=5):
 
 def lp_then_ft_experiments(args, num_replications=5, val_mode=False):
     adapt_name = 'lp_then_ft'
+    if val_mode:
+        adapt_name += '_valmode'
     num_replications = 5
     datasets = get_datasets(args)
     model = moco_resnet50
@@ -618,6 +620,8 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False):
     else:
         hyperparams_list = range_hyper('optimizer.args.lr', SWEEP_LRS)
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
+    if val_model:
+        hyperparams_list = append_to_each(hyperparams_list, {'use_net_val_mode': True})
     if args.no_replications:
         num_replications = 0
     for dataset in datasets:
@@ -675,7 +679,6 @@ def main(args):
         'linprobe_experiments': linprobe_experiments,
         'linprobe_experiments_no_aug': linprobe_experiments_no_aug,
         'lp_then_ft_experiments': lp_then_ft_experiments,
-        'lp_then_ft_val_mode_experiments': lp_then_ft_val_mode_experiments,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)
