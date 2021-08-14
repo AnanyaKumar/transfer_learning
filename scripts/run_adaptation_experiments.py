@@ -576,8 +576,7 @@ def linprobe_experiments_no_aug(args, num_replications=5):
     linprobe_experiments(args, num_replications=num_replications, aug=False) 
 
 
-def lp_then_ft_experiments(args, num_replications=5):
-    # datasets = [cifar_stl, living17, entity30]
+def lp_then_ft_experiments(args, num_replications=5, val_mode=False):
     adapt_name = 'lp_then_ft'
     num_replications = 5
     datasets = get_datasets(args)
@@ -645,6 +644,7 @@ def main(args):
         'linprobe_experiments': linprobe_experiments,
         'linprobe_experiments_no_aug': linprobe_experiments_no_aug,
         'lp_then_ft_experiments': lp_then_ft_experiments,
+        'lp_then_ft_val_mode_experiments': lp_then_ft_val_mode_experiments,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)
