@@ -1,4 +1,5 @@
 
+import clip
 from collections import OrderedDict
 import torchvision.models as models
 from torchvision.models import resnet50
