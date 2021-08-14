@@ -182,10 +182,10 @@ def add_dataset_model_deps(deps, args, dataset, model):
 
 def get_best_config_path(adapt_name, dataset, model, args):
     if args.codalab:
-        summarize_job_name = get_summarize_job_name(adapt_name, dataset.name, model.name)
+        summarize_job_name = get_summarize_job_name(adapt_name, dataset.name, args.model_name)
         return summarize_job_name + '/best_config.json'
     else:
-        group_dir = get_group_dir_path(adapt_name, dataset.name, model.name, args)
+        group_dir = get_group_dir_path(adapt_name, dataset.name, args.model_name, args)
         return group_dir + '/best_config.json'
 
 
@@ -200,7 +200,7 @@ def add_model_to_kwargs(kwargs, args, model):
 
 def run_adapt_sweep(adapt_name, dataset, model, hyperparams, args, deps=[], rerun=False):
     run_name = hyperparams_to_str(hyperparams)
-    group_name = get_group_name(adapt_name, dataset.name, model.name)
+    group_name = get_group_name(adapt_name, dataset.name, args.model_name)
     project_name = PROJECT_NAME
     kwargs = deepcopy(hyperparams)
     add_model_to_kwargs(kwargs, args, model)
@@ -218,7 +218,7 @@ def run_adapt_sweep(adapt_name, dataset, model, hyperparams, args, deps=[], reru
 def run_adapt_replication(adapt_name, dataset, model, seed, args, deps=[],
                           replication_hyperparams=None, rerun=False):
     run_name = 'replication_'+str(seed)
-    group_name = get_group_name(adapt_name, dataset.name, model.name)
+    group_name = get_group_name(adapt_name, dataset.name, args.model_name)
     project_name = PROJECT_NAME
     best_config_path = get_best_config_path(adapt_name, dataset, model, args)
     if replication_hyperparams is not None:
@@ -312,14 +312,14 @@ def linprobe_run(args, job_name, model, seed, config_path, features_save_path, r
 
 def run_linprobe_replication(adapt_name, dataset, model, seed, args, deps=[], rerun=False,
                              aug=True):
-    group_dir_path = get_group_dir_path(adapt_name, dataset.name, model.name, args)
+    group_dir_path = get_group_dir_path(adapt_name, dataset.name, args.model_name, args)
     config_path = get_config_path(args, dataset.config_rel_path)
     features_save_path = group_dir_path + '/features_' + str(seed)
     # summarize_results looks for files which start with stats and end with .tsv
     results_save_path = group_dir_path + '/stats_' + str(seed) + '.tsv'
     weights_save_path = group_dir_path + '/weights_' + str(seed) + '.pkl'
     val_metric = dataset.val_metric
-    job_name = get_group_name(adapt_name, dataset.name, model.name) + '_' + str(seed)
+    job_name = get_group_name(adapt_name, dataset.name, args.model_name) + '_' + str(seed)
     deps = add_dataset_model_deps(deps, args, dataset, model)
     return linprobe_run(
         args, job_name, model, seed, config_path, features_save_path, results_save_path,
@@ -372,8 +372,8 @@ def summarize_run(dir_path, job_name, val_metric, secondary_val_metrics, output_
 
 
 def summarize_adaptation(adapt_name, dataset, model, args, deps, replication=False):
-    group_dir_path = get_group_dir_path(adapt_name, dataset.name, model.name, args)
-    job_name = get_summarize_job_name(adapt_name, dataset.name, model.name, replication)
+    group_dir_path = get_group_dir_path(adapt_name, dataset.name, args.model_name, args)
+    job_name = get_summarize_job_name(adapt_name, dataset.name, args.model_name, replication)
     return summarize_run(group_dir_path, job_name, dataset.val_metric, dataset.secondary_val_metrics,
         dataset.output_metrics, args, deps)
 
@@ -385,8 +385,8 @@ def summarize_linprobe_run(dir_path, job_name, val_metric, secondary_val_metrics
 
 
 def summarize_linprobe(adapt_name, dataset, model, args, deps):
-    group_dir_path = get_group_dir_path(adapt_name, dataset.name, model.name, args)
-    job_name = get_summarize_job_name(adapt_name, dataset.name, model.name, replication=True)
+    group_dir_path = get_group_dir_path(adapt_name, dataset.name, args.model_name, args)
+    job_name = get_summarize_job_name(adapt_name, dataset.name, args.model_name, replication=True)
     secondary_val_metrics = dataset.linprobe_secondary_val_metrics
     if secondary_val_metrics is None:
         secondary_val_metrics = dataset.secondary_val_metrics
@@ -478,10 +478,9 @@ names_to_datasets = {
 ## Models.
 ############################################
 
-Model = namedtuple('Model', ['name', 'kwargs', 'bundles'])
+Model = namedtuple('Model', ['kwargs', 'bundles'])
 
 moco_resnet50 = Model(
-    name='resnet50',
     kwargs={
         'classname': 'models.imnet_resnet.ResNet50',
         'pretrained': True,
@@ -492,7 +491,6 @@ moco_resnet50 = Model(
 )
 
 swav_resnet50 = Model(
-    name='swav_resnet50',
     kwargs={
         'classname': 'models.imnet_resnet.ResNet50',
         'pretrained': True,
@@ -503,7 +501,6 @@ swav_resnet50 = Model(
 )
 
 sup_resnet50 = Model(
-    name='sup_resnet50',
     kwargs={
         'classname': 'models.imnet_resnet.ResNet50',
         'pretrained': True,
@@ -513,13 +510,19 @@ sup_resnet50 = Model(
 )
 
 clip_resnet50 = Model(
-    name='clip_resnet50',
     kwargs={
         'classname': 'models.clip_model.ClipModel',
         'model_name': 'RN50',
     },
     bundles=[]
 )
+
+names_to_model = {
+    'resnet50': moco_resnet50,
+    'swav_resnet50': swav_resnet50,
+    'sup_resnet50': sup_resnet50,
+    'clip_resnet50': clip_resnet50,
+}
 
 ############################################
 ## Functions to specify hyperparameter sweeps.
@@ -572,7 +575,7 @@ def get_datasets(args):
 def fine_tuning_experiments(args, num_replications=5):
     adapt_name = 'full_ft'
     datasets = get_datasets(args)
-    model = moco_resnet50
+    model = names_to_model[args.model_name]
     if args.only_one_run:
         hyperparams_list = range_hyper('optimizer.args.lr', [SWEEP_LRS[0]])
         num_replications = 0
@@ -593,7 +596,7 @@ def linprobe_experiments(args, num_replications=5, aug=True):
     if not(aug):
         adapt_name += '_noaug'
     datasets = get_datasets(args)
-    model = moco_resnet50
+    model = names_to_model[args.model_name]
     if args.no_replications or args.only_one_run:
         num_replications = 1
     for dataset in datasets:
@@ -613,7 +616,7 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False):
         adapt_name += '_valmode'
     num_replications = 5
     datasets = get_datasets(args)
-    model = moco_resnet50
+    model = names_to_model[args.model_name]
     if args.only_one_run:
         hyperparams_list = range_hyper('optimizer.args.lr', [SWEEP_LRS[0]])
         num_replications = 0
@@ -626,7 +629,7 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False):
         num_replications = 0
     for dataset in datasets:
         cur_hyperparams_list = deepcopy(hyperparams_list)
-        group_path = get_group_dir_path(adapt_name, dataset.name, model.name, args)
+        group_path = get_group_dir_path(adapt_name, dataset.name, args.model_name, args)
         cur_hyperparams_list = append_to_each(
             cur_hyperparams_list,
             {'linear_probe_checkpoint_path': group_path + '/weights_0.pkl'})
@@ -733,6 +736,8 @@ if __name__ == "__main__":
                         help='(Slurm only) sbatch script')
     parser.add_argument('--datasets', type=str, nargs='+',
                         help='Datasets to test on (if unspecified, run on all).', required=False)
+    parser.add_argument('--model_name', type=str, default='resnet',  # This is moco resnet.
+                        help='Model to use', required=False)
     parser.add_argument('--only_one_run', action='store_true',
                         help=('Only run one hyperparameter setting, e.g. for debugging'
                               '(also do not run replications).'), required=False)
