@@ -629,7 +629,7 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False):
     else:
         hyperparams_list = range_hyper('optimizer.args.lr', SWEEP_LRS)
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
-    if val_model:
+    if val_mode:
         hyperparams_list = append_to_each(hyperparams_list, {'use_net_val_mode': True})
     if args.no_replications:
         num_replications = 0
