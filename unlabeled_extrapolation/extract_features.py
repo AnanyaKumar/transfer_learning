@@ -48,10 +48,13 @@ def load_test_dataset(config, idx, split_arg_name='split', split='val', batch_si
     return test_data, test_loader
 
 
-def get_features_labels(net, loader, use_cuda=True):
+def get_features_labels(net, loader, use_cuda=True, train_mode=False):
     if use_cuda:
         net.cuda()
-    net.eval()
+    if train_mode:
+        net.train()
+    else:
+        net.eval()
     features_list, labels_list = [], []
     with torch.no_grad():
         for data in loader:
@@ -115,6 +118,9 @@ def main():
     parser.add_argument('--use_test_transforms_for_train', type=str,
                         help='no augmentations when training.', required=False,
                         default='False')
+    parser.add_argument('--train_mode', type=str,
+                        help='Produce features in train mode', required=False,
+                        default='False')
     args, unparsed = parser.parse_known_args()
     config = quinine.Quinfig(args.config)
     utils.update_config(unparsed, config) 
@@ -140,11 +146,17 @@ def main():
         config['train_dataset']['transforms'] = config['default_test_transforms']
         print(config['train_dataset'])
     elif args.use_test_transforms_for_train != 'False':
-        raise ValueError('use_test_transforms_for_train must be True or False.')
+        raise ValueError(f'use_test_transforms_for_train must be True or False, but was '
+                         f'{args.use_test_transforms_for_train}')
     train_loader = get_train_loader(config)
     
     # Get features and labels.
-    train_features, train_labels = get_features_labels(net, train_loader)
+    train_mode = False
+    if args.train_mode == 'True':
+        train_mode = True
+    elif args.train_mode != 'False':
+        raise ValueError(f'train_mode must be True or False but was {args.train_mode}')
+    train_features, train_labels = get_features_labels(net, train_loader, train_mode=train_mode)
     features, labels = [train_features], [train_labels]
     for _, loader in test_name_loaders:
         cur_features, cur_labels = get_features_labels(net, loader)

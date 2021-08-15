@@ -289,13 +289,15 @@ def adaptation_experiment(adapt_name, dataset, model, hyperparams_list, num_repl
 
 def linprobe_run(args, job_name, model, seed, config_path, features_save_path, results_save_path,
                  weights_save_path, val_metric, num_reg_values=50, deps=[], rerun=False, aug=True,
-                 root_prefix=''):
+                 root_prefix='', train_mode=False):
     extract_code_path = args.code_dir + '/extract_features.py'
     kwargs = {}
     add_model_to_kwargs(kwargs, args, model)
     kwargs['config'] = config_path
     kwargs['save_path'] = features_save_path
     kwargs['root_prefix'] = root_prefix
+    if train_mode:
+        kwargs['train_mode'] = True
     # If no augmentation, then use test transform for train.
     kwargs['use_test_transforms_for_train'] = not(aug)
     extract_cmd = get_python_cmd(code_path=extract_code_path, python_path=args.python_path,
@@ -318,7 +320,7 @@ def linprobe_run(args, job_name, model, seed, config_path, features_save_path, r
 
 
 def run_linprobe_replication(adapt_name, dataset, model, seed, args, deps=[], rerun=False,
-                             aug=True):
+                             aug=True, train_mode=False):
     group_dir_path = get_group_dir_path(adapt_name, dataset.name, args.model_name, args)
     config_path = get_config_path(args, dataset.config_rel_path)
     features_save_path = group_dir_path + '/features_' + str(seed)
@@ -334,15 +336,16 @@ def run_linprobe_replication(adapt_name, dataset, model, seed, args, deps=[], re
         root_prefix = args.codalab_data_dir
     return linprobe_run(
         args, job_name, model, seed, config_path, features_save_path, results_save_path,
-        weights_save_path, val_metric, deps=deps, rerun=rerun, aug=aug, root_prefix=root_prefix)
+        weights_save_path, val_metric, deps=deps, rerun=rerun, aug=aug, root_prefix=root_prefix,
+        train_mode=train_mode)
 
 
 def linprobe_experiment(adapt_name, dataset, model, num_replications, args, deps=[], rerun=False,
-                        aug=True):
+                        aug=True, train_mode=False):
     replication_ids = []
     for i in range(num_replications):
         job_id = run_linprobe_replication(adapt_name, dataset, model, seed=i, args=args,
-                                          deps=deps, rerun=rerun, aug=aug)
+                                          deps=deps, rerun=rerun, aug=aug, train_mode=train_mode)
         replication_ids.append(job_id)
     summarize_id = summarize_linprobe(adapt_name, dataset, model, args, deps=replication_ids)
     all_ids = replication_ids + [summarize_id]
@@ -602,10 +605,12 @@ def fine_tuning_experiments(args, num_replications=5):
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
-def linprobe_experiments(args, num_replications=5, aug=True):
+def linprobe_experiments(args, num_replications=5, aug=True, train_mode=False):
     adapt_name = 'linprobe'
     if not(aug):
         adapt_name += '_noaug'
+    if train_mode:
+        adapt_name += '_trainmode'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
     if args.no_replications or args.only_one_run:
@@ -613,7 +618,7 @@ def linprobe_experiments(args, num_replications=5, aug=True):
     for dataset in datasets:
         _, all_ids = linprobe_experiment(
             adapt_name=adapt_name, dataset=dataset, model=model, num_replications=num_replications,
-            args=args, aug=aug)
+            args=args, aug=aug, train_mode=train_mode)
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
@@ -621,11 +626,17 @@ def linprobe_experiments_no_aug(args, num_replications=5):
     linprobe_experiments(args, num_replications=num_replications, aug=False) 
 
 
-def lp_then_ft_experiments(args, num_replications=5, val_mode=False):
+def linprobe_experiments_trainmode(args, num_replications=5):
+    linprobe_experiments(args, num_replications=num_replications, train_mode=True) 
+
+
+def lp_then_ft_experiments(args, num_replications=5, val_mode=False, train_mode=False):
     adapt_name = 'lp_then_ft'
-    linprobe_adapt_name = 'linprobe'
     if val_mode:
         adapt_name += '_valmode'
+    linprobe_adapt_name = 'linprobe'
+    if train_mode:
+        linprobe_adapt_name += '_trainmode'
     num_replications = 5
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
@@ -655,6 +666,10 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False):
             replication_hyperparams_list=replication_hyperparams_list, args=args,
             ignore_name_hypers={'linear_probe_checkpoint_path'})
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
+
+
+def lp_then_ft_trainmode_experiments(args, num_replications=5):
+    lp_then_ft_experiments(args, num_replications=num_replications, train_mode=True)
 
 
 ############################################
@@ -695,6 +710,8 @@ def main(args):
         'linprobe_experiments': linprobe_experiments,
         'linprobe_experiments_no_aug': linprobe_experiments_no_aug,
         'lp_then_ft_experiments': lp_then_ft_experiments,
+        'linprobe_experiments_trainmode': linprobe_experiments_trainmode,
+        'lp_then_ft_trainmode_experiments': lp_then_ft_trainmode_experiments,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)
