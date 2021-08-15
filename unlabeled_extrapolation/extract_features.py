@@ -160,7 +160,7 @@ def main():
     # print('output shapes: ', features[0][0].shape, labels[0][0].shape)
     # print('save path: ', config.save_path)
     
-    # Create save directory if needed.
+    # Create save directory.
     save_dir = os.path.dirname(args.save_path)
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)

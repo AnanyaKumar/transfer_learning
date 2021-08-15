@@ -28,8 +28,10 @@ def normalize_features(features, normalize_index):
     # TODO: consider changing to axis=0
     mean = np.mean(features[normalize_index])
     stddev = np.std(features[normalize_index])
+    normalized_features = []
     for i in range(len(features)):
-        features[i] = (features[i] - mean) / stddev
+        normalized_features.append((features[i] - mean) / stddev)
+    return normalized_features
 
 
 def inv_normalize_weights(weights, intercept, features, normalize_index):
@@ -123,10 +125,10 @@ def main():
     if val_index == -1:
         raise ValueError('Val metric not found in loaders: ', loader_names)
     # Normalize featurs, this makes regularization hyperparameters more consistent across datasets.
-    normalize_features(features, args.train_index)
+    normalized_features = normalize_features(features, args.train_index)
     # Get the best classifier.
     clf, coef, intercept, best_c, best_i, accs = test_log_reg_warm_starting(
-            features, labels, args.train_index, args.test_indices, val_index=val_index,
+            normalized_features, labels, args.train_index, args.test_indices, val_index=val_index,
             loader_names=loader_names, num_cs=args.num_reg_values, random_state=args.seed) 
     # Create parent folders for save paths if needed.
     def make_parent_dir(save_path):
