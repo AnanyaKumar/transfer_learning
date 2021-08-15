@@ -65,5 +65,5 @@ test_datasets:
           verbose: False
 
 early_stop_dataset_names:
-    - 'sketch-test'
-    - 'real-test'
+    - 'sketch_val'
+    - 'real_val'
