@@ -48,9 +48,18 @@ def load_test_dataset(config, idx, split_arg_name='split', split='val', batch_si
     return test_data, test_loader
 
 
-def get_features_labels(net, loader, use_cuda=True, train_mode=False):
+def get_features_labels(net, loader, use_cuda=True, train_mode=False, use_new_bn_stats=False):
     if use_cuda:
         net.cuda()
+    if use_new_bn_stats:
+        if train_mode:
+            raise ValueError('If use_new_bn_stats, then train_mode must be False.')
+        net.train()
+        for data in loader:
+            images, labels = data
+            if use_cuda:
+                images, labels = images.cuda(), labels.cuda()
+            net(images)
     if train_mode:
         net.train()
     else:
@@ -121,6 +130,9 @@ def main():
     parser.add_argument('--train_mode', type=str,
                         help='Produce features in train mode', required=False,
                         default='False')
+    parser.add_argument('--use_new_bn_stats', type=str,
+                        help='Update batchnorm stats before producing features.', required=False,
+                        default='False')
     args, unparsed = parser.parse_known_args()
     config = quinine.Quinfig(args.config)
     utils.update_config(unparsed, config) 
@@ -156,7 +168,13 @@ def main():
         train_mode = True
     elif args.train_mode != 'False':
         raise ValueError(f'train_mode must be True or False but was {args.train_mode}')
-    train_features, train_labels = get_features_labels(net, train_loader, train_mode=train_mode)
+    use_new_bn_stats = False
+    if args.use_new_bn_stats == 'True':
+        use_new_bn_stats = True
+    elif args.use_new_bn_stats != 'False':
+        raise ValueError(f'use_new_bn_stats must be True or False but was {args.use_new_bn_stats}')
+    train_features, train_labels = get_features_labels(net, train_loader, train_mode=train_mode,
+                                                       use_new_bn_stats=use_new_bn_stats)
     features, labels = [train_features], [train_labels]
     for _, loader in test_name_loaders:
         cur_features, cur_labels = get_features_labels(net, loader)

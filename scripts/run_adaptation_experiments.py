@@ -685,6 +685,10 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False, train_mode=
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
+def lp_then_ft_valmode_experiments(args, num_replications=5):
+    lp_then_ft_experiments(args, num_replications=num_replications, val_mode=True)
+
+
 def lp_then_ft_trainmode_experiments(args, num_replications=5):
     lp_then_ft_experiments(args, num_replications=num_replications, train_mode=True)
 
@@ -735,6 +739,7 @@ def main(args):
         'lp_then_ft_trainmode_experiments': lp_then_ft_trainmode_experiments,
         'linprobe_experiments_usenewbnstats': linprobe_experiments_usenewbnstats,
         'lp_then_ft_usenewbnstats_experiments': lp_then_ft_usenewbnstats_experiments,
+        'lp_then_ft_valmode_experiments': lp_then_ft_valmode_experiments,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)
