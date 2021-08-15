@@ -293,7 +293,6 @@ def main(config, log_dir, checkpoints_dir):
         0, test_loaders, max_test_examples, config, net, criterion, device,
         loss_name_prefix='test_loss/', acc_name_prefix='test_acc/')
     # Log stats.
-    test_metrics.append(test_stats)
     if config['wandb']:
         wandb.log(test_stats)
 
