@@ -13,10 +13,10 @@ train_dataset:
         version: 'sentry'
         verbose: False
     transforms:
-        - classname: torchvision.transforms.Resize
+        - classname: unlabeled_extrapolation.datasets.transforms.Resize
           args:
               size: [256, 256]
-              interpolation: 'BICUBIC'
+              interpolation: 'bicubic'
         - classname: torchvision.transforms.RandomCrop
           args:
               size: 224
