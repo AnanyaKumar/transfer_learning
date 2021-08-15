@@ -23,9 +23,9 @@ class ClipModel(nn.Module):
         super().__init__()
         if model_name not in MODELS:
             raise ValueError(f'model_name must be in {MODELS} but was {model_name}')
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self._device = "cuda" if torch.cuda.is_available() else "cpu"
         # Note that model has both a language and vision part.
-        model, _ = clip.load(model_name, device=device)
+        model, _ = clip.load(model_name, device=self._device)
         self._model = model
         self._classifier = None
 
@@ -45,6 +45,7 @@ class ClipModel(nn.Module):
     def new_last_layer(self, num_classes):
         num_in_features = self._model.visual.output_dim
         self._classifier = nn.Linear(num_in_features, num_classes)
+        self._classifier.to(self._device)
 
     def add_probe(self, probe):
         self._classifier = probe
