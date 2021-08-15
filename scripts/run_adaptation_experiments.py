@@ -623,6 +623,7 @@ def linprobe_experiments_no_aug(args, num_replications=5):
 
 def lp_then_ft_experiments(args, num_replications=5, val_mode=False):
     adapt_name = 'lp_then_ft'
+    linprobe_adapt_name = 'linprobe'
     if val_mode:
         adapt_name += '_valmode'
     num_replications = 5
@@ -640,14 +641,14 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False):
         num_replications = 0
     for dataset in datasets:
         cur_hyperparams_list = deepcopy(hyperparams_list)
-        group_path = get_group_dir_path(adapt_name, dataset.name, args.model_name, args)
+        linprobe_group_path = get_group_dir_path(linprobe_adapt_name, dataset.name, args.model_name, args)
         cur_hyperparams_list = append_to_each(
             cur_hyperparams_list,
-            {'linear_probe_checkpoint_path': group_path + '/weights_0.pkl'})
+            {'linear_probe_checkpoint_path': linprobe_group_path + '/weights_0.pkl'})
         replication_hyperparams_list = []
         for i in range(num_replications):
             replication_hyperparams_list.append({
-                'linear_probe_checkpoint_path': group_path + '/weights_' + str(i) + '.pkl'})
+                'linear_probe_checkpoint_path': linprobe_group_path + '/weights_' + str(i) + '.pkl'})
         _, all_ids = adaptation_experiment(
             adapt_name=adapt_name, dataset=dataset, model=model,
             hyperparams_list=cur_hyperparams_list, num_replications=num_replications,
