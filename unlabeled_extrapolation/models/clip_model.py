@@ -7,8 +7,14 @@ import torch
 from torch import nn
 from . import model_utils
 
+from torchvision.transforms import Normalize
+
 
 MODELS = {'RN50', 'RN101', 'RN50x4', 'RN50x16', 'ViT-B/32', 'ViT-B/16'}
+
+normalize_transform = Normalize(
+    mean=(0.48145466, 0.4578275, 0.40821073),
+    std=(0.26862954, 0.26130258, 0.27577711))
 
 
 class ClipModel(nn.Module):
@@ -19,13 +25,12 @@ class ClipModel(nn.Module):
             raise ValueError(f'model_name must be in {MODELS} but was {model_name}')
         device = "cuda" if torch.cuda.is_available() else "cpu"
         # Note that model has both a language and vision part.
-        model, preprocess = clip.load(model_name, device=device)
-        self._preprocess = preprocess
+        model, _ = clip.load(model_name, device=device)
         self._model = model
         self._classifier = None
 
     def forward(self, x):
-        features = self._model.encode_image(self._preprocess(x))
+        features = self.get_features(x)
         if self._classifier is None:
             return features
         return self._classifier(features)
@@ -48,7 +53,10 @@ class ClipModel(nn.Module):
         return self._classifier
 
     def set_last_layer(self, coef, intercept):
-        model_utils.set_linear_layer(self._classifier, coef, intercept) 
-    
+        model_utils.set_linear_layer(self._classifier, coef, intercept)
+
     def get_feature_extractor(self):
-        return self._model.visual
+        raise NotImplementedError('Be careful, we need to normalize image first before encoding it.')
+    
+    def get_features(self, x):
+        return self._model.encode_image(normalize_transform(x))

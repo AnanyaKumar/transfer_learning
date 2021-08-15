@@ -65,3 +65,6 @@ class WildsVisionModel(nn.Module):
     def get_feature_extractor(self):
         return nn.Sequential(*list(self._model.children())[:-1])
 
+    def get_features(self, x):
+        return self.get_feature_extractor()(x)
+

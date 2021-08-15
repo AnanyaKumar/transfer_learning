@@ -52,14 +52,13 @@ def get_features_labels(net, loader, use_cuda=True):
     if use_cuda:
         net.cuda()
     net.eval()
-    feature_model = net.get_feature_extractor() # nn.Sequential(*list(net._model.children())[:-1])
     features_list, labels_list = [], []
     with torch.no_grad():
         for data in loader:
             images, labels = data
             if use_cuda:
                 images, labels = images.cuda(), labels.cuda()
-            features = feature_model(images)
+            features = net.get_features(images)
             features_list.append(features.detach().cpu().numpy())
             labels_list.append(labels.detach().cpu().numpy())
     features = np.squeeze(np.concatenate(features_list))

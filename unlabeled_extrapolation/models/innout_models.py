@@ -317,6 +317,9 @@ class CNN1D(nn.Module):
     def get_feature_extractor(self):
         return self.feature_extractor
 
+    def get_features(self, x):
+        return self.get_feature_extractor()(x)
+
 
 
 class CNN1DMultitask(MultitaskModel):
