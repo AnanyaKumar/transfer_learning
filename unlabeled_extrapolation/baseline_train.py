@@ -292,9 +292,8 @@ def main(config, log_dir, checkpoints_dir):
     test_stats = get_all_test_stats(
         0, test_loaders, max_test_examples, config, net, criterion, device,
         loss_name_prefix='test_loss/', acc_name_prefix='test_acc/')
-    # Log stats.
-    if config['wandb']:
-        wandb.log(test_stats)
+    logging.info('Initial test stats')
+    logging.info(test_stats)
 
     for epoch in range(config['epochs']):
         # Save checkpoint once in a while.
