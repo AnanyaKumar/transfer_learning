@@ -28,10 +28,10 @@ train_dataset:
               std: [0.26862954, 0.26130258, 0.27577711]
 
 default_test_transforms:
-    - classname: torchvision.transforms.Resize
+    - classname: unlabeled_extrapolation.datasets.transforms.Resize
       args:
-          size: [224, 224]
-          interpolation: 'BICUBIC'
+          size: [256, 256]
+          interpolation: 'bicubic'
     - classname: torchvision.transforms.ToTensor
     - classname: torchvision.transforms.Normalize
       args:
