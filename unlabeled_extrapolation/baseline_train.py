@@ -285,6 +285,18 @@ def main(config, log_dir, checkpoints_dir):
     train_metrics = []
     test_metrics = []
     prev_ckp_path = None
+    # For the first epoch we get stats, but we don't save them or update best checkpoint.
+    # This can be useful if we start with a great model that quickly gets corrupted in the first
+    # epoch, we don't want the initial statistics to dominate.
+    # First argument is epoch.
+    test_stats = get_all_test_stats(
+        0, test_loaders, max_test_examples, config, net, criterion, device,
+        loss_name_prefix='test_loss/', acc_name_prefix='test_acc/')
+    # Log stats.
+    test_metrics.append(test_stats)
+    if config['wandb']:
+        wandb.log(test_stats)
+
     for epoch in range(config['epochs']):
         # Save checkpoint once in a while.
         if epoch % config['save_freq'] == 0:
@@ -300,7 +312,7 @@ def main(config, log_dir, checkpoints_dir):
         scheduler.step()
         # Get test stats across all test sets.
         test_stats = get_all_test_stats(
-            epoch, test_loaders, max_test_examples, config, net, criterion, device,
+            epoch+1, test_loaders, max_test_examples, config, net, criterion, device,
             loss_name_prefix='test_loss/', acc_name_prefix='test_acc/')
         # Keep track of the best stats.
         update_best_stats(train_stats, best_stats)
