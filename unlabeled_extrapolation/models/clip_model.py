@@ -27,6 +27,7 @@ class ClipModel(nn.Module):
         # Note that model has both a language and vision part.
         model, _ = clip.load(model_name, device=self._device)
         self._model = model
+        self._model.visual.float()
         self._classifier = None
 
     def forward(self, x):
