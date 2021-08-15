@@ -133,10 +133,11 @@ def config_run(args, kwargs, config_path, run_name, group_name, project_name,
 ## Functions to get directory/job names.
 ############################################
 
-def hyperparams_to_str(hyperparams, item_sep='_', key_value_sep='-'):
+def hyperparams_to_str(hyperparams, item_sep='_', key_value_sep='-', ignore_name_hypers={}):
     """Convert hyperparameters into string."""
     sorted_hyperparams = sorted(hyperparams.items())
-    return item_sep.join([str(k) + key_value_sep + str(v) for k, v in sorted_hyperparams])
+    return item_sep.join([str(k) + key_value_sep + str(v) for k, v in sorted_hyperparams
+                          if k not in ignore_name_hypers])
  
 def get_group_name(adapt_name, dataset_name, model_name):
     return adapt_name+'_'+dataset_name+'_'+model_name
@@ -198,8 +199,9 @@ def add_model_to_kwargs(kwargs, args, model):
             kwargs['model.' + k] = v
 
 
-def run_adapt_sweep(adapt_name, dataset, model, hyperparams, args, deps=[], rerun=False):
-    run_name = hyperparams_to_str(hyperparams)
+def run_adapt_sweep(adapt_name, dataset, model, hyperparams, args, deps=[], rerun=False,
+                    ignore_name_hypers={}):
+    run_name = hyperparams_to_str(hyperparams, ignore_name_hypers=ignore_name_hypers)
     group_name = get_group_name(adapt_name, dataset.name, args.model_name)
     project_name = PROJECT_NAME
     kwargs = deepcopy(hyperparams)
@@ -236,11 +238,13 @@ def run_adapt_replication(adapt_name, dataset, model, seed, args, deps=[],
         deps=deps, run_saved=True, rerun=rerun)
 
 
-def adaptation_sweep(adapt_name, dataset, model, hyperparams_list, args, deps=[], rerun=False):
+def adaptation_sweep(adapt_name, dataset, model, hyperparams_list, args, deps=[], rerun=False,
+                     ignore_name_hypers={}):
     sweep_ids = []
     for hyperparams in hyperparams_list:
         job_id = run_adapt_sweep(adapt_name, dataset, model,
-            hyperparams=hyperparams, args=args, deps=deps, rerun=rerun)
+            hyperparams=hyperparams, args=args, deps=deps, rerun=rerun,
+            ignore_name_hypers=ignore_name_hypers)
         # Job id of -1 means we didn't run the job because it's already run.
         if job_id != -1:
             sweep_ids.append(job_id)
@@ -267,10 +271,11 @@ def adaptation_replication(adapt_name, dataset, model, num_replications, args, d
 
 
 def adaptation_experiment(adapt_name, dataset, model, hyperparams_list, num_replications, args,
-                          deps=[], replication_hyperparams_list=None, rerun=False):
+                          deps=[], replication_hyperparams_list=None, rerun=False, ignore_name_hypers={}):
     """Sweep over hyperparams_list, find best, and replicate on a dataset for a model"""
+    # ignore_name_hypers is the set of hyperparameters to ignore in the run name.
     sweep_ids = adaptation_sweep(adapt_name, dataset, model, hyperparams_list,
-        args=args, deps=deps, rerun=rerun)
+        args=args, deps=deps, rerun=rerun, ignore_name_hypers=ignore_name_hypers)
     summarize_id = summarize_adaptation(adapt_name, dataset, model, args,
         deps=sweep_ids)
     replication_ids = adaptation_replication(adapt_name, dataset, model, num_replications,
@@ -646,7 +651,8 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False):
         _, all_ids = adaptation_experiment(
             adapt_name=adapt_name, dataset=dataset, model=model,
             hyperparams_list=cur_hyperparams_list, num_replications=num_replications,
-            replication_hyperparams_list=replication_hyperparams_list, args=args)
+            replication_hyperparams_list=replication_hyperparams_list, args=args,
+            ignore_name_hypers={'linear_probe_checkpoint_path'})
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
