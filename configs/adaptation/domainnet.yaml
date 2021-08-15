@@ -4,7 +4,7 @@ inherit:
   - datasets_domainnet.yaml
 
 num_classes: 40
-epochs: &epochs 500  # Very small dataset so run for much longer.
+epochs: &epochs 200  # Very small dataset so run for longer.
 
 model:
   classname: models.clip_model.ClipModel

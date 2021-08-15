@@ -589,8 +589,14 @@ def get_datasets(args):
     return datasets
 
 
-def fine_tuning_experiments(args, num_replications=5):
+def fine_tuning_experiments(args, num_replications=5, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False):
     adapt_name = 'full_ft'
+    if linear_probe:
+        adapt_name = 'torch_linprobe'
+    if batchnorm_ft:
+        adapt_name = 'batchnorm_ft'
+    if higher_linear_lr:
+        adapt_name = 'full_ft_higherlinlr'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
     if args.only_one_run:
@@ -599,6 +605,12 @@ def fine_tuning_experiments(args, num_replications=5):
     else:
         hyperparams_list = range_hyper('optimizer.args.lr', SWEEP_LRS)
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
+    if linear_probe:
+        hyperparams_list = append_to_each(hyperparams_list, {'linear_probe': True})
+    if batchnorm_ft:
+        hyperparams_list = append_to_each(hyperparams_list, {'batchnorm_ft': True})
+    if higher_linear_lr:
+        hyperparams_list = append_to_each(hyperparams_list, {'linear_layer_lr_multiplier': 10})
     if args.no_replications:
         num_replications = 0
     for dataset in datasets:
@@ -606,6 +618,18 @@ def fine_tuning_experiments(args, num_replications=5):
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
             num_replications=num_replications, args=args)
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
+
+
+def torch_linprobe_experiments(args, num_replications=5):
+    fine_tuning_experiments(args, num_replications=num_replications, linear_probe=True)
+
+
+def batchnorm_ft_experiments(args, num_replications=5):
+    fine_tuning_experiments(args, num_replications=num_replications, batchnorm_ft=True)
+
+
+def ft_higher_linear_lr_experiments(args, num_replications=5):
+    fine_tuning_experiments(args, num_replications=num_replications, higher_linear_lr=True)
 
 
 def linprobe_experiments(args, num_replications=5, aug=True, train_mode=False, use_new_bn_stats=False):
@@ -740,6 +764,9 @@ def main(args):
         'linprobe_experiments_usenewbnstats': linprobe_experiments_usenewbnstats,
         'lp_then_ft_usenewbnstats_experiments': lp_then_ft_usenewbnstats_experiments,
         'lp_then_ft_valmode_experiments': lp_then_ft_valmode_experiments,
+        'torch_linprobe_experiments': torch_linprobe_experiments,
+        'batchnorm_ft_experiments': batchnorm_ft_experiments,
+        'ft_higher_linear_lr_experiments': ft_higher_linear_lr_experiments,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)
