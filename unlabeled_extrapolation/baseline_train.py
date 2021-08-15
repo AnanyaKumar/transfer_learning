@@ -311,7 +311,7 @@ def main(config, log_dir, checkpoints_dir):
         scheduler.step()
         # Get test stats across all test sets.
         test_stats = get_all_test_stats(
-            epoch+1, test_loaders, max_test_examples, config, net, criterion, device,
+            epoch, test_loaders, max_test_examples, config, net, criterion, device,
             loss_name_prefix='test_loss/', acc_name_prefix='test_acc/')
         # Keep track of the best stats.
         update_best_stats(train_stats, best_stats)
