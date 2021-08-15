@@ -22,10 +22,6 @@ train_dataset:
               size: 224
         - classname: torchvision.transforms.RandomHorizontalFlip
         - classname: torchvision.transforms.ToTensor
-        - classname: torchvision.transforms.Normalize
-          args:
-              mean: [0.48145466, 0.4578275, 0.40821073]
-              std: [0.26862954, 0.26130258, 0.27577711]
 
 default_test_transforms:
     - classname: unlabeled_extrapolation.datasets.transforms.Resize
@@ -33,10 +29,6 @@ default_test_transforms:
           size: [224, 224]
           interpolation: 'bicubic'
     - classname: torchvision.transforms.ToTensor
-    - classname: torchvision.transforms.Normalize
-      args:
-          mean: [0.48145466, 0.4578275, 0.40821073]
-          std: [0.26862954, 0.26130258, 0.27577711]
 
 test_datasets:
     - name: 'sketch_val'
