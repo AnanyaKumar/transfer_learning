@@ -596,7 +596,8 @@ def fine_tuning_experiments(args, num_replications=5, linear_probe=False, batchn
         adapt_name = 'torch_linprobe'
     if batchnorm_ft:
         adapt_name = 'batchnorm_ft'
-        sweep_lrs = [10.0 * lr for lr in sweep_lrs] + [0.3]
+        # TODO: hacky / hardcoded.
+        sweep_lrs = SWEEP_LRS[2:] + [0.03, 0.1, 0.3]
     if higher_linear_lr:
         adapt_name = 'full_ft_higherlinlr'
     datasets = get_datasets(args)
@@ -672,12 +673,14 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False, train_mode=
     sweep_lrs = SWEEP_LRS
     if val_mode:
         adapt_name += '_valmode'
+        # TODO: decide what to do for other datasets, add more lrs too?
         if args.datasets == ['domainnet']:
             sweep_lrs = [1e-5, 3e-6, 1e-6, 3e-7]
     linprobe_adapt_name = 'linprobe'
     if train_mode:
         adapt_name += '_trainmode'
         linprobe_adapt_name += '_trainmode'
+        # TODO: hacky / hardcoded.
         sweep_lrs = [1e-6, 3e-6, 1e-5] + sweep_lrs
     if use_new_bn_stats:
         if train_mode:
