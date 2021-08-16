@@ -672,7 +672,7 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False, train_mode=
     sweep_lrs = SWEEP_LRS
     if val_mode:
         adapt_name += '_valmode'
-        if args.dataset == 'domainnet':
+        if args.datasets == ['domainnet']:
             sweep_lrs = [1e-5, 3e-6, 1e-6, 3e-7]
     linprobe_adapt_name = 'linprobe'
     if train_mode:
