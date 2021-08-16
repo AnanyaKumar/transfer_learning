@@ -591,19 +591,21 @@ def get_datasets(args):
 
 def fine_tuning_experiments(args, num_replications=5, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False):
     adapt_name = 'full_ft'
+    sweep_lrs = SWEEP_LRS
     if linear_probe:
         adapt_name = 'torch_linprobe'
     if batchnorm_ft:
         adapt_name = 'batchnorm_ft'
+        sweep_lrs = [10.0 * lr for lr in sweep_lrs] + [0.3]
     if higher_linear_lr:
         adapt_name = 'full_ft_higherlinlr'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
     if args.only_one_run:
-        hyperparams_list = range_hyper('optimizer.args.lr', [SWEEP_LRS[0]])
+        hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
         num_replications = 0
     else:
-        hyperparams_list = range_hyper('optimizer.args.lr', SWEEP_LRS)
+        hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
     if linear_probe:
         hyperparams_list = append_to_each(hyperparams_list, {'linear_probe': True})
@@ -667,12 +669,16 @@ def linprobe_experiments_usenewbnstats(args, num_replications=5):
 
 def lp_then_ft_experiments(args, num_replications=5, val_mode=False, train_mode=False, use_new_bn_stats=False):
     adapt_name = 'lp_then_ft'
+    sweep_lrs = SWEEP_LRS
     if val_mode:
         adapt_name += '_valmode'
+        if args.dataset == 'domainnet':
+            sweep_lrs = [1e-5, 3e-6, 1e-6, 3e-7]
     linprobe_adapt_name = 'linprobe'
     if train_mode:
         adapt_name += '_trainmode'
         linprobe_adapt_name += '_trainmode'
+        sweep_lrs = [1e-6, 3e-6, 1e-5] + sweep_lrs
     if use_new_bn_stats:
         if train_mode:
             raise ValueError('If use_new_bn_stats is True, train_mode must be False.')
@@ -682,10 +688,10 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False, train_mode=
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
     if args.only_one_run:
-        hyperparams_list = range_hyper('optimizer.args.lr', [SWEEP_LRS[0]])
+        hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
         num_replications = 0
     else:
-        hyperparams_list = range_hyper('optimizer.args.lr', SWEEP_LRS)
+        hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
     if val_mode:
         hyperparams_list = append_to_each(hyperparams_list, {'use_net_val_mode': True})
