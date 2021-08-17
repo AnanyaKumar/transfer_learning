@@ -122,7 +122,7 @@ def config_run(args, kwargs, config_path, run_name, group_name, project_name,
         cmd = dataset_copy_cmd + ' && ' + cmd
     job_name = group_name + '_' + run_name
     if os.path.isfile(log_dir + '/stats.tsv') and not(rerun):
-        # TODO: should we rerun only if stats.tsv is entirely filled out?
+        # TODO: should we rerun if stats.tsv is not completely filled out?
         # Maybe design this a bit better.
         return -1
     else:
@@ -684,6 +684,9 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False, train_mode=
         linprobe_adapt_name += '_trainmode'
         # TODO: hacky / hardcoded.
         sweep_lrs = [1e-6, 3e-6, 1e-5] + sweep_lrs
+    # TODO: hacky / hardcoded.
+    if not(val_mode) and not(train_mode) and args.datasets == ['domainnet']:
+        sweep_lrs = [3e-6, 1e-5] + sweep_lrs
     if use_new_bn_stats:
         if train_mode:
             raise ValueError('If use_new_bn_stats is True, train_mode must be False.')
