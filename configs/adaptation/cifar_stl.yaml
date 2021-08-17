@@ -4,7 +4,7 @@ inherit:
   - datasets_cifar_stl.yaml
 
 num_classes: 10
-epochs: &epochs 50
+epochs: &epochs 20
 
 model:
   classname: models.imnet_resnet.ResNet50

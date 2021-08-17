@@ -4,7 +4,7 @@ inherit:
   - datasets_living17.yaml
 
 num_classes: 17
-epochs: &epochs 50
+epochs: &epochs 20
 
 model:
   classname: models.imnet_resnet.ResNet50

@@ -597,11 +597,11 @@ def fine_tuning_experiments(args, num_replications=5, linear_probe=False, batchn
         adapt_name += '_valmode'
         # TODO: decide what to do for other datasets, add more lrs too? hacky / hardcoded.
         if args.datasets == ['entity30'] or args.datasets == ['living17']:
-            sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
+            sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
         if args.datasets == ['cifar_stl']:
-            sweep_lrs = [3e-8, 1e-7, 3e-7, 1e-6, 3e-6, 1e-5]
+            sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
         if args.datasets == ['domainnet']:
-            sweep_lrs = [3e-9, 1e-8, 3e-8, 1e-7, 3e-7, 1e-6]
+            sweep_lrs = [1e-6, 3e-6, 1e-5, 3e-5, 1e-4, 3e-4]
     if linear_probe:
         adapt_name = 'torch_linprobe'
     if batchnorm_ft:

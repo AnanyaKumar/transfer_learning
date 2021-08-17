@@ -4,7 +4,7 @@ inherit:
   - datasets_entity30.yaml
 
 num_classes: 30
-epochs: &epochs 50
+epochs: &epochs 20
 
 model:
   classname: models.imnet_resnet.ResNet50
