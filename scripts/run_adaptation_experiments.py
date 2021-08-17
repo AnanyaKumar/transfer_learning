@@ -647,6 +647,10 @@ def ft_higher_linear_lr_experiments(args, num_replications=5):
     fine_tuning_experiments(args, num_replications=num_replications, higher_linear_lr=True)
 
 
+def ft_val_mode_experiment(args, num_replications=5):
+    fine_tuning_experiments(args, num_replications=num_replications, val_mode=True)
+
+
 def linprobe_experiments(args, num_replications=5, aug=True, train_mode=False, use_new_bn_stats=False):
     adapt_name = 'linprobe'
     if not(aug):
@@ -795,6 +799,7 @@ def main(args):
         'torch_linprobe_experiments': torch_linprobe_experiments,
         'batchnorm_ft_experiments': batchnorm_ft_experiments,
         'ft_higher_linear_lr_experiments': ft_higher_linear_lr_experiments,
+        'ft_val_mode_experiment': ft_val_mode_experiment,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)
