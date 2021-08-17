@@ -589,9 +589,19 @@ def get_datasets(args):
     return datasets
 
 
-def fine_tuning_experiments(args, num_replications=5, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False):
+def fine_tuning_experiments(args, num_replications=5, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
+                            val_mode=False):
     adapt_name = 'full_ft'
     sweep_lrs = SWEEP_LRS
+    if val_mode:
+        adapt_name += '_valmode'
+        # TODO: decide what to do for other datasets, add more lrs too? hacky / hardcoded.
+        if args.datasets == ['entity30'] or args.datasets == ['living17']:
+            sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
+        if args.datasets == ['cifar_stl']:
+            sweep_lrs = [3e-8, 1e-7, 3e-7, 1e-6, 3e-6, 1e-5]
+        if args.datasets == ['domainnet']:
+            sweep_lrs = [3e-9, 1e-8, 3e-8, 1e-7, 3e-7, 1e-6]
     if linear_probe:
         adapt_name = 'torch_linprobe'
     if batchnorm_ft:
@@ -607,6 +617,8 @@ def fine_tuning_experiments(args, num_replications=5, linear_probe=False, batchn
         num_replications = 0
     else:
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
+    if val_mode:
+        hyperparams_list = append_to_each(hyperparams_list, {'use_net_val_mode': True})
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
     if linear_probe:
         hyperparams_list = append_to_each(hyperparams_list, {'linear_probe': True})
@@ -674,10 +686,12 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False, train_mode=
     if val_mode:
         adapt_name += '_valmode'
         # TODO: decide what to do for other datasets, add more lrs too? hacky / hardcoded.
+        if args.datasets == ['entity30'] or args.datasets == ['living17']:
+            sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
+        if args.datasets == ['cifar_stl']:
+            sweep_lrs = [3e-8, 1e-7, 3e-7, 1e-6, 3e-6, 1e-5]
         if args.datasets == ['domainnet']:
-            sweep_lrs = [1e-5, 3e-6, 1e-6, 3e-7]
-        else:
-            sweep_lrs = [1e-5, 3e-6, 1e-6]
+            sweep_lrs = [3e-9, 1e-8, 3e-8, 1e-7, 3e-7, 1e-6]
     linprobe_adapt_name = 'linprobe'
     if train_mode:
         adapt_name += '_trainmode'
