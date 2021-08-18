@@ -483,11 +483,27 @@ domainnet = Dataset(
     slurm_data_dir='/scr/biggest/',
     eval_config_rel_path='adaptation/domainnet_eval.yaml')
 
+landcover = Dataset(
+    name='landcover',
+    val_metric='test_acc/nonafrica-val',
+    secondary_val_metrics=['test_acc/africa', 'test_acc/nonafrica-test', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/nonafrica-val',
+        'test_acc/africa', 'test_acc/nonafrica-test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/nonafrica-val',
+        'test_acc/africa', 'test_acc/nonafrica-test'],
+    config_rel_path='adaptation/landcover_to_africa.yaml',
+    bundles=['landcover'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/u/scr/nlp/eix/',
+    eval_config_rel_path='adaptation/landcover_to_africa_eval.yaml')
+
 names_to_datasets = {
     'living17': living17,
     'entity30': entity30,
     'cifar_stl': cifar_stl,
     'domainnet': domainnet,
+    'landcover': landcover,
 }
 
 
@@ -534,11 +550,31 @@ clip_resnet50 = Model(
     bundles=[]
 )
 
+landcover_baseline = Model(
+    kwargs={
+        'classname': 'models.innout_models.CNN1D',
+        'in_channels': 8,
+        'output_size': 6,
+    },
+    bundles=[]
+)
+
+landcover_auxin = Model(
+    kwargs={
+        'classname': 'models.innout_models.CNN1D',
+        'in_channels': 14,
+        'output_size': 6,
+    },
+    bundles=[]
+)
+
 names_to_model = {
     'resnet50': moco_resnet50,
     'swav_resnet50': swav_resnet50,
     'sup_resnet50': sup_resnet50,
     'clip_resnet50': clip_resnet50,
+    'landcover-baseline': landcover_baseline,
+    'landcover_auxin': landcover_auxin,
 }
 
 ############################################
