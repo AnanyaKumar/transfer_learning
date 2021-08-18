@@ -1,0 +1,53 @@
+
+root_prefix: '/u/scr/nlp/eix/'
+
+# Add augmentations, and change normalization a bit.
+# The difference is swav augmentation has a 0.228 instead of 0.229 (lol)
+# Probably doesn't make a difference.
+train_dataset:
+    classname: datasets.landcover.Landcover
+    args:
+        root: 'landcover/timeseries_by_box_v2'
+        cache_path: 'landcover/landcover_v2.pkl'
+        seed: 1111
+        unlabeled_prop: 0.9
+        split: 'nonafrica-train'
+        include_ERA5: True
+    transforms: []
+
+# Change transform (e.g. centercrop), and change normalization a bit.
+default_test_transforms: []
+
+test_datasets:
+    - name: 'nonafrica-val'
+      classname: datasets.landcover.Landcover
+      args:
+          root: 'landcover/timeseries_by_box_v2'
+          cache_path: 'landcover/landcover_v2.pkl'
+          seed: 1111
+          unlabeled_prop: 0.9
+          split: 'nonafrica-val'
+          include_ERA5: True
+    - name: 'nonafrica-test'
+      classname: datasets.landcover.Landcover
+      args:
+          root: 'landcover/timeseries_by_box_v2'
+          cache_path: 'landcover/landcover_v2.pkl'
+          seed: 1111
+          unlabeled_prop: 0.9
+          split: 'nonafrica-test'
+          include_ERA5: True
+    - name: 'africa'
+      classname: datasets.landcover.Landcover
+      args:
+          root: 'landcover/timeseries_by_box_v2'
+          cache_path: 'landcover/landcover_v2.pkl'
+          seed: 1111
+          unlabeled_prop: 0.9
+          split: 'africa'
+          include_ERA5: True
+
+early_stop_dataset_names:
+    - 'nonafrica-val'
+    - 'africa'
+

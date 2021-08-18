@@ -498,12 +498,28 @@ landcover = Dataset(
     slurm_data_dir='/u/scr/nlp/eix/',
     eval_config_rel_path='adaptation/landcover_to_africa_eval.yaml')
 
+landcover_auxin = Dataset(
+    name='landcover_auxin',
+    val_metric='test_acc/nonafrica-val',
+    secondary_val_metrics=['test_acc/africa', 'test_acc/nonafrica-test', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/nonafrica-val',
+        'test_acc/africa', 'test_acc/nonafrica-test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/nonafrica-val',
+        'test_acc/africa', 'test_acc/nonafrica-test'],
+    config_rel_path='adaptation/landcover_auxin_to_africa.yaml',
+    bundles=['landcover'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/u/scr/nlp/eix/',
+    eval_config_rel_path='adaptation/landcover_auxin_to_africa_eval.yaml')
+
 names_to_datasets = {
     'living17': living17,
     'entity30': entity30,
     'cifar_stl': cifar_stl,
     'domainnet': domainnet,
     'landcover': landcover,
+    'landcover_auxin': landcover_auxin,
 }
 
 
