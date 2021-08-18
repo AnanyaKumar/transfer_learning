@@ -648,7 +648,7 @@ def fine_tuning_experiments(args, num_replications=5, linear_probe=False, batchn
         adapt_name = 'full_ft_higherlinlr'
     # TODO: hacky / hardcoded.
     if (not(val_mode) and not(higher_linear_lr) and not(batchnorm_ft) and not(linear_probe) and
-        (args.datasets == ['landcover'] or args.datasets == ['landcover_auxin']))
+        (args.datasets == ['landcover'] or args.datasets == ['landcover_auxin'])):
         sweep_lrs = [1e-1, 3e-2, 1e-2, 3e-3, 1e-3]
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
