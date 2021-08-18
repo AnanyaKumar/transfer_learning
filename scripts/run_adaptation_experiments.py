@@ -532,8 +532,8 @@ Model = namedtuple('Model', ['kwargs', 'bundles'])
 moco_resnet50 = Model(
     kwargs={
         'classname': 'models.imnet_resnet.ResNet50',
-        'pretrained': True,
-        'pretrain_style': 'mocov2',
+        'args.pretrained': True,
+        'args.pretrain_style': 'mocov2',
         'checkpoint_rel_path': 'moco_v2_800ep_pretrain.pth.tar'
     },
     bundles=['simclr_weights']
@@ -542,8 +542,8 @@ moco_resnet50 = Model(
 swav_resnet50 = Model(
     kwargs={
         'classname': 'models.imnet_resnet.ResNet50',
-        'pretrained': True,
-        'pretrain_style': 'swav',
+        'args.pretrained': True,
+        'args.pretrain_style': 'swav',
         'checkpoint_rel_path': 'swav_800ep_pretrain.pth.tar'
     },
     bundles=['simclr_weights']
@@ -552,8 +552,8 @@ swav_resnet50 = Model(
 sup_resnet50 = Model(
     kwargs={
         'classname': 'models.imnet_resnet.ResNet50',
-        'pretrained': True,
-        'pretrain_style': 'supervised',
+        'args.pretrained': True,
+        'args.pretrain_style': 'supervised',
     },
     bundles=[]
 )
@@ -561,7 +561,7 @@ sup_resnet50 = Model(
 clip_resnet50 = Model(
     kwargs={
         'classname': 'models.clip_model.ClipModel',
-        'model_name': 'RN50',
+        'args.model_name': 'RN50',
     },
     bundles=[]
 )
@@ -569,8 +569,8 @@ clip_resnet50 = Model(
 landcover_baseline = Model(
     kwargs={
         'classname': 'models.innout_models.CNN1D',
-        'in_channels': 8,
-        'output_size': 6,
+        'args.in_channels': 8,
+        'args.output_size': 6,
     },
     bundles=[]
 )
@@ -578,8 +578,8 @@ landcover_baseline = Model(
 landcover_auxin = Model(
     kwargs={
         'classname': 'models.innout_models.CNN1D',
-        'in_channels': 14,
-        'output_size': 6,
+        'args.in_channels': 14,
+        'args.output_size': 6,
     },
     bundles=[]
 )
@@ -589,7 +589,7 @@ names_to_model = {
     'swav_resnet50': swav_resnet50,
     'sup_resnet50': sup_resnet50,
     'clip_resnet50': clip_resnet50,
-    'landcover-baseline': landcover_baseline,
+    'landcover_baseline': landcover_baseline,
     'landcover_auxin': landcover_auxin,
 }
 
