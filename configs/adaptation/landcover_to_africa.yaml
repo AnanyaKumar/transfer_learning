@@ -4,7 +4,7 @@ inherit:
   - datasets_landcover_to_africa.yaml
 
 num_classes: 6
-epochs: &epochs 25
+epochs: &epochs 400
 
 model:
   classname: models.innout_models.CNN1D
