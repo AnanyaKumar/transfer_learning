@@ -260,7 +260,7 @@ def replicated_sweep(adapt_name, dataset, model, hyperparams_list, num_replicati
     for i in range(num_replications):
         for hyperparams in hyperparams_list:
             kwargs = union_dicts(hyperparams, replication_hyperparams_list[i])
-            kwargs['seed'] = i
+            kwargs['seed'] = args.seed + i
             job_id = run_adapt_sweep(adapt_name, dataset, model,
                 hyperparams=kwargs, args=args, deps=deps, rerun=rerun,
                 ignore_name_hypers=ignore_name_hypers, run_name_suffix='_run'+str(i))
@@ -679,7 +679,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     model = names_to_model[args.model_name]
     if args.only_one_run:
         hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
-        num_replications = 0
+        num_replications = 1
+        # Would be num_replications = 0 if we used adaptation_experiment below.
     else:
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
     if val_mode:
@@ -692,9 +693,10 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     if higher_linear_lr:
         hyperparams_list = append_to_each(hyperparams_list, {'linear_layer_lr_multiplier': 10})
     if args.no_replications:
-        num_replications = 0
+        num_replications = 1
+        # Would be num_replications = 0 if we used adaptation_experiment below.
     for dataset in datasets:
-        _, all_ids = adaptation_experiment(
+        _, all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
             num_replications=num_replications, args=args)
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
@@ -756,30 +758,30 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         adapt_name += '_valmode'
         sweep_lrs = [1e-4, 3e-5, 1e-5, 3e-6, 1e-6, 3e-7]
     linprobe_adapt_name = 'linprobe'
-    num_replications = 5
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
     if args.only_one_run:
         hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
-        num_replications = 0
+        num_replications = 1
+        # Would be num_replications = 0 if we used adaptation_experiment below.
     else:
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
-    hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
     if val_mode:
         hyperparams_list = append_to_each(hyperparams_list, {'use_net_val_mode': True})
     if args.no_replications:
-        num_replications = 0
+        num_replications = 1
+        # Would be num_replications = 0 if we used adaptation_experiment below.
     for dataset in datasets:
         cur_hyperparams_list = deepcopy(hyperparams_list)
         linprobe_group_path = get_group_dir_path(linprobe_adapt_name, dataset.name, args.model_name, args)
-        cur_hyperparams_list = append_to_each(
-            cur_hyperparams_list,
-            {'linear_probe_checkpoint_path': linprobe_group_path + '/weights_0.pkl'})
+        # cur_hyperparams_list = append_to_each(
+        #     cur_hyperparams_list,
+        #     {'linear_probe_checkpoint_path': linprobe_group_path + '/weights_0.pkl'})
         replication_hyperparams_list = []
         for i in range(num_replications):
             replication_hyperparams_list.append({
                 'linear_probe_checkpoint_path': linprobe_group_path + '/weights_' + str(i) + '.pkl'})
-        _, all_ids = adaptation_experiment(
+        _, all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model,
             hyperparams_list=cur_hyperparams_list, num_replications=num_replications,
             replication_hyperparams_list=replication_hyperparams_list, args=args,
