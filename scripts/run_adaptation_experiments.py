@@ -200,8 +200,9 @@ def add_model_to_kwargs(kwargs, args, model):
 
 
 def run_adapt_sweep(adapt_name, dataset, model, hyperparams, args, deps=[], rerun=False,
-                    ignore_name_hypers={}):
+                    ignore_name_hypers={}, run_name_suffix=''):
     run_name = hyperparams_to_str(hyperparams, ignore_name_hypers=ignore_name_hypers)
+    run_name += run_name_suffix
     group_name = get_group_name(adapt_name, dataset.name, args.model_name)
     project_name = PROJECT_NAME
     kwargs = deepcopy(hyperparams)
@@ -248,6 +249,24 @@ def adaptation_sweep(adapt_name, dataset, model, hyperparams_list, args, deps=[]
         # Job id of -1 means we didn't run the job because it's already run.
         if job_id != -1:
             sweep_ids.append(job_id)
+    return sweep_ids 
+
+
+def replicated_sweep(adapt_name, dataset, model, hyperparams_list, num_replications,
+                     args, deps=[], replication_hyperparams_list, rerun=False,
+                     ignore_name_hypers={}):
+    # Run multiple replications for each sweep run.
+    sweep_ids = []
+    for i in range(num_replications):
+        for hyperparams in hyperparams_list:
+            kwargs = union_dicts(hyperparams, replication_hyperparams_list[i])
+            kwargs['seed'] = i
+            job_id = run_adapt_sweep(adapt_name, dataset, model,
+                hyperparams=kwargs, args=args, deps=deps, rerun=rerun,
+                ignore_name_hypers=ignore_name_hypers, run_name_suffix='_run'+str(i))
+            # Job id of -1 means we didn't run the job because it's already run.
+            if job_id != -1:
+                sweep_ids.append(job_id)
     return sweep_ids 
 
 
@@ -641,19 +660,13 @@ def get_datasets(args):
     return datasets
 
 
-def fine_tuning_experiments(args, num_replications=5, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
+def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
                             val_mode=False):
     adapt_name = 'full_ft'
     sweep_lrs = SWEEP_LRS
     if val_mode:
         adapt_name += '_valmode'
-        # TODO: decide what to do for other datasets, add more lrs too? hacky / hardcoded.
-        if args.datasets == ['entity30'] or args.datasets == ['living17']:
-            sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
-        if args.datasets == ['cifar_stl']:
-            sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
-        if args.datasets == ['domainnet']:
-            sweep_lrs = [1e-6, 3e-6, 1e-5, 3e-5, 1e-4, 3e-4]
+        sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
     if linear_probe:
         adapt_name = 'torch_linprobe'
     if batchnorm_ft:
@@ -662,10 +675,6 @@ def fine_tuning_experiments(args, num_replications=5, linear_probe=False, batchn
         sweep_lrs = SWEEP_LRS[2:] + [0.03, 0.1, 0.3]
     if higher_linear_lr:
         adapt_name = 'full_ft_higherlinlr'
-    # TODO: hacky / hardcoded.
-    if (not(val_mode) and not(higher_linear_lr) and not(batchnorm_ft) and not(linear_probe) and
-        (args.datasets == ['landcover'] or args.datasets == ['landcover_auxin'])):
-        sweep_lrs = [3e-3]  # TODO: hacky, this was best from [1e-1, 3e-2, 1e-2, 3e-3, 1e-3]
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
     if args.only_one_run:
@@ -691,23 +700,23 @@ def fine_tuning_experiments(args, num_replications=5, linear_probe=False, batchn
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
-def torch_linprobe_experiments(args, num_replications=5):
+def torch_linprobe_experiments(args, num_replications=3):
     fine_tuning_experiments(args, num_replications=num_replications, linear_probe=True)
 
 
-def batchnorm_ft_experiments(args, num_replications=5):
+def batchnorm_ft_experiments(args, num_replications=3):
     fine_tuning_experiments(args, num_replications=num_replications, batchnorm_ft=True)
 
 
-def ft_higher_linear_lr_experiments(args, num_replications=5):
+def ft_higher_linear_lr_experiments(args, num_replications=3):
     fine_tuning_experiments(args, num_replications=num_replications, higher_linear_lr=True)
 
 
-def ft_val_mode_experiment(args, num_replications=5):
+def ft_val_mode_experiment(args, num_replications=3):
     fine_tuning_experiments(args, num_replications=num_replications, val_mode=True)
 
 
-def linprobe_experiments(args, num_replications=5, aug=True, train_mode=False, use_new_bn_stats=False):
+def linprobe_experiments(args, num_replications=3, aug=True, train_mode=False, use_new_bn_stats=False):
     adapt_name = 'linprobe'
     if not(aug):
         adapt_name += '_noaug'
@@ -728,44 +737,25 @@ def linprobe_experiments(args, num_replications=5, aug=True, train_mode=False, u
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
-def linprobe_experiments_no_aug(args, num_replications=5):
+def linprobe_experiments_no_aug(args, num_replications=3):
     linprobe_experiments(args, num_replications=num_replications, aug=False) 
 
 
-def linprobe_experiments_trainmode(args, num_replications=5):
+def linprobe_experiments_trainmode(args, num_replications=3):
     linprobe_experiments(args, num_replications=num_replications, train_mode=True) 
 
 
-def linprobe_experiments_usenewbnstats(args, num_replications=5):
+def linprobe_experiments_usenewbnstats(args, num_replications=3):
     linprobe_experiments(args, num_replications=num_replications, use_new_bn_stats=True) 
 
 
-def lp_then_ft_experiments(args, num_replications=5, val_mode=False, train_mode=False, use_new_bn_stats=False):
+def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=False, use_new_bn_stats=False):
     adapt_name = 'lp_then_ft'
     sweep_lrs = SWEEP_LRS
     if val_mode:
         adapt_name += '_valmode'
-        # TODO: decide what to do for other datasets, add more lrs too? hacky / hardcoded.
-        if args.datasets == ['entity30'] or args.datasets == ['living17']:
-            sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
-        if args.datasets == ['cifar_stl']:
-            sweep_lrs = [3e-8, 1e-7, 3e-7, 1e-6, 3e-6, 1e-5]
-        if args.datasets == ['domainnet']:
-            sweep_lrs = [3e-9, 1e-8, 3e-8, 1e-7, 3e-7, 1e-6]
+        sweep_lrs = [1e-4, 3e-5, 1e-5, 3e-6, 1e-6, 3e-7]
     linprobe_adapt_name = 'linprobe'
-    if train_mode:
-        adapt_name += '_trainmode'
-        linprobe_adapt_name += '_trainmode'
-        # TODO: hacky / hardcoded.
-        sweep_lrs = [1e-6, 3e-6, 1e-5] + sweep_lrs
-    # TODO: hacky / hardcoded.
-    if not(val_mode) and not(train_mode) and args.datasets == ['domainnet']:
-        sweep_lrs = [3e-6, 1e-5] + sweep_lrs
-    if use_new_bn_stats:
-        if train_mode:
-            raise ValueError('If use_new_bn_stats is True, train_mode must be False.')
-        adapt_name += '_usenewbnstats'
-        linprobe_adapt_name += '_usenewbnstats'
     num_replications = 5
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
@@ -797,15 +787,15 @@ def lp_then_ft_experiments(args, num_replications=5, val_mode=False, train_mode=
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
-def lp_then_ft_valmode_experiments(args, num_replications=5):
+def lp_then_ft_valmode_experiments(args, num_replications=3):
     lp_then_ft_experiments(args, num_replications=num_replications, val_mode=True)
 
 
-def lp_then_ft_trainmode_experiments(args, num_replications=5):
+def lp_then_ft_trainmode_experiments(args, num_replications=3):
     lp_then_ft_experiments(args, num_replications=num_replications, train_mode=True)
 
 
-def lp_then_ft_usenewbnstats_experiments(args, num_replications=5):
+def lp_then_ft_usenewbnstats_experiments(args, num_replications=3):
     lp_then_ft_experiments(args, num_replications=num_replications, use_new_bn_stats=True)
 
 
