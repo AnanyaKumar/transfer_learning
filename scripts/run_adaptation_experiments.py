@@ -253,13 +253,16 @@ def adaptation_sweep(adapt_name, dataset, model, hyperparams_list, args, deps=[]
 
 
 def replicated_sweep(adapt_name, dataset, model, hyperparams_list, num_replications,
-                     args, deps=[], replication_hyperparams_list, rerun=False,
+                     args, deps=[], replication_hyperparams_list=[], rerun=False,
                      ignore_name_hypers={}):
     # Run multiple replications for each sweep run.
     sweep_ids = []
     for i in range(num_replications):
         for hyperparams in hyperparams_list:
-            kwargs = union_dicts(hyperparams, replication_hyperparams_list[i])
+            if len(replication_hyperparams_list) > 0:
+                kwargs = union_dicts(hyperparams, replication_hyperparams_list[i])
+            else:
+                kwargs = deepcopy(hyperparams)
             kwargs['seed'] = args.seed + i
             job_id = run_adapt_sweep(adapt_name, dataset, model,
                 hyperparams=kwargs, args=args, deps=deps, rerun=rerun,
@@ -696,7 +699,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
     for dataset in datasets:
-        _, all_ids = replicated_sweep(
+        all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
             num_replications=num_replications, args=args)
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
@@ -733,7 +736,7 @@ def linprobe_experiments(args, num_replications=3, aug=True, train_mode=False, u
     if args.no_replications or args.only_one_run:
         num_replications = 1
     for dataset in datasets:
-        _, all_ids = linprobe_experiment(
+        all_ids = linprobe_experiment(
             adapt_name=adapt_name, dataset=dataset, model=model, num_replications=num_replications,
             args=args, aug=aug, train_mode=train_mode, use_new_bn_stats=use_new_bn_stats)
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
@@ -781,7 +784,7 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         for i in range(num_replications):
             replication_hyperparams_list.append({
                 'linear_probe_checkpoint_path': linprobe_group_path + '/weights_' + str(i) + '.pkl'})
-        _, all_ids = replicated_sweep(
+        all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model,
             hyperparams_list=cur_hyperparams_list, num_replications=num_replications,
             replication_hyperparams_list=replication_hyperparams_list, args=args,
