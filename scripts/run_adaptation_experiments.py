@@ -505,6 +505,21 @@ domainnet = Dataset(
     slurm_data_dir='/scr/biggest/',
     eval_config_rel_path='adaptation/domainnet_eval.yaml')
 
+fmow = Dataset(
+    name='fmow',
+    val_metric='test_acc/americas_val',
+    secondary_val_metrics=['test_acc/africa_val', 'test_acc/europe_val', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/americas_val',
+        'test_acc/africa_val', 'test_acc/europe_val'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/americas_val',
+        'test_acc/africa_val', 'test_acc/europe_val'],
+    config_rel_path='adaptation/fmow.yaml',
+    bundles=['fmow'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/scr/biggest/',
+    eval_config_rel_path='adaptation/fmow_eval.yaml')
+
 landcover = Dataset(
     name='landcover',
     val_metric='test_acc/nonafrica-val',
@@ -540,6 +555,7 @@ names_to_datasets = {
     'entity30': entity30,
     'cifar_stl': cifar_stl,
     'domainnet': domainnet,
+    'fmow': fmow,
     'landcover': landcover,
     'landcover_auxin': landcover_auxin,
 }
@@ -550,6 +566,16 @@ names_to_datasets = {
 ############################################
 
 Model = namedtuple('Model', ['kwargs', 'bundles'])
+
+mocotp_fmow_resnet50 = Model(
+    kwargs={
+        'classname': 'models.imnet_resnet.ResNet50',
+        'args.pretrained': True,
+        'args.pretrain_style': 'mocov2',
+        'checkpoint_rel_path': 'mocotp_checkpoint_0200.pth.tar'
+    },
+    bundles=['simclr_weights']
+)
 
 moco_resnet50 = Model(
     kwargs={
@@ -610,6 +636,7 @@ names_to_model = {
     'resnet50': moco_resnet50,
     'swav_resnet50': swav_resnet50,
     'sup_resnet50': sup_resnet50,
+    'mocotp_fmow_resnet50': mocotp_fmow_resnet50,
     'clip_resnet50': clip_resnet50,
     'landcover_baseline': landcover_baseline,
     'landcover_auxin': landcover_auxin,

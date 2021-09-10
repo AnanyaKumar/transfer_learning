@@ -26,12 +26,6 @@ default_test_transforms:
           std: [0.229, 0.224, 0.225]
 
 test_datasets:
-    - name: 'asia_val'
-      classname: datasets.fmow.Fmow
-      args:
-          split: 'val'
-          regions: [0]
-          root: 'wilds/data'
     - name: 'europe_val'
       classname: datasets.fmow.Fmow
       args:
@@ -54,6 +48,6 @@ test_datasets:
 
 early_stop_dataset_names:
     - 'americas_val'
-    - 'asia_val'
+    - 'europe_val'
     - 'africa_val'
 
