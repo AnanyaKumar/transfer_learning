@@ -5,6 +5,7 @@ root_prefix: '/u/scr/nlp/'
 # The difference is swav augmentation has a 0.228 instead of 0.229 (lol)
 # Probably doesn't make a difference.
 train_dataset:
+    name: 'fmow-train'
     classname: datasets.fmow.Fmow
     args:
         split: 'train'
