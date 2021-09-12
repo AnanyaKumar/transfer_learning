@@ -147,6 +147,22 @@ def build_model(config):
             config['linear_probe_checkpoint_path'] != ''):
             linprobe_path = config['linear_probe_checkpoint_path']
             coef, intercept, best_c, best_i = pickle.load(open(linprobe_path, "rb"))
+            if 'normalize_lp' in config and config['normalize_lp']:
+                logging.info("Normalizing linear probe std-dev")
+                saved_stddev = np.std(coef)
+                rand_weights = net.get_last_layer().weight.detach().numpy()
+                rand_stddev = np.std(rand_weights)
+                logging.info(
+                    "Weights saved stddev: %f, desired stddev: %f",
+                    saved_stddev, rand_stddev)
+                logging.info("Intercept saved stddev: %f", np.std(intercept))
+                coef = (coef / saved_stddev) * rand_stddev
+                intercept = (intercept / saved_stddev) * rand_stddev
+                logging.info(
+                    "Final stddev weights; %f, intercept: %f",
+                    np.std(coef), np.std(intercept))
+                # What should it be, based on rep size (maybe get from net last layer)
+                # Divide
             net.set_last_layer(coef, intercept)
         num_trainable_params = count_parameters(net, True)
         num_params = count_parameters(net, False) + num_trainable_params

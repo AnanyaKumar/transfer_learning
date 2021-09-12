@@ -781,12 +781,18 @@ def linprobe_experiments_usenewbnstats(args, num_replications=3):
     linprobe_experiments(args, num_replications=num_replications, use_new_bn_stats=True) 
 
 
-def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=False, use_new_bn_stats=False):
+def lp_then_ft_experiments(
+    args, num_replications=3, val_mode=False, train_mode=False, use_new_bn_stats=False,
+    normalize_weights=False):
+    if train_mode or use_new_bn_stats:
+        raise NotImplementedError
     adapt_name = 'lp_then_ft'
     sweep_lrs = SWEEP_LRS
     if val_mode:
         adapt_name += '_valmode'
         sweep_lrs = [1e-4, 3e-5, 1e-5, 3e-6, 1e-6, 3e-7]
+    if normalize_weights:
+        adapt_name += '_normalize'
     linprobe_adapt_name = 'linprobe'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
@@ -798,6 +804,8 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
     if val_mode:
         hyperparams_list = append_to_each(hyperparams_list, {'use_net_val_mode': True})
+    if normalize_weights:
+        hyperparams_list = append_to_each(hyperparams_list, {'normalize_lp': True})
     if args.no_replications:
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
@@ -830,6 +838,10 @@ def lp_then_ft_trainmode_experiments(args, num_replications=3):
 def lp_then_ft_usenewbnstats_experiments(args, num_replications=3):
     lp_then_ft_experiments(args, num_replications=num_replications, use_new_bn_stats=True)
 
+
+def lp_then_ft_valmode_normalize_experiments(args, num_replications=3):
+    lp_then_ft_experiments(
+        args, num_replications=num_replications, val_mode=True, normalize_weights=True)
 
 ############################################
 ## Functions to spray dataset on jags.
@@ -874,6 +886,7 @@ def main(args):
         'linprobe_experiments_usenewbnstats': linprobe_experiments_usenewbnstats,
         'lp_then_ft_usenewbnstats_experiments': lp_then_ft_usenewbnstats_experiments,
         'lp_then_ft_valmode_experiments': lp_then_ft_valmode_experiments,
+        'lp_then_ft_valmode_normalize_experiments': lp_then_ft_valmode_normalize_experiments,
         'torch_linprobe_experiments': torch_linprobe_experiments,
         'batchnorm_ft_experiments': batchnorm_ft_experiments,
         'ft_higher_linear_lr_experiments': ft_higher_linear_lr_experiments,
