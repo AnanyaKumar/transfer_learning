@@ -57,7 +57,6 @@ def summarize_results(results_dir, val_metric, output_metrics, replication=False
     # Otherwise, if replication is True look for replication files, if false ignore replicatin files.
     # Returns a list of rows, each row is the result for a corresponding file.
     file_paths = glob.glob(results_dir + '/**/*stats*.tsv', recursive=True)
-    print(file_paths)
     file_paths = list(set(file_paths))
     # Sort so that the results are deterministic, e.g. if multiple runs have
     # the same validation metric.
