@@ -873,10 +873,10 @@ def spray_domainnet_jags(args):
 
 
 def summarize_all_results(args):
-    for name in names_to_dataset:
+    for name in names_to_datasets:
         cmd = 'python scripts/summarize_all_results.py '
         cmd += ' --results_dir_glob=logs/*' + name + '* '
-        dataset = names_to_dataset[name]
+        dataset = names_to_datasets[name]
         val_metrics = [dataset.val_metric] + dataset.secondary_val_metrics
         output_metrics = dataset.output_metrics
         output_file = 'logs/' + name + '.tsv'
