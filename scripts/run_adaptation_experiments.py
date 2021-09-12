@@ -556,8 +556,8 @@ names_to_datasets = {
     'cifar_stl': cifar_stl,
     'domainnet': domainnet,
     'fmow': fmow,
-    'landcover': landcover,
-    'landcover_auxin': landcover_auxin,
+    # 'landcover': landcover,
+    # 'landcover_auxin': landcover_auxin,
 }
 
 
@@ -872,6 +872,20 @@ def spray_domainnet_jags(args):
         subprocess.run(shlex.split(cmd))
 
 
+def summarize_all_results(args):
+    for name in names_to_dataset:
+        cmd = 'python scripts/summarize_all_results.py '
+        cmd += ' --results_dir_glob=logs/*' + name + '* '
+        dataset = names_to_dataset[name]
+        val_metrics = [dataset.val_metric] + dataset.secondary_val_metrics
+        output_metrics = dataset.output_metrics
+        output_file = 'logs/' + name + '.tsv'
+        cmd += ' --val_metrics ' + ' '.join(val_metrics) + ' '
+        cmd += ' --output_metrics ' + ' '.join(output_metrics) + ' '
+        cmd += ' --output_file=' + output_file + ' '
+        print(cmd)
+
+
 def main(args):
     experiment_to_fns = {
         'spray_fmow_jags': spray_fmow_jags,
@@ -891,6 +905,7 @@ def main(args):
         'batchnorm_ft_experiments': batchnorm_ft_experiments,
         'ft_higher_linear_lr_experiments': ft_higher_linear_lr_experiments,
         'ft_val_mode_experiment': ft_val_mode_experiment,
+        'summarize_all_results': summarize_all_results
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)

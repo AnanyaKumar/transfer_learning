@@ -25,14 +25,6 @@ def remove_replication_info(s):
     return s
 
 
-def group_average(results):
-    pass
-
-
-def get_best(results, val_metric):
-    pass
-
-
 def get_all_results(val_metric, dir_paths, output_metrics):
     results, best, dirs = [], [], []
     for dir_path in dir_paths:
