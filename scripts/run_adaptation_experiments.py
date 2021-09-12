@@ -879,7 +879,7 @@ def summarize_all_results(args):
         dataset = names_to_datasets[name]
         val_metrics = [dataset.val_metric] + dataset.secondary_val_metrics
         output_metrics = dataset.output_metrics
-        output_file = 'logs/' + name + '.tsv'
+        output_file = 'logs/paper_results/' + name + '.tsv'
         cmd += ' --val_metrics ' + ' '.join(val_metrics) + ' '
         cmd += ' --output_metrics ' + ' '.join(output_metrics) + ' '
         cmd += ' --output_file=' + output_file + ' '
