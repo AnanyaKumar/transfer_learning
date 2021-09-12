@@ -884,6 +884,8 @@ def summarize_all_results(args):
         cmd += ' --output_metrics ' + ' '.join(output_metrics) + ' '
         cmd += ' --output_file=' + output_file + ' '
         print(cmd)
+        output = subprocess.check_output(shlex.split(cmd)).decode('utf8')
+        print(output)
 
 
 def main(args):
