@@ -52,9 +52,10 @@ def get_result(file_path, val_metric, output_metrics, take_max=True):
         best_res = run_name + best_res
     return best_res, best_value
 
-def summarize_results(results_dir, val_metric, output_metrics, replication=False, use_all=False):
+def summarize_results(results_dir, val_metric, output_metrics, replication=False, use_all=False, max_num=None):
     # If use_all is True, then look at all stats.tsv files.
     # Otherwise, if replication is True look for replication files, if false ignore replicatin files.
+    # max_num is for linear probing, and uses only the first max_num runs.
     # Returns a list of rows, each row is the result for a corresponding file.
     file_paths = glob.glob(results_dir + '/**/*stats*.tsv', recursive=True)
     file_paths = list(set(file_paths))
@@ -63,6 +64,8 @@ def summarize_results(results_dir, val_metric, output_metrics, replication=False
     file_paths = sorted(file_paths)
     results_list, val_values_list = [], []
     for file_path in file_paths:
+        if max_num is not None and int(file_path[-5]) >= max_num:
+            continue
         parent_folder = get_parent_folder(file_path)
         if use_all or (('replication' in parent_folder and replication) or
                        ('replication' not in parent_folder and not replication)):

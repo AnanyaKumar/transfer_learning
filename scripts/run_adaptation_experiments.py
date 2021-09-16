@@ -372,7 +372,7 @@ def linprobe_experiment(adapt_name, dataset, model, num_replications, args, deps
                                           deps=deps, rerun=rerun, aug=aug, train_mode=train_mode,
                                           use_new_bn_stats=use_new_bn_stats)
         replication_ids.append(job_id)
-    summarize_id = summarize_linprobe(adapt_name, dataset, model, args, deps=replication_ids)
+    summarize_id = summarize_linprobe(adapt_name, dataset, model, args, deps=replication_ids, max_num=num_replications)
     all_ids = replication_ids + [summarize_id]
     return [summarize_id], all_ids
 
@@ -391,7 +391,7 @@ def get_summarize_job_name(adapt_name, dataset_name, model_name, replication=Fal
 
 
 def get_summarize_cmd(dir_path, val_metric, secondary_val_metrics, output_metrics, args,
-    summarize_script_name='summarize_results.py'):
+    summarize_script_name='summarize_results.py', max_num=None):
     """Python cmd to summarize all the results in dir_path according to specified metrics."""
     kwargs = {}
     kwargs['results_dir'] = dir_path
@@ -400,6 +400,8 @@ def get_summarize_cmd(dir_path, val_metric, secondary_val_metrics, output_metric
         kwargs['secondary_val_metrics'] = secondary_val_metrics
     if output_metrics is not None:
         kwargs['output_metrics'] = output_metrics
+    if max_num is not None:
+        kwargs['max_num'] = max_num
     code_path = args.scripts_dir + '/' + summarize_script_name
     return get_python_cmd(code_path, args.python_path, kwargs=kwargs, args=args)
  
@@ -417,20 +419,21 @@ def summarize_adaptation(adapt_name, dataset, model, args, deps, replication=Fal
         dataset.output_metrics, args, deps)
 
 
-def summarize_linprobe_run(dir_path, job_name, val_metric, secondary_val_metrics, output_metrics, args, deps):
+def summarize_linprobe_run(dir_path, job_name, val_metric, secondary_val_metrics, output_metrics, args, deps, max_num=None):
     cmd = get_summarize_cmd(dir_path, val_metric, secondary_val_metrics, output_metrics, args,
-                            summarize_script_name='summarize_linprobe_results.py')
+                            summarize_script_name='summarize_linprobe_results.py', max_num=max_num)
     return run_job(cmd, job_name, args, deps)
 
 
-def summarize_linprobe(adapt_name, dataset, model, args, deps):
+def summarize_linprobe(adapt_name, dataset, model, args, deps, max_num=None):
     group_dir_path = get_group_dir_path(adapt_name, dataset.name, args.model_name, args)
     job_name = get_summarize_job_name(adapt_name, dataset.name, args.model_name, replication=True)
     secondary_val_metrics = dataset.linprobe_secondary_val_metrics
     if secondary_val_metrics is None:
         secondary_val_metrics = dataset.secondary_val_metrics
     return summarize_linprobe_run(group_dir_path, job_name, dataset.val_metric,
-        secondary_val_metrics, dataset.linprobe_output_metrics, args, deps)
+        secondary_val_metrics, dataset.linprobe_output_metrics, args, deps,
+        max_num=max_num)
 
 ############################################
 ## Datasets.
@@ -587,6 +590,16 @@ moco_resnet50 = Model(
     bundles=['simclr_weights']
 )
 
+mocov1_resnet50 = Model(
+    kwargs={
+        'classname': 'models.imnet_resnet.ResNet50',
+        'args.pretrained': True,
+        'args.pretrain_style': 'mocov2',
+        'checkpoint_rel_path': 'moco_v1_200ep_pretrain.pth.tar'
+    },
+    bundles=['simclr_weights']
+)
+
 swav_resnet50 = Model(
     kwargs={
         'classname': 'models.imnet_resnet.ResNet50',
@@ -634,6 +647,7 @@ landcover_auxin = Model(
 
 names_to_model = {
     'resnet50': moco_resnet50,
+    'mocov1_resnet50': mocov1_resnet50,
     'swav_resnet50': swav_resnet50,
     'sup_resnet50': sup_resnet50,
     'mocotp_fmow_resnet50': mocotp_fmow_resnet50,
@@ -781,18 +795,12 @@ def linprobe_experiments_usenewbnstats(args, num_replications=3):
     linprobe_experiments(args, num_replications=num_replications, use_new_bn_stats=True) 
 
 
-def lp_then_ft_experiments(
-    args, num_replications=3, val_mode=False, train_mode=False, use_new_bn_stats=False,
-    normalize_weights=False):
-    if train_mode or use_new_bn_stats:
-        raise NotImplementedError
+def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=False, use_new_bn_stats=False):
     adapt_name = 'lp_then_ft'
     sweep_lrs = SWEEP_LRS
     if val_mode:
         adapt_name += '_valmode'
         sweep_lrs = [1e-4, 3e-5, 1e-5, 3e-6, 1e-6, 3e-7]
-    if normalize_weights:
-        adapt_name += '_normalize'
     linprobe_adapt_name = 'linprobe'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
@@ -804,8 +812,6 @@ def lp_then_ft_experiments(
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
     if val_mode:
         hyperparams_list = append_to_each(hyperparams_list, {'use_net_val_mode': True})
-    if normalize_weights:
-        hyperparams_list = append_to_each(hyperparams_list, {'normalize_lp': True})
     if args.no_replications:
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
@@ -839,10 +845,6 @@ def lp_then_ft_usenewbnstats_experiments(args, num_replications=3):
     lp_then_ft_experiments(args, num_replications=num_replications, use_new_bn_stats=True)
 
 
-def lp_then_ft_valmode_normalize_experiments(args, num_replications=3):
-    lp_then_ft_experiments(
-        args, num_replications=num_replications, val_mode=True, normalize_weights=True)
-
 ############################################
 ## Functions to spray dataset on jags.
 ############################################
@@ -872,22 +874,6 @@ def spray_domainnet_jags(args):
         subprocess.run(shlex.split(cmd))
 
 
-def summarize_all_results(args):
-    for name in names_to_datasets:
-        cmd = 'python scripts/summarize_all_results.py '
-        cmd += ' --results_dir_glob=logs/*' + name + '* '
-        dataset = names_to_datasets[name]
-        val_metrics = [dataset.val_metric] + dataset.secondary_val_metrics
-        output_metrics = dataset.output_metrics
-        output_file = 'logs/paper_results/' + name + '.tsv'
-        cmd += ' --val_metrics ' + ' '.join(val_metrics) + ' '
-        cmd += ' --output_metrics ' + ' '.join(output_metrics) + ' '
-        cmd += ' --output_file=' + output_file + ' '
-        print(cmd)
-        output = subprocess.check_output(shlex.split(cmd)).decode('utf8')
-        print(output)
-
-
 def main(args):
     experiment_to_fns = {
         'spray_fmow_jags': spray_fmow_jags,
@@ -902,12 +888,10 @@ def main(args):
         'linprobe_experiments_usenewbnstats': linprobe_experiments_usenewbnstats,
         'lp_then_ft_usenewbnstats_experiments': lp_then_ft_usenewbnstats_experiments,
         'lp_then_ft_valmode_experiments': lp_then_ft_valmode_experiments,
-        'lp_then_ft_valmode_normalize_experiments': lp_then_ft_valmode_normalize_experiments,
         'torch_linprobe_experiments': torch_linprobe_experiments,
         'batchnorm_ft_experiments': batchnorm_ft_experiments,
         'ft_higher_linear_lr_experiments': ft_higher_linear_lr_experiments,
         'ft_val_mode_experiment': ft_val_mode_experiment,
-        'summarize_all_results': summarize_all_results
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)

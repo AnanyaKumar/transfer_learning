@@ -28,18 +28,21 @@ if __name__ == '__main__':
                         help='Metrics to output.')
     parser.add_argument('--output_file', type=str,
                         help='Path to output results, should end with .tsv')
+    parser.add_argument('--max_num', type=int,
+                        help='Max number of lin probe runs to use.')
     parser.add_argument('-s', action='store_true', help="Short version: Do not show column names")
     args = parser.parse_args()
     metrics, results_list = [], []
     # Get results for val_metric.
     val_results, _, _ = summarize_results(
-        args.results_dir, args.val_metric, args.output_metrics, use_all=True)
+        args.results_dir, args.val_metric, args.output_metrics, use_all=True,
+        max_num=args.max_num)
     metrics.append(args.val_metric)
     results_list.append(val_results)
     # Get other results.
     for secondary_val_metric in args.secondary_val_metrics:
         secondary_results, _, _ = summarize_results(
-            args.results_dir, secondary_val_metric, args.output_metrics, use_all=True)
+            args.results_dir, secondary_val_metric, args.output_metrics, use_all=True, max_num=args.max_num)
         metrics.append(secondary_val_metric)
         results_list.append(secondary_results)
     # Save tsv file

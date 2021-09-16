@@ -4,7 +4,6 @@ import os
 import sys
 import torch
 from torch import nn
-import models
 import json
 import numpy as np
 from scipy.special import softmax
