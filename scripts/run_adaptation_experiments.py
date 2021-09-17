@@ -714,7 +714,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     if linear_probe:
         adapt_name = 'torch_linprobe'
         # Linear probing needs a higher learning rate.
-        sweep_lrs = [3e-3, 1e-2, 3e-1, 1e-1, 3e-1, 1.0]
+        sweep_lrs = [3e-3, 1e-2, 3e-1, 1e-1, 3e-1, 1.0, 3.0, 10.0]
     if batchnorm_ft:
         adapt_name = 'batchnorm_ft'
         # TODO: hacky / hardcoded.
