@@ -705,12 +705,14 @@ def get_datasets(args):
 
 
 def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
-                            val_mode=False):
+                            val_mode=False, no_augmentation=False):
     adapt_name = 'full_ft'
     sweep_lrs = SWEEP_LRS
     if val_mode:
         adapt_name += '_valmode'
         sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
+    if no_augmentation:
+        adapt_name += '_no_augmentation'
     if linear_probe:
         adapt_name = 'torch_linprobe'
         # Linear probing needs a higher learning rate.
@@ -729,6 +731,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         # Would be num_replications = 0 if we used adaptation_experiment below.
     else:
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
+    if no_augmentation:
+        hyperparams_list = append_to_each(hyperparams_list, {'no_augmentation': True})
     if val_mode:
         hyperparams_list = append_to_each(hyperparams_list, {'use_net_val_mode': True})
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
@@ -746,6 +750,10 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
             num_replications=num_replications, args=args)
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
+
+
+def fine_tuning_no_augmentation_experiments(args, num_replications=3):
+    fine_tuning_experiments(args, num_replications=num_replications, no_augmentation=True)
 
 
 def torch_linprobe_experiments(args, num_replications=3):
@@ -894,6 +902,7 @@ def main(args):
         'batchnorm_ft_experiments': batchnorm_ft_experiments,
         'ft_higher_linear_lr_experiments': ft_higher_linear_lr_experiments,
         'ft_val_mode_experiment': ft_val_mode_experiment,
+        'fine_tuning_no_augmentation_experiments': fine_tuning_no_augmentation_experiments,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)

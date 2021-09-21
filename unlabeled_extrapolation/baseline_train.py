@@ -424,6 +424,13 @@ def save_command_line_args(log_dir):
         f.write('\n')
 
 
+def update_train_transform(config):
+    if 'no_augmentation' in config and config['no_augmentation']:
+        if 'default_test_transforms' not in config:
+            raise ValueError('If no_augmentation=True, must specify default_test_transforms.')
+        config['train_dataset']['transforms'] = config['default_test_transforms']
+
+
 def update_test_transform_configs(config):
     # Use default test transform for test datasets that don't specify a transform.
     for test_dataset_config in config['test_datasets']:
@@ -485,6 +492,8 @@ def preprocess_config(config, config_path):
         update_root_prefix(config)
         # # Note: copying config over is not that useful anymore with Quinine, so use json below.
         # shutil.copy(args.config, log_dir+'/original_config.yaml')
+        # If no_augmentation option in config, then use test_transforms for training.
+        update_train_transform(config)
 
 
 def setup():
