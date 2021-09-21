@@ -27,6 +27,12 @@ default_test_transforms:
           std: [0.229, 0.224, 0.225]
 
 test_datasets:
+    - name: 'id_val'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'val'
+          regions: ['all']
+          root: 'wilds/data'
     - name: 'ood_val'
       classname: datasets.fmow.Fmow
       args:
@@ -48,6 +54,5 @@ test_datasets:
           root: 'wilds/data'
 
 early_stop_dataset_names:
+    - 'id_val'
     - 'ood_val'
-    - 'test'
-    - 'africa_test'
