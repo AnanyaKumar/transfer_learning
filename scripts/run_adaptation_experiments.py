@@ -574,7 +574,7 @@ names_to_datasets = {
     'cifar_stl': cifar_stl,
     'domainnet': domainnet,
     'fmow': fmow,
-    'fmow_all': fmow,
+    'fmow_all': fmow_all,
     # 'landcover': landcover,
     # 'landcover_auxin': landcover_auxin,
 }
