@@ -523,6 +523,21 @@ fmow = Dataset(
     slurm_data_dir='/scr/biggest/',
     eval_config_rel_path='adaptation/fmow_eval.yaml')
 
+fmow_all = Dataset(
+    name='fmow_all',
+    val_metric='test_acc/ood_val',
+    secondary_val_metrics=['test_acc/test', 'test_acc/africa_test', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/ood_val',
+        'test_acc/test', 'test_acc/africa_test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/ood_val',
+        'test_acc/test', 'test_acc/africa_test'],
+    config_rel_path='adaptation/fmow_all.yaml',
+    bundles=['fmow'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/scr/biggest/',
+    eval_config_rel_path='adaptation/fmow_all_eval.yaml')
+
 landcover = Dataset(
     name='landcover',
     val_metric='test_acc/nonafrica-val',
@@ -559,6 +574,7 @@ names_to_datasets = {
     'cifar_stl': cifar_stl,
     'domainnet': domainnet,
     'fmow': fmow,
+    'fmow_all': fmow,
     # 'landcover': landcover,
     # 'landcover_auxin': landcover_auxin,
 }
