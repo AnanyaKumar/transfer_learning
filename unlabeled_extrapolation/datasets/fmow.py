@@ -18,14 +18,22 @@ class Fmow(Dataset):
         super().__init__()
         super_dataset = get_dataset(dataset='fmow', download=False, root_dir=root)
         self._subset = super_dataset.get_subset(split, transform=transform)
-        super_indices = self._subset.indices
-        subset_metadata = self._subset.dataset.metadata_array[super_indices].numpy()
-        self._indices = np.argwhere([(a in regions) for a in subset_metadata[:, 0]])[:,0]
+        self._region = regions
+        if 'all' not in self._regions:
+            super_indices = self._subset.indices
+            subset_metadata = self._subset.dataset.metadata_array[super_indices].numpy()
+            self._indices = np.argwhere([(a in regions) for a in subset_metadata[:, 0]])[:,0]
         
     def __getitem__(self, i):
-        x, y, _ = self._subset[self._indices[i]]
+        if 'all' not in self._regions:
+            x, y, _ = self._subset[self._indices[i]]
+        else:
+            x, y, _ = self._subset[i]
         return x, y
 
     def __len__(self) -> int:
-        return len(self._indices)
+        if 'all' not in self._regions:
+            return len(self._indices)
+        else:
+            return len(self._subset)
 
