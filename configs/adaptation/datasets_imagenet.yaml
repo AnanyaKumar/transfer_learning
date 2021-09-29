@@ -1,0 +1,59 @@
+
+root_prefix: ''
+
+# The train and test transforms are taken from the Swav fine-tuning script.
+train_dataset:
+    name: 'train'
+    classname: datasets.imagenet.ImageNet
+    args:
+        root: '/scr/biggest/imagenet/'
+        split: 'train'
+        num_examples: 150000
+    transforms:
+        - classname: unlabeled_extrapolation.datasets.transforms.Resize
+          args:
+              size: 224
+              interpolation: 'bicubic'
+        - classname: torchvision.transforms.CenterCrop
+          args:
+              size: 224
+        - classname: torchvision.transforms.ToTensor
+        - classname: torchvision.transforms.Normalize
+          args:
+              mean: [0.48145466, 0.4578275, 0.40821073]
+              std: [0.26862954, 0.26130258, 0.27577711]
+
+default_test_transforms:
+    - classname: unlabeled_extrapolation.datasets.transforms.Resize
+      args:
+          size: 224
+          interpolation: 'bicubic'
+    - classname: torchvision.transforms.CenterCrop
+      args:
+          size: 224
+    - classname: torchvision.transforms.ToTensor
+    - classname: torchvision.transforms.Normalize
+      args:
+          mean: [0.48145466, 0.4578275, 0.40821073]
+          std: [0.26862954, 0.26130258, 0.27577711]
+
+test_datasets:
+    - name: 'val'
+      classname: datasets.imagenet.ImageNet
+      args:
+          root: '/scr/biggest/imagenet/'
+          split: 'val'
+    - name: 'v2'
+      classname: datasets.imagenet.ImageNet
+      args:
+          root: '/u/scr/nlp/imagenet/'
+          split: 'imagenetv2-matched-frequency-format-val'
+    - name: 'renditions'
+      classname: datasets.imagenet.ImageNet
+      args:
+          root: '/u/scr/nlp/imagenet/'
+          split: 'imagenet-r'
+
+early_stop_dataset_names:
+    - 'val'
+

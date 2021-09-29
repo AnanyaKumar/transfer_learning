@@ -30,6 +30,7 @@ class ImageNet(Dataset):
         if self._num_examples is not None:
             i = self._data_indices[i]
         x, y = self.data[i]
+        x = x.convert('RGB')
         if self._split == 'renditions' or self._split == 'imagenet-r':
             y = r_indices[y]
         return x, y
