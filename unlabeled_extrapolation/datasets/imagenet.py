@@ -17,9 +17,10 @@ class ImageNet(Dataset):
 
     def __init__(self, root, split='train', num_examples=None, transform=None, seed=0):
         super().__init__()
-        self.data = datasets.ImageFolder(root=root + '/' + split, transform=transform)
+        self.data = datasets.ImageFolder(root=root + '/' + split, transform=None)
         self._split = split
         self._num_examples = num_examples
+        self._transform = transform
         if self._num_examples is not None:
             if self._num_examples > len(self.data):
                 raise ValueError('num_examples can be at most the dataset size {len(self.data)}')
@@ -31,6 +32,8 @@ class ImageNet(Dataset):
             i = self._data_indices[i]
         x, y = self.data[i]
         x = x.convert('RGB')
+        if self._transform is not None:
+            x = self._transform(x)
         if self._split == 'renditions' or self._split == 'imagenet-r':
             y = r_indices[y]
         return x, y
