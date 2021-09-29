@@ -15,4 +15,3 @@ scheduler:
   classname: torch.optim.lr_scheduler.CosineAnnealingLR
   args:
     T_max: *epochs
-

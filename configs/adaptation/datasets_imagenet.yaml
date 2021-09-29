@@ -8,7 +8,6 @@ train_dataset:
     args:
         root: '/scr/biggest/imagenet/'
         split: 'train'
-        num_examples: 150000
     transforms:
         - classname: unlabeled_extrapolation.datasets.transforms.Resize
           args:
