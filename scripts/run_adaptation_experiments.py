@@ -659,6 +659,14 @@ clip_resnet50 = Model(
     bundles=[]
 )
 
+clip_vit_b16 = Model(
+    kwargs={
+        'classname': 'models.clip_model.ClipModel',
+        'args.model_name': 'ViT-B/16',
+    },
+    bundles=[]
+)
+
 landcover_baseline = Model(
     kwargs={
         'classname': 'models.innout_models.CNN1D',
@@ -684,6 +692,7 @@ names_to_model = {
     'sup_resnet50': sup_resnet50,
     'mocotp_fmow_resnet50': mocotp_fmow_resnet50,
     'clip_resnet50': clip_resnet50,
+    'clip_vit_b16': clip_vit_b16,
     'landcover_baseline': landcover_baseline,
     'landcover_auxin': landcover_auxin,
 }

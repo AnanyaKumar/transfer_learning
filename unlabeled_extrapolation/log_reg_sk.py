@@ -48,7 +48,7 @@ def inv_normalize_weights(weights, intercept, features, normalize_index):
 
 
 def test_log_reg_warm_starting(features, labels, train_index, test_indices, val_index, loader_names,
-                               num_cs=100, start_c=-7, end_c=2, max_iter=200, random_state=0):
+                               num_cs=100, start_c=-7, end_c=2, max_iter=20, random_state=0):
     L = len(features)
     # TODO: figure out what this should be based on initial results.
     Cs = np.logspace(start_c, end_c, num_cs)
