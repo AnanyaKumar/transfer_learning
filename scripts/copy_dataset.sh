@@ -119,7 +119,7 @@ if [ "$dataset_name" = imagenet ]; then
 	    echo "Extracting $dst_folder/$folder.tar.gz..."
 	    mkdir -p $dst_folder/tmp
 	    tar xzf $dst_folder/$folder.tar.gz -C $dst_folder/tmp
-	    mv $dst_folder/tmp/\* $dst_folder/
+	    mv $dst_folder/tmp/* $dst_folder/
 	fi
     done
 elif [ "$dataset_name" = domainnet ]; then
