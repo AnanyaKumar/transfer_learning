@@ -104,6 +104,7 @@ ACL_STRING=${ACL_STRING: : -1} # Remove trailing comma
 
 if [ ! -d "$dst_folder" ]; then
     mkdir -p $dst_folder
+    mkdir -p $dst_folder/tmp
     setfacl -d -m $ACL_STRING $dst_folder # Set default permissions for folder
 fi
 
@@ -111,11 +112,13 @@ if [ "$dataset_name" = imagenet ]; then
     for folder in train val; do
 	if [ ! -f "$dst_folder/$folder.tar.gz" ]; then
 	    echo "Copying $dataset_src/$folder.tar.gz to $dst_folder..."
-	    cp $dataset_src/$folder.tar.gz $dst_folder
+	    cp $dataset_src/$folder.tar.gz $dst_folder/tmp.tar.gz
+	    mv $dst_folder/tmp.tar.gz $dst_folder/$folder.tar.gz
 	fi
 	if [ ! -d "$dst_folder/$folder" ]; then
 	    echo "Extracting $dst_folder/$folder.tar.gz..."
-	    tar xzf $dst_folder/$folder.tar.gz -C $dst_folder
+	    tar xzf $dst_folder/$folder.tar.gz -C $dst_folder/tmp
+	    mv $dst_folder/tmp/* $dst_folder/*
 	fi
     done
 elif [ "$dataset_name" = domainnet ]; then
