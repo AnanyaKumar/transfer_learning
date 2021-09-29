@@ -489,7 +489,7 @@ imagenet = Dataset(
         'test_acc/v2', 'test_acc/renditions'],
     config_rel_path='adaptation/imagenet.yaml',
     bundles=['imagenet'],
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='',
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     eval_config_rel_path='adaptation/imagenet_eval.yaml')
 
