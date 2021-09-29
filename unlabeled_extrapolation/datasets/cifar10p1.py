@@ -3,6 +3,7 @@
 
 import os
 import pathlib
+from PIL import Image
 
 import torch
 from torch.utils.data import Dataset
@@ -10,6 +11,7 @@ import numpy as np
 
 
 def load_new_test_data(root, version_string=''):
+    data_path = root
     filename = 'cifar10.1'
     if version_string == '':
         version_string = 'v7'
@@ -44,11 +46,17 @@ class CIFAR10p1(Dataset):
 
     def __init__(self, root, split='train', version='v6', transform=None):
         super().__init__()
-        imagedata, labels = load_new_test_data(root=root, version)
+        imagedata, labels = load_new_test_data(root=root, version_string=version)
+        self._transform = transform
+        self._imagedata = imagedata
+        self._labels = labels
         
     def __getitem__(self, i):
-        x, y, _ = self._subset[self._indices[i]]
+        x = Image.fromarray(np.uint8(self._imagedata[i]))
+        if self._transform is not None:
+            x = self._transform(x)
+        y = self._labels[i]
         return x, y
 
     def __len__(self) -> int:
-        return len(self._indices)
+        return len(self._imagedata)
