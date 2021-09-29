@@ -18,7 +18,7 @@ class Fmow(Dataset):
         super().__init__()
         super_dataset = get_dataset(dataset='fmow', download=False, root_dir=root)
         self._subset = super_dataset.get_subset(split, transform=transform)
-        self._region = regions
+        self._regions = regions
         if 'all' not in self._regions:
             super_indices = self._subset.indices
             subset_metadata = self._subset.dataset.metadata_array[super_indices].numpy()
