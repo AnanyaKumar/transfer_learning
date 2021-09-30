@@ -42,11 +42,6 @@ test_datasets:
       args:
           root: '/scr/biggest/imagenet/'
           split: 'val'
-    - name: 'v2'
-      classname: datasets.imagenet.ImageNet
-      args:
-          root: '/u/scr/nlp/imagenet/'
-          split: 'imagenetv2-matched-frequency-format-val'
     - name: 'renditions'
       classname: datasets.imagenet.ImageNet
       args:

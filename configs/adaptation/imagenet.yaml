@@ -3,7 +3,7 @@ inherit:
   - resnet50_transfer.yaml 
   - datasets_imagenet.yaml
 
-num_classes: 30
+num_classes: 1000
 epochs: &epochs 5
 
 model:
