@@ -757,7 +757,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     if linear_probe:
         adapt_name = 'torch_linprobe'
         # Linear probing needs a higher learning rate.
-        sweep_lrs = [3e-3, 1e-2, 3e-1, 1e-1, 3e-1, 1.0, 3.0, 10.0]
+        # Tried 1.0 for ImageNet + CLIP ViT, not so good
+        sweep_lrs = [1e-2, 1e-1] # [3e-3, 1e-2, 3e-1, 1e-1, 3e-1, 1.0, 3.0, 10.0]
     if batchnorm_ft:
         adapt_name = 'batchnorm_ft'
         # TODO: hacky / hardcoded.
@@ -768,7 +769,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     model = names_to_model[args.model_name]
     if args.only_one_run:
         # TODO: how to choose which one to run? 1e-3 does well in practice.
-        hyperparams_list = range_hyper('optimizer.args.lr', [1e-3])
+        hyperparams_list = range_hyper('optimizer.args.lr', [1e-4])
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
     else:

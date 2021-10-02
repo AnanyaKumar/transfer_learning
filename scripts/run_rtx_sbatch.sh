@@ -3,7 +3,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=24G
-#SBATCH --exclude=jagupard[10-25]
+#SBATCH --exclude=jagupard[10-27]
 
 # Print execute commands in the log.
 set -x

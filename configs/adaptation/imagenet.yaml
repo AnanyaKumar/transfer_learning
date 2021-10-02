@@ -4,7 +4,7 @@ inherit:
   - datasets_imagenet.yaml
 
 num_classes: 1000
-epochs: &epochs 5
+epochs: &epochs 10
 
 model:
   classname: models.clip_model.ClipModel
