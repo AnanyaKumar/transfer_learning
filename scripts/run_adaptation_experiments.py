@@ -785,7 +785,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     model = names_to_model[args.model_name]
     if args.only_one_run:
         # TODO: how to choose which one to run? 1e-3 does well in practice.
-        hyperparams_list = range_hyper('optimizer.args.lr', [3e-4])
+        hyperparams_list = range_hyper('optimizer.args.lr', [1e-4])
         # TODO: remove this.
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
