@@ -493,6 +493,21 @@ imagenet = Dataset(
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     eval_config_rel_path='adaptation/imagenet_eval.yaml')
 
+imagenet_augs = Dataset(
+    name='imagenet_augs',
+    val_metric='test_acc/val',
+    secondary_val_metrics=['test_acc/renditions' 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/val',
+        'test_acc/renditions'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
+        'test_acc/renditions'],
+    config_rel_path='adaptation/imagenet_augs.yaml',
+    bundles=['imagenet'],
+    slurm_data_dir='',
+    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
+    eval_config_rel_path='adaptation/imagenet_augs_eval.yaml')
+
 cifar_stl = Dataset(
     name='cifar_stl',
     val_metric='test_acc/cifar10-test',
@@ -587,6 +602,7 @@ names_to_datasets = {
     'living17': living17,
     'entity30': entity30,
     'imagenet': imagenet,
+    'imagenet_augs': imagenet_augs,
     'cifar_stl': cifar_stl,
     'domainnet': domainnet,
     'fmow': fmow,
