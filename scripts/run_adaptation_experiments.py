@@ -462,7 +462,22 @@ living17 = Dataset(
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     slurm_data_dir='/scr/biggest/',
     eval_config_rel_path='adaptation/living17_eval.yaml')
- 
+
+living17_nonorm = Dataset(
+    name='living17_nonorm',
+    val_metric='test_acc/source_val_living',
+    secondary_val_metrics=['test_acc/target_val_living', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/source_val_living',
+        'test_acc/target_val_living'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/source_val_living',
+        'test_acc/target_val_living'],
+    config_rel_path='adaptation/living17_nonorm.yaml',
+    bundles=['imagenet'],
+    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
+    slurm_data_dir='/scr/biggest/',
+    eval_config_rel_path='adaptation/living17_nonorm_eval.yaml')
+
 entity30 = Dataset(
     name='entity30',
     val_metric='test_acc/source_val_entity',
@@ -522,6 +537,22 @@ cifar_stl = Dataset(
     slurm_data_cmd=None,
     slurm_data_dir='/u/scr/ananya/',
     eval_config_rel_path='adaptation/cifar_stl_eval.yaml')
+
+cifar_stl_nonorm = Dataset(
+    name='cifar_stl_nonorm',
+    val_metric='test_acc/cifar10-test',
+    secondary_val_metrics=['test_acc/stl-test', 'test_acc/imnet-n-cifar', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/cifar10-test',
+        'test_acc/stl-test', 'test_acc/imnet-n-cifar'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/cifar10-test',
+        'test_acc/stl-test', 'test_acc/imnet-n-cifar'],
+    config_rel_path='adaptation/cifar_stl_nonorm.yaml',
+    bundles=['cifar_stl'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/u/scr/ananya/',
+    eval_config_rel_path='adaptation/cifar_stl_nonorm_eval.yaml')
+
 
 domainnet = Dataset(
     name='domainnet',
@@ -600,10 +631,12 @@ landcover_auxin = Dataset(
 
 names_to_datasets = {
     'living17': living17,
+    'living17_nonorm': living17_nonorm,
     'entity30': entity30,
     'imagenet': imagenet,
     'imagenet_augs': imagenet_augs,
     'cifar_stl': cifar_stl,
+    'cifar_stl_nonorm': cifar_stl_nonorm,
     'domainnet': domainnet,
     'fmow': fmow,
     'fmow_all': fmow_all,
@@ -683,6 +716,14 @@ clip_vit_b16 = Model(
     bundles=[]
 )
 
+dino_vit_b16 = Model(
+    kwargs={
+        'classname': 'models.vit_model.VitModel',
+        'args.model_name': 'dino_vitb16',
+    },
+    bundles=[]
+)
+ 
 landcover_baseline = Model(
     kwargs={
         'classname': 'models.innout_models.CNN1D',
@@ -709,6 +750,7 @@ names_to_model = {
     'mocotp_fmow_resnet50': mocotp_fmow_resnet50,
     'clip_resnet50': clip_resnet50,
     'clip_vit_b16': clip_vit_b16,
+    'dino_vit_b16': dino_vit_b16,
     'landcover_baseline': landcover_baseline,
     'landcover_auxin': landcover_auxin,
 }

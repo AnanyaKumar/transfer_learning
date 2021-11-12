@@ -1,9 +1,9 @@
 
 inherit:
   - resnet50_transfer.yaml 
-  - datasets_living17.yaml
+  - datasets_cifar_stl_nonorm.yaml
 
-num_classes: 17
+num_classes: 10
 epochs: &epochs 20
 
 model:

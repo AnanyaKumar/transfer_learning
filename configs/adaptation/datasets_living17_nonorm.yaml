@@ -1,0 +1,47 @@
+
+root_prefix: '/scr/biggest/'
+
+# The train and test transforms are taken from the Swav fine-tuning script.
+train_dataset:
+    name: 'source_train_living'
+    classname: datasets.breeds.Breeds
+    args:
+        source: True
+        split: 'train'
+        breeds_name: 'living17'
+        root: 'imagenet/'
+    transforms:
+        - classname: torchvision.transforms.RandomResizedCrop
+          args:
+              size: 224
+        - classname: torchvision.transforms.RandomHorizontalFlip
+        - classname: torchvision.transforms.ToTensor
+
+default_test_transforms:
+    - classname: torchvision.transforms.Resize
+      args:
+          size: 256
+    - classname: torchvision.transforms.CenterCrop
+      args:
+          size: 224
+    - classname: torchvision.transforms.ToTensor
+
+test_datasets:
+    - name: 'source_val_living'
+      classname: datasets.breeds.Breeds
+      args:
+          source: True
+          split: 'val'
+          breeds_name: 'living17'
+          root: 'imagenet/'
+    - name: 'target_val_living'
+      classname: datasets.breeds.Breeds
+      args:
+          source: False
+          target: True
+          split: 'val'
+          breeds_name: 'living17'
+          root: 'imagenet/'
+
+early_stop_dataset_names: {}
+

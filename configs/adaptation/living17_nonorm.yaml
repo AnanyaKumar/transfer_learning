@@ -1,7 +1,7 @@
 
 inherit:
   - resnet50_transfer.yaml 
-  - datasets_living17.yaml
+  - datasets_living17_nonorm.yaml
 
 num_classes: 17
 epochs: &epochs 20
