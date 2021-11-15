@@ -5,6 +5,7 @@ inherit:
 
 num_classes: 1000
 epochs: &epochs 10
+batch_size: 64
 
 model:
   classname: models.clip_model.ClipModel

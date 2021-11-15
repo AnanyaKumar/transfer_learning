@@ -5,6 +5,7 @@ inherit:
 
 num_classes: 10
 epochs: &epochs 20
+save_no_checkpoints: True
 
 model:
   classname: models.imnet_resnet.ResNet50

@@ -36,6 +36,21 @@ test_datasets:
       args:
           root: '/u/scr/nlp/imagenet/'
           split: 'imagenet-r'
+    - name: 'imagenet-a'
+      classname: datasets.imagenet.ImageNet
+      args:
+          root: '/u/scr/nlp/imagenet/'
+          split: 'imagenet-a'
+    - name: 'v2'
+      classname: datasets.imagenet.ImageNet
+      args:
+          root: '/u/scr/nlp/imagenet/'
+          split: 'imagenetv2-matched-frequency-format-val'
+    - name: 'sketch'
+      classname: datasets.imagenet.ImageNet
+      args:
+          root: '/u/scr/nlp/imagenet/'
+          split: 'sketch'
 
 early_stop_dataset_names:
     - 'val'

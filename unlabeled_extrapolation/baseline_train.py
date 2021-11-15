@@ -37,6 +37,18 @@ def reset_state(model, training):
         model.eval()
 
 
+# In some datasets, only some indices are valid.
+# So we only take the argmax among the set of valid indices.
+def get_argmax_valid(logits, valid_indices):
+    compressed_logits = logits[:, valid_indices]
+    assert compressed_logits.shape == (logits.shape[0], len(np.unique(valid_indices)))
+    compressed_preds = np.argmax(compressed_logits, axis=-1).astype(np.int32)
+    valid_indices = np.array(valid_indices)
+    preds = valid_indices[compressed_preds]
+    assert preds.shape == (logits.shape[0],)
+    return preds
+
+
 def get_test_stats(config, net, test_loader, criterion, device, max_examples=float('infinity')):
     # Evaluate accuracy and loss on validation.
     # Returns right after we've seen at least max_examples examples (not batches).
@@ -51,8 +63,15 @@ def get_test_stats(config, net, test_loader, criterion, device, max_examples=flo
                 data = utils.to_device(data, device)
             images, labels = data
             outputs = net(images)
-            _, predicted = torch.max(outputs.data, dim=1)
-            correct = (predicted == labels).cpu()
+            if hasattr(test_loader.dataset, 'valid_indices'):
+                # This basically projects onto the set of valid indices.
+                # We take the argmax among the set of valid indices.
+                logits = outputs.data.detach().cpu().numpy()
+                predicted = get_argmax_valid(logits, test_loader.dataset.valid_indices)
+            else:
+                _, predicted = torch.max(outputs.data, dim=1)
+                predicted = predicted.detach().cpu().numpy()
+            correct = (predicted == labels.detach().cpu().numpy())
             val_acc.add_values(correct.tolist())
             loss = criterion(outputs, labels).cpu()
             loss_list = loss.tolist()
@@ -170,8 +189,30 @@ def build_model(config):
     return net
 
 
+def get_l2_dist(weight_dict1, weight_dict2, ignore='.fc.'):
+    l2_dist = torch.tensor(0.0).cuda()
+    for key in weight_dict1:
+        if ignore not in key:
+            l2_dist += torch.sum(torch.square(weight_dict1[key] - weight_dict2[key]))
+    return l2_dist
+
+
+def get_param_weights_counts(net, detach):
+    weight_dict = {}
+    count_dict = {}
+    for param in net.named_parameters():
+        name = param[0]
+        weights = param[1]
+        if detach:
+            weight_dict[name] = weights.detach().clone()
+        else:
+            weight_dict[name] = weights
+        count_dict[name] = np.prod(np.array(list(param[1].shape)))
+    return weight_dict, count_dict
+
+
 def train(epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
-          test_loaders, max_test_examples):
+          test_loaders, max_test_examples, weight_dict_initial):
     # Returns a dictionary with epoch, train/loss and train/acc.
     # Train model.
     training_state = net.training
@@ -180,6 +221,8 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
         'train/loss': Accumulator(),
         'train/acc': Accumulator(),
     }
+    if 'l2sp_weight' in config:
+        loss_dict['train/l2sp_loss'] = Accumulator()
     if 'model_loss' in config:
         loss_dict['train/model_loss'] = Accumulator()
     num_examples = 0
@@ -195,6 +238,11 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
         optimizer.zero_grad()
         outputs = net(inputs)
         loss = criterion(outputs, labels)
+        if 'l2sp_weight' in config:
+            weight_dict, _ = get_param_weights_counts(net, detach=False)
+            l2sp_loss = config['l2sp_weight'] * get_l2_dist(weight_dict_initial, weight_dict)
+            loss_dict['train/l2sp_loss'].add_value(l2sp_loss.tolist())
+            loss += l2sp_loss
         _, train_preds = torch.max(outputs.data, axis=1)
         loss_dict['train/loss'].add_value(loss.tolist())
         loss_dict['train/acc'].add_values((train_preds == labels).tolist())
@@ -311,10 +359,15 @@ def main(config, log_dir, checkpoints_dir):
     # Log stats.
     logging.info('Initial test stats')
     logging.info(test_stats)
+    # If l2sp, then save initial weights so we can regularize towards them.
+    weight_dict_initial = None
+    if 'l2sp_weight' in config:
+        weight_dict_initial, _ = get_param_weights_counts(net, detach=True)
 
     for epoch in range(config['epochs']):
         # Save checkpoint once in a while.
-        if epoch % config['save_freq'] == 0:
+        if epoch % config['save_freq'] == 0 and (
+            'save_no_checkpoints' not in config or not config['save_no_checkpoints']):
             cur_ckp_filename = 'ckp_' + str(epoch)
             utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, cur_ckp_filename)
             if (prev_ckp_path is not None and not(config['save_all_checkpoints'])):
@@ -323,7 +376,7 @@ def main(config, log_dir, checkpoints_dir):
         # One epoch of model training.
         train_stats = train(
            epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
-           test_loaders, max_test_examples) 
+           test_loaders, max_test_examples, weight_dict_initial) 
         scheduler.step()
         # Get test stats across all test sets.
         test_stats = get_all_test_stats(
@@ -362,7 +415,8 @@ def main(config, log_dir, checkpoints_dir):
                     best_accs[metric_name] = test_stats[metric_name]
                     checkpoint_name = 'ckp_best_' + name
                     utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, checkpoint_name)
-    utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, 'ckp_last')
+    if 'save_no_checkpoints' not in config or not config['save_no_checkpoints']:
+        utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, 'ckp_last')
 
 
 def make_new_dir(new_dir, remove_old_ok=True):

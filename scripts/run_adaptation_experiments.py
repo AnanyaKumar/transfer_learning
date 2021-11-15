@@ -804,9 +804,10 @@ def get_datasets(args):
 
 
 def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
-                            val_mode=False, no_augmentation=False):
+                            val_mode=False, no_augmentation=False, l2sp=False):
     adapt_name = 'full_ft'
-    sweep_lrs = SWEEP_LRS
+    # TODO: Change back
+    sweep_lrs = [0.0001] # SWEEP_LRS
     if val_mode:
         adapt_name += '_valmode'
         sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
@@ -814,15 +815,19 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         adapt_name += '_no_augmentation'
     if linear_probe:
         adapt_name = 'torch_linprobe'
+        print('hello')
         # Linear probing needs a higher learning rate.
         # Tried 1.0 for ImageNet + CLIP ViT, not so good
-        sweep_lrs = [1e-2, 1e-1] # [3e-3, 1e-2, 3e-1, 1e-1, 3e-1, 1.0, 3.0, 10.0]
+        # TODO: Change to sweep.
+        sweep_lrs = [1e-2] # [1e-2, 3e-2, 1e-1] # [3e-3, 1e-2, 3e-1, 1e-1, 3e-1, 1.0, 3.0, 10.0]
     if batchnorm_ft:
         adapt_name = 'batchnorm_ft'
         # TODO: hacky / hardcoded.
         sweep_lrs = SWEEP_LRS[2:] + [0.03, 0.1, 0.3]
     if higher_linear_lr:
         adapt_name = 'full_ft_higherlinlr'
+    if l2sp:
+        adapt_name = 'l2sp'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
     if args.only_one_run:
@@ -844,6 +849,9 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         hyperparams_list = append_to_each(hyperparams_list, {'batchnorm_ft': True})
     if higher_linear_lr:
         hyperparams_list = append_to_each(hyperparams_list, {'linear_layer_lr_multiplier': 10})
+    if l2sp:
+        # Tried 1.0, 0.1, 0.01
+        hyperparams_list = append_to_each(hyperparams_list, {'l2sp_weight': 0.01})
     if args.no_replications:
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
@@ -868,6 +876,10 @@ def batchnorm_ft_experiments(args, num_replications=3):
 
 def ft_higher_linear_lr_experiments(args, num_replications=3):
     fine_tuning_experiments(args, num_replications=num_replications, higher_linear_lr=True)
+
+
+def l2sp_experiments(args, num_replications=3):
+    fine_tuning_experiments(args, num_replications=num_replications, l2sp=True)
 
 
 def ft_val_mode_experiment(args, num_replications=3):
@@ -1005,6 +1017,7 @@ def main(args):
         'ft_higher_linear_lr_experiments': ft_higher_linear_lr_experiments,
         'ft_val_mode_experiment': ft_val_mode_experiment,
         'fine_tuning_no_augmentation_experiments': fine_tuning_no_augmentation_experiments,
+        'l2sp_experiments': l2sp_experiments,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)
