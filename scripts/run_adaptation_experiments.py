@@ -804,10 +804,17 @@ def get_datasets(args):
 
 
 def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
-                            val_mode=False, no_augmentation=False, l2sp=False):
+                            val_mode=False, no_augmentation=False, l2sp=False, side_tune=False):
     adapt_name = 'full_ft'
-    # TODO: Change back
-    sweep_lrs = [0.0001] # SWEEP_LRS
+    datasets = get_datasets(args)
+    model = names_to_model[args.model_name]
+    sweep_lrs = SWEEP_LRS
+    if 'imagenet' or 'imagenet_augs' in datasets:
+        if len(datasets) > 1:
+            raise ValueError('ImageNet uses custom learning rates, so launch it separately.')
+        sweep_lrs = [0.0001, 0.0003, 0.001]
+    if side_tune:
+        adapt_name += '_side_tune'
     if val_mode:
         adapt_name += '_valmode'
         sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
@@ -815,11 +822,10 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         adapt_name += '_no_augmentation'
     if linear_probe:
         adapt_name = 'torch_linprobe'
-        print('hello')
         # Linear probing needs a higher learning rate.
-        # Tried 1.0 for ImageNet + CLIP ViT, not so good
-        # TODO: Change to sweep.
-        sweep_lrs = [1e-2] # [1e-2, 3e-2, 1e-1] # [3e-3, 1e-2, 3e-1, 1e-1, 3e-1, 1.0, 3.0, 10.0]
+        if 'imagenet' or 'imagenet_augs' in datasets:
+            sweep_lrs = [0.01, 0.03, 0.1]
+        sweep_lrs = [3e-3, 1e-2, 3e-1, 1e-1, 3e-1, 1.0]
     if batchnorm_ft:
         adapt_name = 'batchnorm_ft'
         # TODO: hacky / hardcoded.
@@ -828,16 +834,17 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         adapt_name = 'full_ft_higherlinlr'
     if l2sp:
         adapt_name = 'l2sp'
-    datasets = get_datasets(args)
-    model = names_to_model[args.model_name]
+    # Set hyperparameters
     if args.only_one_run:
         # TODO: how to choose which one to run? 1e-3 does well in practice.
         hyperparams_list = range_hyper('optimizer.args.lr', [1e-4])
-        # TODO: remove this.
+        # TODO: remove this?
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
     else:
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
+    if side_tune:
+        hyperparams_list = append_to_each(hyperparams_list, {'side_tune': True})
     if no_augmentation:
         hyperparams_list = append_to_each(hyperparams_list, {'no_augmentation': True})
     if val_mode:
@@ -850,7 +857,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     if higher_linear_lr:
         hyperparams_list = append_to_each(hyperparams_list, {'linear_layer_lr_multiplier': 10})
     if l2sp:
-        # Tried 1.0, 0.1, 0.01
+        # Note: tried 1.0, 0.1, 0.01, 0.001, 0.0001 on Living-17
+        # 0.01 worked best ID, and 0.1 worked best OOD but did 0.4% worse than fine-tuning ID.
         hyperparams_list = append_to_each(hyperparams_list, {'l2sp_weight': 0.01})
     if args.no_replications:
         num_replications = 1
@@ -868,6 +876,10 @@ def fine_tuning_no_augmentation_experiments(args, num_replications=3):
 
 def torch_linprobe_experiments(args, num_replications=3):
     fine_tuning_experiments(args, num_replications=num_replications, linear_probe=True)
+
+
+def side_tune_experiments(args, num_replications=3):
+    fine_tuning_experiments(args, num_replications=num_replications, side_tune=True)
 
 
 def batchnorm_ft_experiments(args, num_replications=3):
@@ -1018,6 +1030,7 @@ def main(args):
         'ft_val_mode_experiment': ft_val_mode_experiment,
         'fine_tuning_no_augmentation_experiments': fine_tuning_no_augmentation_experiments,
         'l2sp_experiments': l2sp_experiments,
+        'side_tune_experiments': side_tune_experiments,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)
