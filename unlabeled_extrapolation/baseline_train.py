@@ -138,9 +138,10 @@ def build_model(config):
     finetune = 'finetune' in config and config['finetune']
     linear_probe = 'linear_probe' in config and config['linear_probe']
     batch_norm = 'batchnorm_ft' in config and config['batchnorm_ft']
+    side_tune = 'side_tune' in config and config['side_tune']
     def count_parameters(model, trainable):
         return sum(p.numel() for p in model.parameters() if p.requires_grad == trainable)
-    if finetune or linear_probe or batch_norm:
+    if finetune or linear_probe or batch_norm or side_tune:
         if linear_probe:
             logging.info('linear probing, freezing bottom layers.')
             # If unspecified, we set use_net_val_mode = True for linear-probing.
@@ -162,6 +163,10 @@ def build_model(config):
             net.add_probe(probe_net)
         else:
             net.new_last_layer(config['num_classes'])
+        if side_tune:
+            # This is currently only supported for some networks like ResNet-50,
+            # would need to add support for other networks.
+            net.enable_side_tuning()
         if ('linear_probe_checkpoint_path' in config and
             config['linear_probe_checkpoint_path'] != ''):
             linprobe_path = config['linear_probe_checkpoint_path']

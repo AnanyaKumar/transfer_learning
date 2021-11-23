@@ -809,13 +809,17 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
     sweep_lrs = SWEEP_LRS
-    if 'imagenet' or 'imagenet_augs' in datasets:
+    if 'imagenet' in datasets or 'imagenet_augs' in datasets:
         if len(datasets) > 1:
             raise ValueError('ImageNet uses custom learning rates, so launch it separately.')
         sweep_lrs = [0.0001, 0.0003, 0.001]
     if side_tune:
         adapt_name += '_side_tune'
-    if val_mode:
+        sweep_lrs = sweep_lrs + [3e-2, 1e-1, 3e-1, 1.0, 3.0, 10.0]
+        if val_mode:
+            adapt_name += '_valmode'
+            sweep_lrs = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
+    elif val_mode:
         adapt_name += '_valmode'
         sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
     if no_augmentation:
@@ -823,7 +827,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     if linear_probe:
         adapt_name = 'torch_linprobe'
         # Linear probing needs a higher learning rate.
-        if 'imagenet' or 'imagenet_augs' in datasets:
+        if 'imagenet' in datasets or 'imagenet_augs' in datasets:
             sweep_lrs = [0.01, 0.03, 0.1]
         sweep_lrs = [3e-3, 1e-2, 3e-1, 1e-1, 3e-1, 1.0]
     if batchnorm_ft:
@@ -880,6 +884,10 @@ def torch_linprobe_experiments(args, num_replications=3):
 
 def side_tune_experiments(args, num_replications=3):
     fine_tuning_experiments(args, num_replications=num_replications, side_tune=True)
+
+
+def side_tune_val_mode_experiments(args, num_replications=3):
+    fine_tuning_experiments(args, num_replications=num_replications, val_mode=True, side_tune=True)
 
 
 def batchnorm_ft_experiments(args, num_replications=3):
@@ -1031,6 +1039,7 @@ def main(args):
         'fine_tuning_no_augmentation_experiments': fine_tuning_no_augmentation_experiments,
         'l2sp_experiments': l2sp_experiments,
         'side_tune_experiments': side_tune_experiments,
+        'side_tune_val_mode_experiments': side_tune_val_mode_experiments,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)

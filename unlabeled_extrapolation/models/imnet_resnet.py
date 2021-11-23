@@ -66,13 +66,29 @@ class ResNet50(nn.Module):
             raise NotImplementedError()
         elif not pretrained or pretrain_style == 'supervised':
             self._model = resnet50(pretrained=pretrained)
+        self._side_tuning = False
 
     def forward(self, x):
+        if self._side_tuning:
+            pretrained_reps = self.get_features(x)
+            side_reps = self._side_network.get_features(x)
+            print(pretrained_reps.shape, side_reps.shape)
+            return self._model.fc(pretrained_reps + side_reps)
         return self._model(x)
 
     def set_requires_grad(self, val):
         for param in self._model.parameters():
                 param.requires_grad = val
+
+    def enable_side_tuning(self):
+        self._side_tuning = True
+        # Freeze gradients for the original network.
+        self.set_requires_grad(val=False)
+        # Create the last layer again, so that parameters are not frozen.
+        self.new_last_layer(num_classes=self._model.fc.out_features)
+        # Add a side network, as per the side-tuning paper.
+        # In many of their experiments, this is also a ResNet-50 like the original network.
+        self._side_network = ResNet50()
 
     def new_last_layer(self, num_classes):
         num_in_features = self._model.fc.in_features
@@ -91,4 +107,8 @@ class ResNet50(nn.Module):
         return nn.Sequential(*list(self._model.children())[:-1])
 
     def get_features(self, x):
-        return self.get_feature_extractor()(x)
+        # Note: For side-tuning, this gives the original pretrained features.
+        # It's a big ambiguous what the 'features' are in that case.
+        features = self.get_feature_extractor()(x)
+        return torch.reshape(features, (features.shape[0], -1))
+
