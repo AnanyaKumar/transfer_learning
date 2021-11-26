@@ -51,6 +51,7 @@ test_datasets:
           breeds_name: 'living17'
           root: 'imagenet/'
 
+# TODO: re-enable saving checkpoints.
 early_stop_dataset_names:
     - 'source_val_living'
     - 'target_val_living'

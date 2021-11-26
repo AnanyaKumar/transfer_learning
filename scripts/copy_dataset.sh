@@ -108,18 +108,20 @@ if [ ! -d "$dst_folder" ]; then
     setfacl -d -m $ACL_STRING $dst_folder # Set default permissions for folder
 fi
 
+a1=$RANDOM
+a2=$RANDOM
 if [ "$dataset_name" = imagenet ]; then
     for folder in train val; do
 	if [ ! -f "$dst_folder/$folder.tar.gz" ]; then
 	    echo "Copying $dataset_src/$folder.tar.gz to $dst_folder..."
-	    cp $dataset_src/$folder.tar.gz $dst_folder/tmp.tar.gz
-	    mv $dst_folder/tmp.tar.gz $dst_folder/$folder.tar.gz
+	    cp $dataset_src/$folder.tar.gz $dst_folder/tmp_$a1$a2.tar.gz
+	    mv -n $dst_folder/tmp_$a1$a2.tar.gz $dst_folder/$folder.tar.gz
 	fi
 	if [ ! -d "$dst_folder/$folder" ]; then
 	    echo "Extracting $dst_folder/$folder.tar.gz..."
-	    mkdir -p $dst_folder/tmp
-	    tar xzf $dst_folder/$folder.tar.gz -C $dst_folder/tmp
-	    mv $dst_folder/tmp/* $dst_folder/
+	    mkdir -p $dst_folder/tmp_$a1$a2
+	    tar xzf $dst_folder/$folder.tar.gz -C $dst_folder/tmp_$a1$a2
+	    mv -n $dst_folder/tmp_$a1$a2/* $dst_folder/
 	fi
     done
 elif [ "$dataset_name" = domainnet ]; then

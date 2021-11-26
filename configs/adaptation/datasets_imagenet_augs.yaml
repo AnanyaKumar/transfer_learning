@@ -54,4 +54,3 @@ test_datasets:
 
 early_stop_dataset_names:
     - 'val'
-

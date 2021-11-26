@@ -804,15 +804,19 @@ def get_datasets(args):
 
 
 def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
-                            val_mode=False, no_augmentation=False, l2sp=False, side_tune=False):
+                            val_mode=False, no_augmentation=False, l2sp=False, side_tune=False,
+                            imagenet_lp_ft_phase2=False):
     adapt_name = 'full_ft'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
     sweep_lrs = SWEEP_LRS
-    if 'imagenet' in datasets or 'imagenet_augs' in datasets:
-        if len(datasets) > 1:
+    if 'imagenet' in args.datasets or 'imagenet_augs' in args.datasets:
+        if len(args.datasets) > 1:
             raise ValueError('ImageNet uses custom learning rates, so launch it separately.')
-        sweep_lrs = [0.0001, 0.0003, 0.001]
+        if imagenet_lp_ft_phase2:
+            sweep_lrs = [0.00001, 0.00003, 0.0001]
+        else:
+            sweep_lrs = [0.0001, 0.0003, 0.001]
     if side_tune:
         adapt_name += '_side_tune'
         sweep_lrs = sweep_lrs + [3e-2, 1e-1, 3e-1, 1.0, 3.0, 10.0]
@@ -821,15 +825,17 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
             sweep_lrs = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
     elif val_mode:
         adapt_name += '_valmode'
-        sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
+        if 'imagenet' not in args.datasets and 'imagenet_augs' not in args.datasets:
+            sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
     if no_augmentation:
         adapt_name += '_no_augmentation'
     if linear_probe:
         adapt_name = 'torch_linprobe'
         # Linear probing needs a higher learning rate.
-        if 'imagenet' in datasets or 'imagenet_augs' in datasets:
+        if 'imagenet' in args.datasets or 'imagenet_augs' in args.datasets:
             sweep_lrs = [0.01, 0.03, 0.1]
-        sweep_lrs = [3e-3, 1e-2, 3e-1, 1e-1, 3e-1, 1.0]
+        else:
+            sweep_lrs = [3e-3, 1e-2, 3e-2, 1e-1, 3e-1, 1.0]
     if batchnorm_ft:
         adapt_name = 'batchnorm_ft'
         # TODO: hacky / hardcoded.
@@ -838,10 +844,12 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         adapt_name = 'full_ft_higherlinlr'
     if l2sp:
         adapt_name = 'l2sp'
+    if args.epochs is not None:
+        adapt_name += '_epochs' + str(args.epochs)
     # Set hyperparameters
     if args.only_one_run:
         # TODO: how to choose which one to run? 1e-3 does well in practice.
-        hyperparams_list = range_hyper('optimizer.args.lr', [1e-4])
+        hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs[0])
         # TODO: remove this?
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
@@ -864,14 +872,45 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         # Note: tried 1.0, 0.1, 0.01, 0.001, 0.0001 on Living-17
         # 0.01 worked best ID, and 0.1 worked best OOD but did 0.4% worse than fine-tuning ID.
         hyperparams_list = append_to_each(hyperparams_list, {'l2sp_weight': 0.01})
+    if args.epochs is not None:
+        hyperparams_list = append_to_each(hyperparams_list, {'epochs': args.epochs})
+        hyperparams_list = append_to_each(hyperparams_list, {'scheduler.args.T_max': args.epochs})
+    if args.save_no_checkpoints:
+        hyperparams_list = append_to_each(hyperparams_list, {'save_no_checkpoints': True})
+    if imagenet_lp_ft_phase2:
+        if 'imagenet_augs' in args.datasets:
+            hyperparams_list = append_to_each(hyperparams_list,
+                {'checkpoint_path':
+                    '/u/scr/ananya/cifar_experiments/unlabeled_extrapolation/logs/'
+                    'torch_linprobe_epochs5_imagenet_augs_clip_vit_b16/'
+                    'epochs-5_linear_probe-True_optimizer.args.lr-0.1_scheduler.args.'
+                    'T_max-5_seed-0_run0/checkpoints/ckp_best_val'})
+
+        if 'imagenet' in args.datasets:
+            hyperparams_list = append_to_each(hyperparams_list,
+                {'checkpoint_path':
+                    '/u/scr/ananya/cifar_experiments/unlabeled_extrapolation/logs/'
+                    'torch_linprobe_epochs5_imagenet_clip_vit_b16/'
+                    'epochs-5_linear_probe-True_optimizer.args.lr-0.1_scheduler.args.'
+                    'T_max-5_seed-0_run0/checkpoints/ckp_best_val'})
     if args.no_replications:
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
     for dataset in datasets:
         all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
-            num_replications=num_replications, args=args)
+            num_replications=num_replications, args=args, ignore_name_hypers={'checkpoint_path'})
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
+
+
+def ft_imnet_lp_ft_phase_2_experiments(args, num_replications=3):
+    fine_tuning_experiments(args, num_replications=num_replications,
+                            imagenet_lp_ft_phase2=True)
+
+
+def ft_imnet_lp_ft_phase_2_val_mode_experiments(args, num_replications=3):
+    fine_tuning_experiments(args, num_replications=num_replications,
+                            val_mode=True, imagenet_lp_ft_phase2=True)
 
 
 def fine_tuning_no_augmentation_experiments(args, num_replications=3):
@@ -940,6 +979,8 @@ def linprobe_experiments_usenewbnstats(args, num_replications=3):
 
 
 def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=False, use_new_bn_stats=False):
+    if args.epochs is not None:
+        raise ValueError('Does not support epochs yet.')
     adapt_name = 'lp_then_ft'
     sweep_lrs = SWEEP_LRS
     if val_mode:
@@ -959,6 +1000,11 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
     if args.no_replications:
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
+    if args.epochs is not None:
+        hyperparams_list = append_to_each(hyperparams_list, {'epochs': args.epochs})
+        hyperparams_list = append_to_each(hyperparams_list, {'scheduler.args.T_max': args.epochs})
+    if args.save_no_checkpoints:
+        hyperparams_list = append_to_each(hyperparams_list, {'save_no_checkpoints': True})
     for dataset in datasets:
         cur_hyperparams_list = deepcopy(hyperparams_list)
         linprobe_group_path = get_group_dir_path(linprobe_adapt_name, dataset.name, args.model_name, args)
@@ -1014,7 +1060,7 @@ def spray_domainnet_jags(args):
     for i in range(10, 30):
         cmd = 'sbatch -p jag-lo --cpus-per-task=1 --gres=gpu:0 --mem=4G'
         cmd += f' --nodelist=jagupard{i} -J copy_domainnet_jag{i} -o %x.out'
-        cmd += ' copy_dataset.sh domainnet'
+        cmd += ' scripts/copy_dataset.sh domainnet'
         subprocess.run(shlex.split(cmd))
 
 
@@ -1040,6 +1086,8 @@ def main(args):
         'l2sp_experiments': l2sp_experiments,
         'side_tune_experiments': side_tune_experiments,
         'side_tune_val_mode_experiments': side_tune_val_mode_experiments,
+        'ft_imnet_lp_ft_phase_2_experiments': ft_imnet_lp_ft_phase_2_experiments,
+        'ft_imnet_lp_ft_phase_2_val_mode_experiments': ft_imnet_lp_ft_phase_2_val_mode_experiments,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)
@@ -1066,7 +1114,11 @@ if __name__ == "__main__":
                         help='Experiment to run.')
     parser.add_argument('--seed', type=int, required=False, default=0,
                         help='Base seed, we typically add to this seed for replication runs.')
+    parser.add_argument('--epochs', type=int, required=False, default=None,
+                        help='Number of epochs to run job for.')
+    # Note that store_true creates a default value of False.
     parser.add_argument('--codalab', action='store_true', help='run on CodaLab not slurm')
+    parser.add_argument('--save_no_checkpoints', action='store_true', help='run on CodaLab not slurm')
     parser.add_argument('--partition', type=str, required=False, default='jag-standard',
                         help='(Slurm only) What priority to use.')
     parser.add_argument('--mail_user', type=str, required=False,

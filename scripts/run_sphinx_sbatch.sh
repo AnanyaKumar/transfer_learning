@@ -4,6 +4,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --partition=sphinx
+#SBATCH -t 2-0:00
 
 # Print execute commands in the log.
 set -x

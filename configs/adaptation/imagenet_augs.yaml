@@ -6,6 +6,7 @@ inherit:
 num_classes: 1000
 epochs: &epochs 10
 batch_size: 128
+  # save_no_checkpoints: True
 
 model:
   classname: models.clip_model.ClipModel

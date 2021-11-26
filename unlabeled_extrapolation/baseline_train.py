@@ -191,6 +191,11 @@ def build_model(config):
         num_trainable_params = count_parameters(net, True)
         num_params = count_parameters(net, False) + num_trainable_params
         logging.info(f'Fine Tuning {num_trainable_params} of {num_params} parameters.')
+    if 'checkpoint_path' in config and len(config['checkpoint_path']) > 0:
+        logging.info(utils.load_ckp(config['checkpoint_path'], net))
+        num_trainable_params = count_parameters(net, True)
+        num_params = count_parameters(net, False) + num_trainable_params
+        logging.info(f'Fine Tuning checkpoint: {num_trainable_params} of {num_params} parameters.')
     return net
 
 
@@ -419,7 +424,8 @@ def main(config, log_dir, checkpoints_dir):
                 if metric_name not in best_accs or test_stats[metric_name] > best_accs[metric_name]:
                     best_accs[metric_name] = test_stats[metric_name]
                     checkpoint_name = 'ckp_best_' + name
-                    utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, checkpoint_name)
+                    if 'save_no_checkpoints' not in config or not config['save_no_checkpoints']:
+                        utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, checkpoint_name)
     if 'save_no_checkpoints' not in config or not config['save_no_checkpoints']:
         utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, 'ckp_last')
 
