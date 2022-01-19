@@ -1,0 +1,41 @@
+
+root_prefix: '/u/scr/ananya/'
+
+train_dataset:
+    name: 'train'
+    classname: datasets.celeba.CelebA
+    args:
+        target_attribute: 'Wearing_Earrings'
+        split: 'train'
+          # pickle_file_path: 'celeba_pickle/celeba_full_pickle'
+    transforms:
+        - classname: torchvision.transforms.Resize
+          args:
+              size: [224, 224]
+        - classname: torchvision.transforms.ToTensor
+
+default_test_transforms:
+    - classname: torchvision.transforms.Resize
+      args:
+          size: [224, 224]
+    - classname: torchvision.transforms.ToTensor
+
+default_test_args:
+  target_attribute: 'Wearing_Earrings'
+
+test_datasets:
+    - name: 'val'
+      classname: datasets.celeba.CelebA
+      args:
+          split: 'val'
+            # pickle_file_path: 'celeba_pickle/celeba_full_pickle'
+    - name: 'test'
+      classname: datasets.celeba.CelebA
+      args:
+          split: 'test'
+            # pickle_file_path: 'celeba_pickle/celeba_full_pickle'
+  
+early_stop_dataset_names:
+    - 'val'
+    - 'test'
+

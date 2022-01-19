@@ -11,13 +11,11 @@ WORKSHEET_NAME = 'nlp::ananyak-fine-tuning'
 DOCKER_IMAGE = 'ananya/unlabeled-extrapolation'
 
 
-def run_sbatch(cmd, job_name, args, exclude=None,
-               nodes=1, gres='gpu:1', cpus_per_task=2, mem='16G', deps=[]):
+def run_sbatch(cmd, job_name, args, exclude=None, deps=[]):
     output_path = args.output_dir + '/' + job_name
     sbatch_script_path = args.scripts_dir + '/' + args.sbatch_script_name 
     slurm_cmd = f'sbatch --partition={args.partition} --job-name={job_name} --output={output_path} ' +\
-                f'--mail-type=END,FAIL --mail-user={args.mail_user} --nodes={nodes} ' +\
-                f'--gres={gres} --cpus-per-task={cpus_per_task} --mem={mem} '
+                f'--mail-type=END,FAIL --mail-user={args.mail_user} '
     deps = filter(lambda s: str(s) != '-1', deps)
     deps = [str(s) for s in deps]
     if len(deps) > 0:
@@ -441,6 +439,8 @@ def summarize_linprobe(adapt_name, dataset, model, args, deps, max_num=None):
 
 
 # If linprobe_secondary_val_metrics is None, use secondary_val_metrics.
+# TODO: slurm_data_dir should populate root_prefix in configs, which it
+# does not do at the moment.
 Dataset = namedtuple(
     'Dataset',
     ['name', 'val_metric', 'secondary_val_metrics', 'output_metrics',
@@ -458,6 +458,36 @@ living17 = Dataset(
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/source_val_living',
         'test_acc/target_val_living'],
     config_rel_path='adaptation/living17.yaml',
+    bundles=['imagenet'],
+    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
+    slurm_data_dir='/scr/biggest/',
+    eval_config_rel_path='adaptation/living17_eval.yaml')
+
+celeba = Dataset(
+    name='celeba',
+    val_metric='test_acc/val',
+    secondary_val_metrics=['test_acc/test', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/val',
+        'test_acc/test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
+        'test_acc/test'],
+    config_rel_path='adaptation/celeba.yaml',
+    bundles=['celeba_pickle'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/scr/biggest/',
+    eval_config_rel_path='adaptation/celeba_eval.yaml')
+
+living17_noaugs = Dataset(
+    name='living17_noaugs',
+    val_metric='test_acc/source_val_living',
+    secondary_val_metrics=['test_acc/target_val_living', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/source_val_living',
+        'test_acc/target_val_living'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/source_val_living',
+        'test_acc/target_val_living'],
+    config_rel_path='adaptation/living17_noaugs.yaml',
     bundles=['imagenet'],
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     slurm_data_dir='/scr/biggest/',
@@ -640,6 +670,8 @@ names_to_datasets = {
     'domainnet': domainnet,
     'fmow': fmow,
     'fmow_all': fmow_all,
+    'living17_noaugs': living17_noaugs,
+    'celeba': celeba,
     # 'landcover': landcover,
     # 'landcover_auxin': landcover_auxin,
 }
@@ -659,6 +691,14 @@ mocotp_fmow_resnet50 = Model(
         'checkpoint_rel_path': 'mocotp_checkpoint_0200.pth.tar'
     },
     bundles=['simclr_weights']
+)
+
+scratch_resnet50 = Model(
+    kwargs={
+        'classname': 'models.imnet_resnet.ResNet50',
+        'args.pretrained': False,
+    },
+    bundles=[]
 )
 
 moco_resnet50 = Model(
@@ -700,6 +740,18 @@ sup_resnet50 = Model(
     bundles=[]
 )
 
+# Version where we normalize inside the model.
+# TODO: ideally I think all normalization should be in the model...
+sup_resnet50_norm = Model(
+    kwargs={
+        'classname': 'models.imnet_resnet.ResNet50',
+        'args.pretrained': True,
+        'args.pretrain_style': 'supervised',
+        'args.normalize': True,
+    },
+    bundles=[]
+)
+
 clip_resnet50 = Model(
     kwargs={
         'classname': 'models.clip_model.ClipModel',
@@ -712,6 +764,15 @@ clip_vit_b16 = Model(
     kwargs={
         'classname': 'models.clip_model.ClipModel',
         'args.model_name': 'ViT-B/16',
+    },
+    bundles=[]
+)
+
+scratch_vit_b16_clipstyle = Model(
+    kwargs={
+        'classname': 'models.clip_model.ClipModel',
+        'args.model_name': 'ViT-B/16',
+        'args.scratch': True,
     },
     bundles=[]
 )
@@ -743,13 +804,16 @@ landcover_auxin = Model(
 )
 
 names_to_model = {
+    'scratch_resnet50': scratch_resnet50,
     'resnet50': moco_resnet50,
     'mocov1_resnet50': mocov1_resnet50,
     'swav_resnet50': swav_resnet50,
     'sup_resnet50': sup_resnet50,
+    'sup_resnet50_norm': sup_resnet50_norm,
     'mocotp_fmow_resnet50': mocotp_fmow_resnet50,
     'clip_resnet50': clip_resnet50,
     'clip_vit_b16': clip_vit_b16,
+    'scratch_vit_b16_clipstyle': scratch_vit_b16_clipstyle,
     'dino_vit_b16': dino_vit_b16,
     'landcover_baseline': landcover_baseline,
     'landcover_auxin': landcover_auxin,
@@ -801,6 +865,75 @@ def get_datasets(args):
         datasets = [names_to_datasets[n] for n in args.datasets]
     print(datasets)
     return datasets
+
+
+def fine_tuning_celeba_single_experiment(args, attribute_name, num_replications=3,
+                                  linear_probe=False, val_mode=False, final=True):
+    adapt_name = 'full_ft'
+    args.datasets = ['celeba']
+    datasets = get_datasets(args)
+    model = names_to_model[args.model_name]
+    sweep_lrs = SWEEP_LRS
+    if linear_probe:
+        adapt_name = 'torch_linprobe'
+        sweep_lrs = [3e-3, 1e-2, 3e-2, 1e-1, 3e-1, 1.0]
+        if args.model_name == 'clip_vit_b16' and final:
+            sweep_lrs = [0.01]  # We found this to be best on Wearing Earrings.
+    elif args.model_name == 'clip_vit_b16':
+        if final:
+            sweep_lrs = [3e-06]  # We found this to be best on Wearing Earrings.
+        else:
+            sweep_lrs = [1e-6, 3e-6, 1e-5, 3e-5, 1e-4, 3e-4]
+    elif args.model_name == 'scratch_vit_b16_clipstyle':
+        if final:
+            sweep_lrs = [0.003]  # We found this to be best on WearingEarrings.
+        else:
+            sweep_lrs = [3e-3, 1e-2, 3e-2, 1e-1, 3e-1, 1.0]
+    if args.epochs is not None:
+        adapt_name += '_epochs' + str(args.epochs)
+    adapt_name += '_' + attribute_name
+    # Set hyperparameters
+    if args.only_one_run:
+        hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs[0])
+        num_replications = 1
+        # Would be num_replications = 0 if we used adaptation_experiment below.
+    else:
+        hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
+    if val_mode:
+        hyperparams_list = append_to_each(hyperparams_list, {'use_net_val_mode': True})
+    hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
+    if linear_probe:
+        hyperparams_list = append_to_each(hyperparams_list, {'linear_probe': True})
+    if args.epochs is not None:
+        hyperparams_list = append_to_each(hyperparams_list, {'epochs': args.epochs})
+        hyperparams_list = append_to_each(hyperparams_list, {'scheduler.args.T_max': args.epochs})
+    if args.save_no_checkpoints:
+        hyperparams_list = append_to_each(hyperparams_list, {'save_no_checkpoints': True})
+    hyperparams_list = append_to_each(hyperparams_list, {'default_test_args.target_attribute': attribute_name})
+    hyperparams_list = append_to_each(hyperparams_list, {'train_dataset.args.target_attribute': attribute_name})
+    if args.no_replications:
+        num_replications = 1
+        # Would be num_replications = 0 if we used adaptation_experiment below.
+    for dataset in datasets:
+        all_ids = replicated_sweep(
+            adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
+            num_replications=num_replications, args=args, ignore_name_hypers={'checkpoint_path', 'default_test_args.target_attribute', 'train_dataset.args.target_attribute'})
+        print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
+
+
+def fine_tuning_celeba_experiments(args, linear_probe=True):
+    # fine_tuning_celeba_single_experiment(args, 'Wearing_Earrings', linear_probe=True, val_mode=True)
+    if linear_probe:
+        fine_tuning_celeba_single_experiment(args, 'Wearing_Earrings', num_replications=5, linear_probe=True, val_mode=True, final=True)
+        fine_tuning_celeba_single_experiment(args, 'Wearing_Necklace', num_replications=5, linear_probe=True, val_mode=True, final=True)
+        fine_tuning_celeba_single_experiment(args, 'Wearing_Necktie', num_replications=5, linear_probe=True, val_mode=True, final=True)
+        fine_tuning_celeba_single_experiment(args, 'Eyeglasses', num_replications=5, linear_probe=True, val_mode=True, final=True)
+    else:
+        fine_tuning_celeba_single_experiment(args, 'Wearing_Earrings', num_replications=5, final=True)
+        fine_tuning_celeba_single_experiment(args, 'Wearing_Necklace', num_replications=5, final=True)
+        fine_tuning_celeba_single_experiment(args, 'Wearing_Necktie', num_replications=5, final=True)
+        fine_tuning_celeba_single_experiment(args, 'Eyeglasses', num_replications=5, final=True)
+
 
 
 def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
@@ -919,6 +1052,11 @@ def fine_tuning_no_augmentation_experiments(args, num_replications=3):
 
 def torch_linprobe_experiments(args, num_replications=3):
     fine_tuning_experiments(args, num_replications=num_replications, linear_probe=True)
+
+
+def torch_linprobe_valmode_experiments(args, num_replications=3):
+    fine_tuning_experiments(args, num_replications=num_replications, linear_probe=True,
+                            val_mode=True)
 
 
 def side_tune_experiments(args, num_replications=3):
@@ -1046,6 +1184,11 @@ def spray_dataset_jags(copy_cmd):
         subprocess.run(cmd, shell=True)
 
 
+def spray_celeba_jags(args):
+    spray_dataset_jags(
+        f'source {args.scripts_dir}/copy_local.sh /u/scr/ananya/celeba.tar.gz')
+
+
 def spray_fmow_jags(args):
     spray_dataset_jags(
         f'source {args.scripts_dir}/copy_local.sh /u/scr/nlp/wilds/data/fmow_v1.1.tar.gz wilds/data')
@@ -1066,10 +1209,12 @@ def spray_domainnet_jags(args):
 
 def main(args):
     experiment_to_fns = {
+        'spray_celeba_jags': spray_celeba_jags,
         'spray_fmow_jags': spray_fmow_jags,
         'spray_imagenet_jags': spray_imagenet_jags,
         'spray_domainnet_jags': spray_domainnet_jags,
         'fine_tuning_experiments': fine_tuning_experiments,
+        'fine_tuning_celeba_experiments': fine_tuning_celeba_experiments,
         'linprobe_experiments': linprobe_experiments,
         'linprobe_experiments_no_aug': linprobe_experiments_no_aug,
         'lp_then_ft_experiments': lp_then_ft_experiments,
@@ -1079,6 +1224,7 @@ def main(args):
         'lp_then_ft_usenewbnstats_experiments': lp_then_ft_usenewbnstats_experiments,
         'lp_then_ft_valmode_experiments': lp_then_ft_valmode_experiments,
         'torch_linprobe_experiments': torch_linprobe_experiments,
+        'torch_linprobe_valmode_experiments': torch_linprobe_valmode_experiments,
         'batchnorm_ft_experiments': batchnorm_ft_experiments,
         'ft_higher_linear_lr_experiments': ft_higher_linear_lr_experiments,
         'ft_val_mode_experiment': ft_val_mode_experiment,

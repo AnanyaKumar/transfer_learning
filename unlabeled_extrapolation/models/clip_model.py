@@ -5,6 +5,8 @@ import torchvision.models as models
 from torchvision.models import resnet50
 import torch
 from torch import nn
+import os
+
 from . import model_utils
 
 from torchvision.transforms import Normalize
@@ -17,15 +19,62 @@ normalize_transform = Normalize(
     std=(0.26862954, 0.26130258, 0.27577711))
 
 
+def build_model_scratch(model_name, device):
+    model_path = clip.clip._download(clip.clip._MODELS[model_name], os.path.expanduser("~/.cache/clip"))
+    model = torch.jit.load(model_path, map_location="cpu").eval()
+    state_dict = model.state_dict()
+
+    vit = "visual.proj" in state_dict
+
+    if vit:
+        vision_width = state_dict["visual.conv1.weight"].shape[0]
+        vision_layers = len([k for k in state_dict.keys() if k.startswith("visual.") and k.endswith(".attn.in_proj_weight")])
+        vision_patch_size = state_dict["visual.conv1.weight"].shape[-1]
+        grid_size = round((state_dict["visual.positional_embedding"].shape[0] - 1) ** 0.5)
+        image_resolution = vision_patch_size * grid_size
+    else:
+        counts: list = [len(set(k.split(".")[2] for k in state_dict if k.startswith(f"visual.layer{b}"))) for b in [1, 2, 3, 4]]
+        vision_layers = tuple(counts)
+        vision_width = state_dict["visual.layer1.0.conv1.weight"].shape[0]
+        output_width = round((state_dict["visual.attnpool.positional_embedding"].shape[0] - 1) ** 0.5)
+        vision_patch_size = None
+        assert output_width ** 2 + 1 == state_dict["visual.attnpool.positional_embedding"].shape[0]
+        image_resolution = output_width * 32
+
+    embed_dim = state_dict["text_projection"].shape[1]
+    context_length = state_dict["positional_embedding"].shape[0]
+    vocab_size = state_dict["token_embedding.weight"].shape[0]
+    transformer_width = state_dict["ln_final.weight"].shape[0]
+    transformer_heads = transformer_width // 64
+    transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith(f"transformer.resblocks")))
+
+    model = clip.model.CLIP(
+        embed_dim,
+        image_resolution, vision_layers, vision_width, vision_patch_size,
+        context_length, vocab_size, transformer_width, transformer_heads, transformer_layers
+    )
+
+    for key in ["input_resolution", "context_length", "vocab_size"]:
+        if key in state_dict:
+            del state_dict[key]
+
+    clip.model.convert_weights(model)
+    return model.eval().to(device)
+
+
 class ClipModel(nn.Module):
 
-    def __init__(self, model_name):
+    def __init__(self, model_name, scratch=False):
+        # If scratch is True, then we randomly initialize weights.
         super().__init__()
         if model_name not in MODELS:
             raise ValueError(f'model_name must be in {MODELS} but was {model_name}')
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         # Note that model has both a language and vision part.
-        model, _ = clip.load(model_name, device=self._device)
+        if scratch:
+            model = build_model_scratch(model_name, device=self._device)
+        else:
+            model, _ = clip.load(model_name, device=self._device)
         self._model = model
         self._model.visual.float()
         self._classifier = None

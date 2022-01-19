@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=24G
+#SBATCH --mem=16G
 #SBATCH --exclude=jagupard[15,18]
 # #SBATCH --exclude=jagupard[14,17,18,20]
 

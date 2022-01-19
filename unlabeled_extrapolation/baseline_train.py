@@ -49,7 +49,8 @@ def get_argmax_valid(logits, valid_indices):
     return preds
 
 
-def get_test_stats(config, net, test_loader, criterion, device, max_examples=float('infinity')):
+def get_test_stats(config, net, test_loader, criterion, device, epoch, loader_name, log_dir,
+                   max_examples=float('infinity')):
     # Evaluate accuracy and loss on validation.
     # Returns right after we've seen at least max_examples examples (not batches).
     val_loss = Accumulator()
@@ -57,6 +58,9 @@ def get_test_stats(config, net, test_loader, criterion, device, max_examples=flo
     training_state = net.training
     net.eval()
     num_examples = 0
+    if 'save_model_preds' in config and config.save_model_preds:
+        predicted_list = []
+        labels_list = []
     with torch.no_grad():
         for data in test_loader:
             if config['use_cuda']:
@@ -71,6 +75,9 @@ def get_test_stats(config, net, test_loader, criterion, device, max_examples=flo
             else:
                 _, predicted = torch.max(outputs.data, dim=1)
                 predicted = predicted.detach().cpu().numpy()
+            if 'save_model_preds' in config and config.save_model_preds:
+                predicted_list.append(predicted)
+                labels_list.append(labels.detach().cpu().numpy())
             correct = (predicted == labels.detach().cpu().numpy())
             val_acc.add_values(correct.tolist())
             loss = criterion(outputs, labels).cpu()
@@ -80,6 +87,11 @@ def get_test_stats(config, net, test_loader, criterion, device, max_examples=flo
             if num_examples >= max_examples:
                 logging.info("Breaking after %d examples.", num_examples)
                 break
+    if 'save_model_preds' in config and config.save_model_preds:
+        preds = np.concatenate(predicted_list)
+        labels = np.concatenate(labels_list)
+        pickle_name = log_dir+'/model_preds/'+loader_name+'_'+str(epoch)+'_preds.pkl'
+        pickle.dump((preds, labels), open(pickle_name, "wb"))
     reset_state(net, training_state)
     return val_loss, val_acc
 
@@ -96,7 +108,7 @@ def update_best_stats(stats, best_stats):
             best_stats[best_k] = v
 
 
-def get_test_loaders(config, shuffle=True):
+def get_test_loaders(config, shuffle=False):
     test_loaders = {}
     max_test_examples = {}
     logging.info('Found %d testing datasets.', len(config['test_datasets']))
@@ -276,7 +288,7 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
         if 'test_interval' in config and should_log(config['test_interval']):
             stats = get_all_test_stats(
                 test_loaders, max_test_examples, config, net, criterion, device,
-                loss_name_prefix='inter_test_loss/', acc_name_prefix='inter_test_acc/')
+                log_dir=log_dir, loss_name_prefix='inter_test_loss/', acc_name_prefix='inter_test_acc/')
             if config['wandb']:
                 wandb.log(stats)
     reset_state(net, training_state)
@@ -287,7 +299,7 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
 
 
 def get_all_test_stats(epoch, test_loaders, max_test_examples, config, net, criterion, device,
-                   loss_name_prefix, acc_name_prefix):
+                       log_dir, loss_name_prefix, acc_name_prefix):
     stats = {'epoch': epoch}
     for name, test_loader in test_loaders.items():
         logging.info(f'testing {name}')
@@ -295,8 +307,8 @@ def get_all_test_stats(epoch, test_loaders, max_test_examples, config, net, crit
         if name in max_test_examples:
             max_examples = max_test_examples[name]
         val_loss, val_acc = get_test_stats(
-            config, net, test_loader, criterion, device,
-            max_examples=max_examples)
+            config, net, test_loader, criterion, device, epoch, name,
+            log_dir=log_dir, max_examples=max_examples)
         # So this will look something like 'test_loss/cinic', 'test_acc/cinic'.
         stats[loss_name_prefix + name] = val_loss.get_mean()
         stats[acc_name_prefix + name] = val_acc.get_mean()
@@ -365,7 +377,7 @@ def main(config, log_dir, checkpoints_dir):
     # First argument is epoch.
     test_stats = get_all_test_stats(
         0, test_loaders, max_test_examples, config, net, criterion, device,
-        loss_name_prefix='test_loss/', acc_name_prefix='test_acc/')
+        log_dir=log_dir, loss_name_prefix='test_loss/', acc_name_prefix='test_acc/')
     # Log stats.
     logging.info('Initial test stats')
     logging.info(test_stats)
@@ -391,7 +403,7 @@ def main(config, log_dir, checkpoints_dir):
         # Get test stats across all test sets.
         test_stats = get_all_test_stats(
             epoch, test_loaders, max_test_examples, config, net, criterion, device,
-            loss_name_prefix='test_loss/', acc_name_prefix='test_acc/')
+            log_dir=log_dir, loss_name_prefix='test_loss/', acc_name_prefix='test_acc/')
         # Keep track of the best stats.
         update_best_stats(train_stats, best_stats)
         update_best_stats(test_stats, best_stats)
@@ -496,7 +508,7 @@ def update_train_transform(config):
         config['train_dataset']['transforms'] = config['default_test_transforms']
 
 
-def update_test_transform_configs(config):
+def update_test_transform_args_configs(config):
     # Use default test transform for test datasets that don't specify a transform.
     for test_dataset_config in config['test_datasets']:
         if 'transforms' not in test_dataset_config:
@@ -504,13 +516,17 @@ def update_test_transform_configs(config):
                 raise ValueError('Must either specify default_test_transforms '
                                  'or a transform for each test dataset')
             test_dataset_config['transforms'] = config['default_test_transforms']
+        if config['default_test_args'] is not None:
+            for default_test_arg in config['default_test_args']:
+                if default_test_arg not in test_dataset_config['args']:
+                    test_dataset_config['args'][default_test_arg] = config['default_test_args'][default_test_arg]
 
 
 def update_root_prefix(config):
     # Go through test datasets, and train dataset. If root_prefix specified, then prepend that
     # to the root.
     def apply_root_prefix(dataset_config, root_prefix):
-        for key in ['root', 'cache_path']:
+        for key in ['root', 'cache_path', 'pickle_file_path']:
             if key in dataset_config['args']:
                 orig_path = dataset_config['args'][key]
                 logging.info('orig_path %s', orig_path)
@@ -546,7 +562,7 @@ def preprocess_config(config, config_path):
         # If we don't specify a transform for some test datasets, but specify a default transform,
         # then use the default transform for that dataset. For datasets that do specify a transform
         # we use that and not the default transform.
-        update_test_transform_configs(config)
+        update_test_transform_args_configs(config)
         # If linear probing, by default we turn batch-norm off while training, if unspecified.
         # If you want bach-norm even when lin probing then set use_net_val_mode to False in the config.
         update_net_eval_mode(config)
@@ -611,6 +627,9 @@ def setup():
     # This makes specifying certain things more convenient, e.g. don't have to specify a
     # transform for every test datset.
     preprocess_config(config, args.config) 
+    # If we should save model preds, then save them.
+    if 'save_model_preds' in config and config.save_model_preds:
+        os.makedirs(log_dir + '/model_preds/')
     # Setup wandb.
     setup_wandb(args, config)
     # Set seed.

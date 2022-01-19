@@ -21,6 +21,7 @@ train_dataset:
               mean: [0.485, 0.456, 0.406]
               std: [0.228, 0.224, 0.225]
 
+    
 default_test_transforms:
     - classname: torchvision.transforms.Resize
       args:

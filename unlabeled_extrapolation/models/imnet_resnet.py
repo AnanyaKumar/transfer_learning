@@ -5,6 +5,7 @@ from torchvision.models import resnet50
 import torch
 from torch import nn
 from . import model_utils
+from torchvision.transforms import Normalize
 try:
     from models import swav_resnet50
 except:
@@ -12,6 +13,10 @@ except:
 
 
 PRETRAIN_STYLE = ['supervised', 'mocov2', 'swav', 'simclrv2']
+
+imnet_normalize_transform = Normalize(
+    mean=(0.485, 0.456, 0.406),
+    std=(0.228, 0.224, 0.225))
 
 
 def load_moco(checkpoint_path):
@@ -53,7 +58,7 @@ def load_swav(checkpoint_path):
 
 class ResNet50(nn.Module):
 
-    def __init__(self, pretrained=False, pretrain_style='supervised', checkpoint_path=None):
+    def __init__(self, pretrained=False, pretrain_style='supervised', checkpoint_path=None, normalize=False):
         super().__init__()
         if pretrain_style not in PRETRAIN_STYLE:
             raise ValueError(
@@ -67,6 +72,7 @@ class ResNet50(nn.Module):
         elif not pretrained or pretrain_style == 'supervised':
             self._model = resnet50(pretrained=pretrained)
         self._side_tuning = False
+        self._normalize = normalize
 
     def forward(self, x):
         if self._side_tuning:
@@ -109,6 +115,8 @@ class ResNet50(nn.Module):
     def get_features(self, x):
         # Note: For side-tuning, this gives the original pretrained features.
         # It's a big ambiguous what the 'features' are in that case.
+        if self._normalize:
+            x = imnet_normalize_transform(x) 
         features = self.get_feature_extractor()(x)
         return torch.reshape(features, (features.shape[0], -1))
 
