@@ -101,7 +101,7 @@ unset __conda_setup
 # <<< conda initialize <<<
 ```
 
-## Running code without slurm
+## Guide to our codebase
 
 The main script is in `experiments/baseline_train.py`. The script requires a YAML config
 file - an example is `configs/adaptation/living17.yaml`.
@@ -117,14 +117,14 @@ This makes things modularized if you have configs for a few datasets, and config
 Try not to make these nested by more than one or two levels
 (A inherits B, B inherits C, C inherits D, etc)
 
-If you base your config off of `configs/breeds_living_moco_probe.yaml` here are some important
+If you base your config off of `configs/adaptation/living17.yaml` here are some important
 args to keep in mind:
 - finetune: If fine-tuning, this should be True.
 - linear_probe: If only training the last linear layer (freeze lower layers), set True, for full fine-tuning set False
 - use_net_val_mode: True if you want to keep the network in "val" mode while training. This should usually be True for linear probing, to turn off batchnorm.
 - num_classes: Specifies the number of classes in the new task you're fine-tuning on.
 
-Notice that we inherit datasets_breeds_living.yaml, where we have:
+Notice that we inherit datasets_living17.yaml, where we have:
 - A train dataset, which we initialize using args, including a transform
 - We specify a list of transforms, which are applied top to bottom
 - We have a list of test_datasets, and we evaluate performance on all of these.
@@ -150,6 +150,8 @@ Benefits of framework:
 - Sets up and outputs to weights and biases
 - New: Saves the command line argument, and config, to run the experiment
 - New: Optionally, can save all the code used to run the experiment so you know exactly what you ran
+- New: can early stop based on a variety of metrics
+- New: track a variety of metrics, and produce a nice TSV with all the results
 
 Setup:
 - First install a virtualenv and activate it (instructions coming)
