@@ -1,0 +1,18 @@
+
+inherit:
+  - resnet50_transfer.yaml 
+  - datasets_domainnet.yaml
+
+num_classes: 40
+epochs: &epochs 50  # Very small dataset so run for longer.
+
+model:
+  classname: models.clip_model.ClipModel
+  args:
+    model_name: 'RN50'
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
+

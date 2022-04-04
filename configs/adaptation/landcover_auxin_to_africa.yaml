@@ -1,0 +1,18 @@
+
+inherit:
+  - landcover_transfer.yaml 
+  - datasets_landcover_auxin_to_africa.yaml
+
+num_classes: 6
+epochs: &epochs 400
+
+model:
+  classname: models.innout_models.CNN1D
+  args:
+    in_channels: 14
+    output_size: 6
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs

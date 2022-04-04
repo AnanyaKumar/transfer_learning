@@ -1,0 +1,58 @@
+
+root_prefix: '/u/scr/nlp/'
+
+# Add augmentations, and change normalization a bit.
+# The difference is swav augmentation has a 0.228 instead of 0.229 (lol)
+# Probably doesn't make a difference.
+train_dataset:
+    name: 'train'
+    classname: datasets.fmow.Fmow
+    args:
+        split: 'train'
+        regions: ['all'] 
+        root: 'wilds/data'
+    transforms:
+        - classname: torchvision.transforms.ToTensor
+        - classname: torchvision.transforms.Normalize
+          args:
+              mean: [0.485, 0.456, 0.406]
+              std: [0.2289, 0.224, 0.225]
+
+# Change transform (e.g. centercrop), and change normalization a bit.
+default_test_transforms:
+    - classname: torchvision.transforms.ToTensor
+    - classname: torchvision.transforms.Normalize
+      args:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+
+test_datasets:
+    - name: 'id_val'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'val'
+          regions: ['all']
+          root: 'wilds/data'
+    - name: 'ood_val'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'ood_val'
+          regions: ['all']
+          root: 'wilds/data'
+    - name: 'test'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'test'
+          regions: ['all']
+          root: 'wilds/data'
+
+    - name: 'africa_test'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'test'
+          regions: [2]
+          root: 'wilds/data'
+
+early_stop_dataset_names:
+    - 'id_val'
+    - 'ood_val'

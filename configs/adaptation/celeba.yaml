@@ -1,0 +1,19 @@
+
+inherit:
+  - resnet50_transfer.yaml 
+  - datasets_celeba.yaml
+
+num_classes: 2
+epochs: &epochs 10  # Maybe increase this later.
+batch_size: 32  # so we can run ViT on all jags.
+save_model_preds: True  # Save all model predictions.
+
+model:
+  classname: models.imnet_resnet.ResNet50
+  args: {}
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
+
