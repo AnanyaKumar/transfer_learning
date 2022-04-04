@@ -1,7 +1,0 @@
-
-inherit:
-  - breeds_living_moco_probe.yaml
-  - datasets_breeds_entity30.yaml
-
-num_classes: 30
-
