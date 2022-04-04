@@ -1,0 +1,41 @@
+
+root_prefix: '/u/scr/ananya/'
+
+train_dataset:
+    name: 'cifar-train'
+    classname: torchvision.datasets.CIFAR10
+    args:
+        train: True
+        download: False
+        root: 'cifar10_dataset'
+    transforms:
+        - classname: torchvision.transforms.Resize
+          args:
+              size: 224
+        - classname: torchvision.transforms.ToTensor
+
+default_test_transforms:
+    - classname: torchvision.transforms.Resize
+      args:
+          size: [224, 224]
+    - classname: torchvision.transforms.ToTensor
+
+test_datasets:
+    - name: 'cifar10-test'
+      classname: torchvision.datasets.CIFAR10
+      args:
+          train: False
+          download: False
+          root: 'cifar10_dataset/'
+    - name: 'stl-test'
+      classname: datasets.stl_cifar_style.STL10
+      args:
+          root: 'stl10_dataset/'
+          split: 'test'
+    - name: 'imnet-n-cifar'
+      classname: datasets.imnet_intersect_c10.ImNetnC10
+      args:
+          root: 'balanced_imnet_intersect_c10_val/'
+
+early_stop_dataset_names: {}
+

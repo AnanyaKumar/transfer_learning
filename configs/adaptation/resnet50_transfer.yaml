@@ -1,0 +1,23 @@
+
+log_interval: 5000
+use_cuda: True
+save_freq: 1001
+batch_size: 64
+num_workers: 4
+save_all_checkpoints: False
+
+finetune: True
+linear_probe: False
+use_net_val_mode: False
+
+optimizer:
+  classname: torch.optim.SGD
+  args:
+    lr: 0.03
+    momentum: 0.9
+
+criterion:
+  classname: torch.nn.CrossEntropyLoss
+  args:
+    reduction: mean
+

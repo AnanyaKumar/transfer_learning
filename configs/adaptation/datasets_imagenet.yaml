@@ -1,0 +1,61 @@
+
+root_prefix: ''
+
+# The train and test transforms are taken from the Swav fine-tuning script.
+train_dataset:
+    name: 'train'
+    classname: datasets.imagenet.ImageNet
+    args:
+        root: '/scr/biggest/imagenet/'
+        split: 'train'
+    transforms:
+        - classname: unlabeled_extrapolation.datasets.transforms.Resize
+          args:
+              size: 224
+              interpolation: 'bicubic'
+        - classname: torchvision.transforms.CenterCrop
+          args:
+              size: 224
+        - classname: torchvision.transforms.ToTensor
+
+default_test_transforms:
+    - classname: unlabeled_extrapolation.datasets.transforms.Resize
+      args:
+          size: 224
+          interpolation: 'bicubic'
+    - classname: torchvision.transforms.CenterCrop
+      args:
+          size: 224
+    - classname: torchvision.transforms.ToTensor
+
+test_datasets:
+    - name: 'val'
+      classname: datasets.imagenet.ImageNet
+      args:
+          root: '/scr/biggest/imagenet/'
+          split: 'val'
+    - name: 'renditions'
+      classname: datasets.imagenet.ImageNet
+      args:
+          root: '/u/scr/nlp/imagenet/'
+          split: 'imagenet-r'
+    - name: 'imagenet-a'
+      classname: datasets.imagenet.ImageNet
+      args:
+          root: '/u/scr/nlp/imagenet/'
+          split: 'imagenet-a'
+    - name: 'v2'
+      classname: datasets.imagenet.ImageNet
+      args:
+          root: '/u/scr/nlp/imagenet/'
+          split: 'imagenetv2-matched-frequency-format-val'
+    - name: 'sketch'
+      classname: datasets.imagenet.ImageNet
+      args:
+          root: '/u/scr/nlp/imagenet/'
+          split: 'sketch'
+
+
+early_stop_dataset_names:
+    - 'val'
+

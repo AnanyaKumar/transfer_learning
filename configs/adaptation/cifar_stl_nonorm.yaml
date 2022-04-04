@@ -1,0 +1,18 @@
+
+inherit:
+  - resnet50_transfer.yaml 
+  - datasets_cifar_stl_nonorm.yaml
+
+num_classes: 10
+epochs: &epochs 20
+save_no_checkpoints: True
+
+model:
+  classname: models.imnet_resnet.ResNet50
+  args: {}
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
+

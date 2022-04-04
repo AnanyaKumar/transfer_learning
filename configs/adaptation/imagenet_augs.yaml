@@ -1,0 +1,19 @@
+
+inherit:
+  - resnet50_transfer.yaml 
+  - datasets_imagenet_augs.yaml
+
+num_classes: 1000
+epochs: &epochs 10
+batch_size: 128
+  # save_no_checkpoints: True
+
+model:
+  classname: models.clip_model.ClipModel
+  args:
+    model_name: 'RN50'
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
