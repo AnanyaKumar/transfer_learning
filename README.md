@@ -73,7 +73,7 @@ For linear probing, you can first extract model features using unlabeled_extrapo
 
 ## Example run (without slurm)
 
-You can run the training code directly without slurm.
+You can run the fine-tuning code directly without slurm.
 
 ```
 export PYTHONPATH="."
