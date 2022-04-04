@@ -1,4 +1,14 @@
-## Steps to run an experiment
+Code for our ICLR (oral) paper:
+
+```
+Fine-Tuning can Distort Pretrained Features and Underperform Out-of-Distribution. 
+Ananya Kumar, Aditi Raghunathan, Robbie Jones, Tengyu Ma, Percy Liang. ICLR 2022.
+```
+
+
+This repository is still being improved and will be updated without backwards compatibility for now. However, we are releasing the code by popular demand.
+
+## Setup and installation
 
 The first time you run this project, in the current directory, which contains README, create a virtualenv:
 ```
@@ -17,8 +27,62 @@ wandb login
 wandb on
 ```
 
-### Alternative: 
-Use the `eix-ue` conda env. Make sure you have this following code in your `.bashrc`:
+## Running paper experiments (Slurm)
+
+The main experiments are in scripts/run_adaptation_experiments.py. For example, if you're on the Stanford NLP cluster, then you can run fine-tuning experiments on Living-17 as follows:
+
+```
+python scripts/run_adaptation_experiments.py --experiment=fine_tuning_experiments --datasets living17 --model_name=resnet50 --partition=jag-standard
+```
+
+For other slurm clusters, you will need to modify the sbatch file "run_sbatch.sh" and change the partition accordingly.
+
+To run LP-FT experiments:
+
+```
+python scripts/run_adaptation_experiments.py --experiment=lp_then_ft_valmode_experiments --datasets living17 --model_name=resnet50 --partition=jag-standard
+```
+
+To run linear probing experiments:
+
+```
+python scripts/run_adaptation_experiments.py --experiment=linprobe_experiments --datasets living17 --model_name=resnet50 --partition=jag-standard
+```
+
+This code may look complicated, but it's written to simplify launching and managing a large number of jobs on a cluster.
+For example, scripts/run_adaptation_experiments.py essentially contains the information to run every experiment in our paper, and exactly what information to track, on a Slurm cluster.
+
+After running the experiments, we have scripts that can produce a tsv file (e.g., which you can copy onto Excel or Google Sheets) with a detailed summary of all the runs (e.g., ID accuracy, OOD accuracy, when early stopping on a variety of metrics). For example, for Living17, run the following:
+
+```
+python  scripts/summarize_all_results.py --results_dir_glob=logs/*living17* --val_metrics test_acc/source_val_living test_acc/target_val_living LAST --output_metrics epoch train/acc test_acc/source_val_living test_acc/target_val_living --output_file=tmp.tsv 
+```
+
+The summary of all living17 runs will now be contained in tmp.tsv.
+
+## Configs
+
+The config files that specify hyperparameters are located in configs. Note that run_adaptation_experiments runs a sweep over these configs and therefore modifies the hyperparameters on configs. So consult run_adaptation_experiments.py for the hyperparameters used in the sweep.
+
+## Main code
+
+The main code for fine-tuning and LP-FT are in unlabeled_extrapolation/baseline_train.py.
+
+For linear probing, you can first extract model features using unlabeled_extrapolation/extract_features.py, and then train a logistic regression classifier using log_reg_sk.py.
+
+## Example run (without slurm)
+
+You can run the training code directly without slurm.
+
+```
+export PYTHONPATH="."
+. env/bin/python experiments/baseline_train.py --config=configs/adaptation/living17.yaml \\
+--log_dir=logs/living17_lr_0.003 --project_name=living17 --group_name=living17 \\
+--run_nameliving17_lr_0.003 --optimizer.args.lr=0.003
+```
+
+## Alternative setup (under construction): 
+Use the `ananya-ue` conda env. Make sure you have this following code in your `.bashrc`:
 ```
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
@@ -36,10 +100,10 @@ unset __conda_setup
 # <<< conda initialize <<<
 ```
 
-## Configs
+## Running code without slurm
 
 The main script is in `experiments/baseline_train.py`. The script requires a YAML config
-file - an example is `configs/breeds_living_moco_probe.yaml`.
+file - an example is `configs/adaptation/living17.yaml`.
 To dynamically change values of the config file with command line arguments,
 simply add new arguments of the form `--key=val` where the key can be any
 string of multiple keys separated by periods. This is to allow for changing
@@ -73,19 +137,10 @@ We also inherit resnet50_transfer.yaml which specifies the scheduler, learning r
 - save_freq is how often we should save checkpoints besides the best checkpoint. For these experiments, the config sets this to a high number so we don't save checkpoints besides the initial, final, and best (saving disk space)
 - model.args.pretrained is True, indicating that we initialize from a supervised Resnet50 model (pre-trained on ImageNet labels)
 
-## Example run
-
-```
-export PYTHONPATH="."
-. env/bin/python experiments/baseline_train.py --config=configs/breeds_living_moco_probe.yaml \\
---log_dir=logs/breeds_moco_linprobe_0.003 --project_name=breeds --group_name=breeds_moco_linprobe \\
---run_name=breeds_moco_linprobe_0.003 --optimizer.args.lr=0.003
-```
-
 # A Lightweight Framework for Training Models
 
-Adapted from Michael Xie's framework for "In-N-Out: Pre-Training and Self-Training using Auxiliary Information for Out-of-Distribution Robustness", 
-https://arxiv.org/abs/2012.04550, Sang Michael Xie*, Ananya Kumar*, Robbie Jones*, Fereshte Khani, Tengyu Ma, Percy Liang. Thanks to contributions by Robbie Jones.
+Adapted from the framework for "In-N-Out: Pre-Training and Self-Training using Auxiliary Information for Out-of-Distribution Robustness", 
+https://arxiv.org/abs/2012.04550, Sang Michael Xie*, Ananya Kumar*, Robbie Jones*, Fereshte Khani, Tengyu Ma, Percy Liang.
 
 Benefits of framework:
 - Config files to specify dataset, model, augmentations, and other arguments, for better readability and reproducibility
