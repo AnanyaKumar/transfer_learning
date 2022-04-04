@@ -1,4 +1,4 @@
-Code for our ICLR (oral) paper:
+Code for our paper:
 
 ```
 Fine-Tuning can Distort Pretrained Features and Underperform Out-of-Distribution. 
@@ -6,7 +6,8 @@ Ananya Kumar, Aditi Raghunathan, Robbie Jones, Tengyu Ma, Percy Liang. ICLR 2022
 ```
 
 
-This repository is still being improved and will be updated without backwards compatibility for now. However, we are releasing the code by popular demand.
+This paper will be published as an Oral at ICLR 2022.
+This repository is still being improved and will be updated without backwards compatibility for now. 
 
 ## Setup and installation
 
