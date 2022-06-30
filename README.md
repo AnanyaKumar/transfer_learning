@@ -141,7 +141,7 @@ We also inherit resnet50_transfer.yaml which specifies the scheduler, learning r
 # A Lightweight Framework for Training Models
 
 Adapted from the framework for "In-N-Out: Pre-Training and Self-Training using Auxiliary Information for Out-of-Distribution Robustness", 
-https://arxiv.org/abs/2012.04550, Sang Michael Xie*, Ananya Kumar*, Robbie Jones*, Fereshte Khani, Tengyu Ma, Percy Liang.
+https://arxiv.org/abs/2012.04550, Sang Michael Xie*, Ananya Kumar*, Robbie Jones*, Fereshte Khani, Tengyu Ma, Percy Liang. Thanks especially to Michael and Robbie!
 
 Benefits of framework:
 - Config files to specify dataset, model, augmentations, and other arguments, for better readability and reproducibility
