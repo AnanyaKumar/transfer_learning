@@ -22,6 +22,18 @@ def get_parent_folder(file_path):
 
 def get_result(file_path, val_metric, output_metrics, take_max=True):
     df = pd.read_csv(file_path, sep='\t')
+    # The user probably wants us to output the val metric!
+    if val_metric not in output_metrics and val_metric != 'LAST':
+        output_metrics += val_metric
+    # If needed, compute the worst among all the test_accs.
+    # That is, if the user is selecting for this metric or wants it displayed.
+    # I guess val_metric == 'WORST' is redundant given the previous line which will
+    # add it to output_metrics, but just keeping it here in case I fiddle around with
+    # the previous line later.
+    if val_metric == 'WORST' or 'WORST' in output_metrics:
+        test_acc_column_names = [s for s in df.columns if 'test_acc' in s]
+        worst_accs = df[test_acc_column_names].min(axis=1)
+        df['WORST'] = worst_accs
     if val_metric is not None and val_metric != 'LAST':
         if val_metric not in df:
             raise ValueError(f'{val_metric} column not in {file_path}')

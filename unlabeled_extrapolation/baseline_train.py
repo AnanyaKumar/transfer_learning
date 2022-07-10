@@ -25,7 +25,7 @@ import numpy as np
 from unlabeled_extrapolation.models import resnet
 from unlabeled_extrapolation.utils.accumulator import Accumulator
 import unlabeled_extrapolation.utils.utils as utils
-
+from timm.data.mixup import Mixup
 
 log_level = logging.INFO
 
@@ -149,11 +149,15 @@ def build_model(config):
     # If fine-tune, re-initialize the last layer.
     finetune = 'finetune' in config and config['finetune']
     linear_probe = 'linear_probe' in config and config['linear_probe']
+    freeze_bottom_k = 'freeze_bottom_k' in config
     batch_norm = 'batchnorm_ft' in config and config['batchnorm_ft']
     side_tune = 'side_tune' in config and config['side_tune']
     def count_parameters(model, trainable):
         return sum(p.numel() for p in model.parameters() if p.requires_grad == trainable)
     if finetune or linear_probe or batch_norm or side_tune:
+        if freeze_bottom_k:
+            # Currently only implemented for some models (including CLIP ViTs).
+           net.freeze_bottom_k(config['freeze_bottom_k']) 
         if linear_probe:
             logging.info('linear probing, freezing bottom layers.')
             # If unspecified, we set use_net_val_mode = True for linear-probing.
@@ -183,6 +187,18 @@ def build_model(config):
             config['linear_probe_checkpoint_path'] != ''):
             linprobe_path = config['linear_probe_checkpoint_path']
             coef, intercept, best_c, best_i = pickle.load(open(linprobe_path, "rb"))
+            if coef.shape[0] == 1:
+                # For binary classification, sklearn returns a 1-d weight
+                # vector. So we convert it into a 2D vector with the same
+                # logits. To see this conversion, notice that if I have a
+                # binary weight vector w, the output is \sigma(w^T x)
+                # = e^(w^T x) / (1 + e^(w^T x)). On the other hand,
+                # if I have weight vector [w/2, -w/2], and I use softmax
+                # I get e^(w^T x / 2) / (e^(w^T x / 2) + e^(-w^T x / 2)
+                # and multiplying num / denom by e^(w^T x / 2)
+                # we get the same expression as above.
+                coef = np.concatenate((-coef/2, coef/2), axis=0)
+                intercept = np.array([-intercept[0]/2, intercept[0]/2])
             if 'normalize_lp' in config and config['normalize_lp']:
                 logging.info("Normalizing linear probe std-dev")
                 saved_stddev = np.std(coef)
@@ -248,6 +264,14 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
     if 'model_loss' in config:
         loss_dict['train/model_loss'] = Accumulator()
     num_examples = 0
+    if 'use_mixup' in config and config['use_mixup']:
+        logging.info('Using mixup')
+        # Hack for older versions of torch. Use KL-div loss instead of cross-entropy,
+        # because mixup produces soft labels.
+        if 'mixup_alpha' in config:
+            mixup = Mixup(num_classes=config['num_classes'], mixup_alpha=config['mixup_alpha'])
+        else:
+            mixup = Mixup(num_classes=config['num_classes'])
     for i, data in enumerate(train_loader, 0):
         if 'use_net_val_mode' in config and config['use_net_val_mode']:
             net.eval()
@@ -257,6 +281,8 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
         if config['use_cuda']:
             data = utils.to_device(data, device)
         inputs, labels = data
+        if 'use_mixup' in config and config['use_mixup']:
+            inputs, labels = mixup(inputs, labels)
         optimizer.zero_grad()
         outputs = net(inputs)
         loss = criterion(outputs, labels)
@@ -267,7 +293,11 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
             loss += l2sp_loss
         _, train_preds = torch.max(outputs.data, axis=1)
         loss_dict['train/loss'].add_value(loss.tolist())
-        loss_dict['train/acc'].add_values((train_preds == labels).tolist())
+        if 'use_mixup' in config and config['use_mixup']:
+            _, max_labels = torch.max(labels.data, axis=1)
+            loss_dict['train/acc'].add_values((train_preds == max_labels).tolist())
+        else:
+            loss_dict['train/acc'].add_values((train_preds == labels).tolist())
         if 'model_loss' in config:
             opt_loss = model_loss(net, inputs, labels)
             opt_loss.backward()
@@ -516,7 +546,7 @@ def update_test_transform_args_configs(config):
                 raise ValueError('Must either specify default_test_transforms '
                                  'or a transform for each test dataset')
             test_dataset_config['transforms'] = config['default_test_transforms']
-        if config['default_test_args'] is not None:
+        if 'default_test_args' in config and config['default_test_args'] is not None:
             for default_test_arg in config['default_test_args']:
                 if default_test_arg not in test_dataset_config['args']:
                     test_dataset_config['args'][default_test_arg] = config['default_test_args'][default_test_arg]

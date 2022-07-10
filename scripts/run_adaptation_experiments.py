@@ -463,6 +463,21 @@ living17 = Dataset(
     slurm_data_dir='/scr/biggest/',
     eval_config_rel_path='adaptation/living17_eval.yaml')
 
+living17_mixup = Dataset(
+    name='living17_mixup',
+    val_metric='test_acc/source_val_living',
+    secondary_val_metrics=['test_acc/target_val_living', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/source_val_living',
+        'test_acc/target_val_living'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/source_val_living',
+        'test_acc/target_val_living'],
+    config_rel_path='adaptation/living17_mixup.yaml',
+    bundles=['imagenet'],
+    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
+    slurm_data_dir='/scr/biggest/',
+    eval_config_rel_path='adaptation/living17_mixup_eval.yaml')
+
 celeba = Dataset(
     name='celeba',
     val_metric='test_acc/val',
@@ -477,6 +492,41 @@ celeba = Dataset(
     slurm_data_cmd=None,
     slurm_data_dir='/scr/biggest/',
     eval_config_rel_path='adaptation/celeba_eval.yaml')
+
+waterbirds = Dataset(
+    name='waterbirds',
+    val_metric='test_acc/val',
+    secondary_val_metrics=['LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    config_rel_path='adaptation/waterbirds.yaml',
+    bundles=['waterbirds_pickle'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    eval_config_rel_path='adaptation/waterbirds_eval.yaml')
+
+waterbirds_augs = Dataset(
+    name='waterbirds_augs',
+    val_metric='test_acc/val',
+    secondary_val_metrics=['LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    config_rel_path='adaptation/waterbirds_augs.yaml',
+    bundles=['waterbirds_pickle'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    eval_config_rel_path='adaptation/waterbirds_augs_eval.yaml')
+
 
 living17_noaugs = Dataset(
     name='living17_noaugs',
@@ -662,6 +712,7 @@ landcover_auxin = Dataset(
 names_to_datasets = {
     'living17': living17,
     'living17_nonorm': living17_nonorm,
+    'living17_mixup': living17_mixup,
     'entity30': entity30,
     'imagenet': imagenet,
     'imagenet_augs': imagenet_augs,
@@ -672,6 +723,8 @@ names_to_datasets = {
     'fmow_all': fmow_all,
     'living17_noaugs': living17_noaugs,
     'celeba': celeba,
+    'waterbirds': waterbirds,  # This dataset doesn't normalize.
+    'waterbirds_augs': waterbirds_augs,  # This data doesn't normalize.
     # 'landcover': landcover,
     # 'landcover_auxin': landcover_auxin,
 }
@@ -768,10 +821,27 @@ clip_vit_b16 = Model(
     bundles=[]
 )
 
+clip_vit_l14 = Model(
+    kwargs={
+        'classname': 'models.clip_model.ClipModel',
+        'args.model_name': 'ViT-L/14',
+    },
+    bundles=[]
+)
+
 scratch_vit_b16_clipstyle = Model(
     kwargs={
         'classname': 'models.clip_model.ClipModel',
         'args.model_name': 'ViT-B/16',
+        'args.scratch': True,
+    },
+    bundles=[]
+)
+
+scratch_vit_l14_clipstyle = Model(
+    kwargs={
+        'classname': 'models.clip_model.ClipModel',
+        'args.model_name': 'ViT-L/14',
         'args.scratch': True,
     },
     bundles=[]
@@ -813,6 +883,7 @@ names_to_model = {
     'mocotp_fmow_resnet50': mocotp_fmow_resnet50,
     'clip_resnet50': clip_resnet50,
     'clip_vit_b16': clip_vit_b16,
+    'clip_vit_l14': clip_vit_l14,
     'scratch_vit_b16_clipstyle': scratch_vit_b16_clipstyle,
     'dino_vit_b16': dino_vit_b16,
     'landcover_baseline': landcover_baseline,
@@ -938,7 +1009,7 @@ def fine_tuning_celeba_experiments(args, linear_probe=True):
 
 def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
                             val_mode=False, no_augmentation=False, l2sp=False, side_tune=False,
-                            imagenet_lp_ft_phase2=False):
+                            imagenet_lp_ft_phase2=False, mixup_sweep=False):
     adapt_name = 'full_ft'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
@@ -950,6 +1021,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
             sweep_lrs = [0.00001, 0.00003, 0.0001]
         else:
             sweep_lrs = [0.0001, 0.0003, 0.001]
+    if 'waterbirds' in args.datasets or 'waterbirds_augs' in args.datasets:
+        sweep_lrs += [1e-5]
     if side_tune:
         adapt_name += '_side_tune'
         sweep_lrs = sweep_lrs + [3e-2, 1e-1, 3e-1, 1.0, 3.0, 10.0]
@@ -982,10 +1055,15 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     # Set hyperparameters
     if args.only_one_run:
         # TODO: how to choose which one to run? 1e-3 does well in practice.
-        hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs[0])
+        hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
         # TODO: remove this?
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
+    elif mixup_sweep:
+        lr_hypers = range_hyper('optimizer.args.lr', sweep_lrs)
+        # TODO: add 1.0 to this as well.
+        mixup_alpha_hypers = range_hyper('mixup_alpha', [0.5])
+        hyperparams_list = product_dict_lists(lr_hypers, mixup_alpha_hypers)
     else:
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
     if side_tune:
@@ -994,6 +1072,10 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         hyperparams_list = append_to_each(hyperparams_list, {'no_augmentation': True})
     if val_mode:
         hyperparams_list = append_to_each(hyperparams_list, {'use_net_val_mode': True})
+    if args.freeze_bottom_k is not None:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'freeze_bottom_k': args.freeze_bottom_k})
+        adapt_name += '_freeze_bottom_' + str(args.freeze_bottom_k)
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
     if linear_probe:
         hyperparams_list = append_to_each(hyperparams_list, {'linear_probe': True})
@@ -1034,6 +1116,11 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
             num_replications=num_replications, args=args, ignore_name_hypers={'checkpoint_path'})
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
+
+
+def fine_tuning_mixup_sweep_experiments(args, num_replications=3):
+    fine_tuning_experiments(args, num_replications=num_replications,
+                            mixup_sweep=True)
 
 
 def ft_imnet_lp_ft_phase_2_experiments(args, num_replications=3):
@@ -1135,6 +1222,10 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
     if val_mode:
         hyperparams_list = append_to_each(hyperparams_list, {'use_net_val_mode': True})
+    if args.freeze_bottom_k is not None:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'freeze_bottom_k': args.freeze_bottom_k})
+        adapt_name += '_freeze_bottom_' + str(args.freeze_bottom_k)
     if args.no_replications:
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
@@ -1234,6 +1325,7 @@ def main(args):
         'side_tune_val_mode_experiments': side_tune_val_mode_experiments,
         'ft_imnet_lp_ft_phase_2_experiments': ft_imnet_lp_ft_phase_2_experiments,
         'ft_imnet_lp_ft_phase_2_val_mode_experiments': ft_imnet_lp_ft_phase_2_val_mode_experiments,
+        'fine_tuning_mixup_sweep_experiments': fine_tuning_mixup_sweep_experiments,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)
@@ -1294,6 +1386,8 @@ if __name__ == "__main__":
                         help='Datasets to test on (if unspecified, run on all).', required=False)
     parser.add_argument('--model_name', type=str, default='resnet50',  # This is moco resnet.
                         help='Model to use', required=False)
+    parser.add_argument('--freeze_bottom_k', type=int, required=False, default=None,
+                        help='Freeze bottom k layers (if not specified, don\'t freeze)')
     parser.add_argument('--only_one_run', action='store_true',
                         help=('Only run one hyperparameter setting, e.g. for debugging'
                               '(also do not run replications).'), required=False)
