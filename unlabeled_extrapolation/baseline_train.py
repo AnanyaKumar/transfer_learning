@@ -144,6 +144,10 @@ def get_train_loader(config, shuffle=True):
     return train_loader
 
 
+def count_parameters(model, trainable):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad == trainable)
+
+
 def build_model(config):
     net = utils.initialize(config['model'])
     # If fine-tune, re-initialize the last layer.
@@ -152,8 +156,6 @@ def build_model(config):
     freeze_bottom_k = 'freeze_bottom_k' in config
     batch_norm = 'batchnorm_ft' in config and config['batchnorm_ft']
     side_tune = 'side_tune' in config and config['side_tune']
-    def count_parameters(model, trainable):
-        return sum(p.numel() for p in model.parameters() if p.requires_grad == trainable)
     if finetune or linear_probe or batch_norm or side_tune:
         if freeze_bottom_k:
             # Currently only implemented for some models (including CLIP ViTs).
@@ -247,6 +249,11 @@ def get_param_weights_counts(net, detach):
             weight_dict[name] = weights
         count_dict[name] = np.prod(np.array(list(param[1].shape)))
     return weight_dict, count_dict
+
+
+def set_requires_grad(component, val):
+    for param in component.parameters():
+        param.requires_grad = val
 
 
 def train(epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
@@ -425,6 +432,14 @@ def main(config, log_dir, checkpoints_dir):
             if (prev_ckp_path is not None and not(config['save_all_checkpoints'])):
                 os.remove(prev_ckp_path)
             prev_ckp_path = checkpoints_dir / cur_ckp_filename
+        # User might specify an epoch for us to fully fine-tune the model.
+        if "full_ft_epoch" in config and config["full_ft_epoch"] is not None:
+            if epoch == config["full_ft_epoch"]:
+                set_requires_grad(net, True) 
+                num_trainable_params = count_parameters(net, True)
+                num_params = count_parameters(net, False) + num_trainable_params
+                assert(num_trainable_params == num_params)
+                logging.info(f'Full FT {num_trainable_params} of {num_params} parameters.')
         # One epoch of model training.
         train_stats = train(
            epoch, config, train_loader, net, device, optimizer, criterion, model_loss,

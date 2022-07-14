@@ -1076,6 +1076,10 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         hyperparams_list = append_to_each(
             hyperparams_list, {'freeze_bottom_k': args.freeze_bottom_k})
         adapt_name += '_freeze_bottom_' + str(args.freeze_bottom_k)
+    if args.full_ft_epoch is not None:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'full_ft_epoch': args.full_ft_epoch})
+        adapt_name += '_full_ft_epoch_' + str(args.full_ft_epoch)
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
     if linear_probe:
         hyperparams_list = append_to_each(hyperparams_list, {'linear_probe': True})
@@ -1387,7 +1391,9 @@ if __name__ == "__main__":
     parser.add_argument('--model_name', type=str, default='resnet50',  # This is moco resnet.
                         help='Model to use', required=False)
     parser.add_argument('--freeze_bottom_k', type=int, required=False, default=None,
-                        help='Freeze bottom k layers (if not specified, don\'t freeze)')
+                        help='Freeze bottom k layers (if not specified, don\'t freeze).')
+    parser.add_argument('--full_ft_epoch', type=int, required=False, default=None,
+                        help='At what epoch should we unfreeze all weights and fine-tune.')
     parser.add_argument('--only_one_run', action='store_true',
                         help=('Only run one hyperparameter setting, e.g. for debugging'
                               '(also do not run replications).'), required=False)
