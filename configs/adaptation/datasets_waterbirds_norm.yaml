@@ -1,0 +1,80 @@
+
+root_prefix: '/u/scr/nlp/'
+
+# The train and test transforms are taken from the Swav fine-tuning script.
+train_dataset:
+    name: 'train'
+    classname: datasets.wilds.WILDS
+    args:
+        root: 'wilds/data/'
+        dataset_name: 'waterbirds'
+        split: 'train'
+    transforms:
+        - classname: unlabeled_extrapolation.datasets.transforms.Resize
+          args:
+              size: 224
+              interpolation: 'bicubic'
+        - classname: torchvision.transforms.CenterCrop
+          args:
+              size: 224
+        - classname: torchvision.transforms.ToTensor
+        - classname: torchvision.transforms.Normalize
+          args:
+              mean: [0.485, 0.456, 0.406]
+              std: [0.228, 0.224, 0.225]
+
+
+default_test_transforms:
+    - classname: unlabeled_extrapolation.datasets.transforms.Resize
+      args:
+          size: 224
+          interpolation: 'bicubic'
+    - classname: torchvision.transforms.CenterCrop
+      args:
+          size: 224
+    - classname: torchvision.transforms.ToTensor
+    - classname: torchvision.transforms.Normalize
+      args:
+          mean: [0.485, 0.456, 0.406]
+          std: [0.228, 0.224, 0.225]
+
+
+test_datasets:
+    - name: 'val'
+      classname: datasets.wilds.WILDS
+      args:
+          root: '/wilds/data/'
+          dataset_name: 'waterbirds'
+          split: 'val'
+    - name: 'landbg-landbird-test'
+      classname: datasets.wilds.WILDS
+      args:
+          root: '/wilds/data/'
+          dataset_name: 'waterbirds'
+          split: 'test'
+          meta_selector: [0, 0, 0]
+    - name: 'landbg-waterbird-test'
+      classname: datasets.wilds.WILDS
+      args:
+          root: '/wilds/data/'
+          dataset_name: 'waterbirds'
+          split: 'test'
+          meta_selector: [0, 1, 0]
+    - name: 'waterbg-landbird-test'
+      classname: datasets.wilds.WILDS
+      args:
+          root: '/wilds/data/'
+          dataset_name: 'waterbirds'
+          split: 'test'
+          meta_selector: [1, 0, 0]   
+    - name: 'waterbg-waterbird-test'
+      classname: datasets.wilds.WILDS
+      args:
+          root: '/wilds/data/'
+          dataset_name: 'waterbirds'
+          split: 'test'
+          meta_selector: [1, 1, 0]
+
+early_stop_dataset_names:
+    - 'val'
+

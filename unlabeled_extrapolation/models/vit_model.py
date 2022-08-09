@@ -12,6 +12,11 @@ from torchvision.transforms import Normalize
 MODELS = {'dino_vits16', 'dino_vits8', 'dino_vitb16', 'dino_vitb8'}
 
 
+def set_requires_grad(component, val):
+    for param in component.parameters():
+        param.requires_grad = val
+
+
 class VitModel(nn.Module):
 
     def __init__(self, model_name):
@@ -31,6 +36,14 @@ class VitModel(nn.Module):
         if self._classifier is None:
             return features
         return self._classifier(features)
+
+    def freeze_bottom_k(self, k):
+        patch_embed = self._model.patch_embed
+        layers = [patch_embed, patch_embed]  # To streamline with CLIP ViT.
+        layers += list(self._model.blocks)
+        layers += [self._classifier]
+        for i in range(min(k, len(layers))):
+            set_requires_grad(layers[i], False)
 
     def set_requires_grad(self, val):
         for param in self._model.parameters():

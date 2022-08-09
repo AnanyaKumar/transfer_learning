@@ -697,4 +697,5 @@ if __name__ == "__main__":
         new_checkpoints_dir = log_dir + '/checkpoints'
         logging.info('Copying from %s to %s', checkpoints_dir, new_checkpoints_dir)
         shutil.copytree(checkpoints_dir, new_checkpoints_dir)
+    os.system('rm -r pymp*')
 
