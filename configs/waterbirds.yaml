@@ -1,0 +1,19 @@
+
+inherit:
+  - resnet50_transfer.yaml 
+  - datasets_waterbirds.yaml
+
+num_classes: 2
+epochs: &epochs 100
+batch_size: 64
+save_no_checkpoints: True
+
+model:
+  classname: models.clip_model.ClipModel
+  args:
+    model_name: 'ViT-B/16'
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs

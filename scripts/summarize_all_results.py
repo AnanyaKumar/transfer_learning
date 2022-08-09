@@ -73,7 +73,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # Get all folders satisfying glob.
     dir_paths = glob.glob(args.results_dir_glob, recursive=False)
-    dir_paths = [dir_path for dir_path in dir_paths if 'linprobe' not in dir_path]
+    dir_paths = [dir_path for dir_path in dir_paths if 'linprobe' not in dir_path or 'torch_linprobe' in dir_path]
     output = ''
     for val_metric in args.val_metrics:
         results, best, dirs = get_all_results(val_metric, dir_paths, args.output_metrics)

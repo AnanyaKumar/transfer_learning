@@ -12,7 +12,8 @@ from . import model_utils
 from torchvision.transforms import Normalize
 
 
-MODELS = {'RN50', 'RN101', 'RN50x4', 'RN50x16', 'ViT-B/32', 'ViT-B/16'}
+MODELS = {'RN50', 'RN101', 'RN50x4', 'RN50x16', 'ViT-B/32', 'ViT-B/16',
+          'ViT-L/14', 'ViT-L/14@336px'}
 
 normalize_transform = Normalize(
     mean=(0.48145466, 0.4578275, 0.40821073),
@@ -62,6 +63,11 @@ def build_model_scratch(model_name, device):
     return model.eval().to(device)
 
 
+def set_requires_grad(component, val):
+    for param in component.parameters():
+        param.requires_grad = val
+
+
 class ClipModel(nn.Module):
 
     def __init__(self, model_name, scratch=False):
@@ -75,6 +81,7 @@ class ClipModel(nn.Module):
             model = build_model_scratch(model_name, device=self._device)
         else:
             model, _ = clip.load(model_name, device=self._device)
+        self._model_name = model_name
         self._model = model
         self._model.visual.float()
         self._classifier = None
@@ -91,6 +98,38 @@ class ClipModel(nn.Module):
         if self._classifier is not None:
             for param in self._classifier.parameters():
                 param.requires_grad = val
+
+    def freeze_bottom_k(self, k):
+        if self._model_name in {'ViT-B/32', 'ViT-B/16',
+                                'ViT-L/14', 'ViT-L/14@336px'}:
+            if k > 0:
+                set_requires_grad(self._model.visual.conv1, False)
+            if k > 1:
+                set_requires_grad(self._model.visual.ln_pre, False)
+            if k > 2:
+                resblocks = self._model.visual.transformer.resblocks
+                n_freeze_transformers = min(k-2, len(resblocks))
+                for i in range(n_freeze_transformers):
+                    set_requires_grad(resblocks[i], False)
+                if k-2 > len(resblocks):
+                    set_requires_grad(self._model.visual.ln_post, False)
+        elif self._model_name in {'RN50'}:
+            visual = self._model.visual
+            if k > 0:
+                set_requires_grad(visual.conv1, False)
+                set_requires_grad(visual.conv2, False)
+                set_requires_grad(visual.conv3, False)
+                set_requires_grad(visual.bn1, False)
+                set_requires_grad(visual.bn2, False)
+                set_requires_grad(visual.bn3, False)
+            layers = [visual.layer1, visual.layer2, visual.layer3, visual.layer3,
+                      visual.attnpool]
+            if k > 1:
+                n_freeze_upper = min(k-1, len(layers))
+                for i in range(n_freeze_upper):
+                    set_requires_grad(layers[i], False)
+        else:
+            raise NotImplementedError
 
     def new_last_layer(self, num_classes):
         num_in_features = self._model.visual.output_dim
