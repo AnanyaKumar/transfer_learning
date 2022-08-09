@@ -1,0 +1,18 @@
+
+inherit:
+  - resnet50_transfer.yaml 
+  - datasets_living17.yaml
+
+num_classes: 17
+epochs: &epochs 20
+use_mixup: True
+
+model:
+  classname: models.imnet_resnet.ResNet50
+  args: {}
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
+
