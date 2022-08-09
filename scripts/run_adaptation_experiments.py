@@ -510,6 +510,23 @@ waterbirds = Dataset(
     slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_eval.yaml')
 
+waterbirds_norm = Dataset(
+    name='waterbirds_norm',
+    val_metric='test_acc/val',
+    secondary_val_metrics=['LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    config_rel_path='adaptation/waterbirds_norm.yaml',
+    bundles=['waterbirds_pickle'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    eval_config_rel_path='adaptation/waterbirds_norm_eval.yaml')
+
 waterbirds_augs = Dataset(
     name='waterbirds_augs',
     val_metric='test_acc/val',
@@ -724,7 +741,8 @@ names_to_datasets = {
     'living17_noaugs': living17_noaugs,
     'celeba': celeba,
     'waterbirds': waterbirds,  # This dataset doesn't normalize.
-    'waterbirds_augs': waterbirds_augs,  # This data doesn't normalize.
+    'waterbirds_augs': waterbirds_augs,  # This dataset doesn't normalize.
+    'waterbirds_norm': waterbirds_norm,  # This dataset normalizes.
     # 'landcover': landcover,
     # 'landcover_auxin': landcover_auxin,
 }
@@ -1021,7 +1039,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
             sweep_lrs = [0.00001, 0.00003, 0.0001]
         else:
             sweep_lrs = [0.0001, 0.0003, 0.001]
-    if 'waterbirds' in args.datasets or 'waterbirds_augs' in args.datasets:
+    if ('waterbirds' in args.datasets or 'waterbirds_augs' in args.datasets or
+        'waterbirds_norm' in args.datasets):
         sweep_lrs += [1e-5]
     if side_tune:
         adapt_name += '_side_tune'
@@ -1031,7 +1050,9 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
             sweep_lrs = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
     elif val_mode:
         adapt_name += '_valmode'
-        if 'imagenet' not in args.datasets and 'imagenet_augs' not in args.datasets:
+        if ('waterbirds' not in args.datasets and 'waterbirds_augs' not in args.datasets and
+            'waterbirds_norm' not in args.datasets and
+            'imagenet' not in args.datasets and 'imagenet_augs' not in args.datasets):
             sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
     if no_augmentation:
         adapt_name += '_no_augmentation'
