@@ -13,7 +13,7 @@ DOCKER_IMAGE = 'ananya/unlabeled-extrapolation'
 
 def run_sbatch(cmd, job_name, args, exclude=None, deps=[]):
     output_path = args.output_dir + '/' + job_name
-    sbatch_script_path = args.scripts_dir + '/' + args.sbatch_script_name 
+    sbatch_script_path = args.scripts_dir + '/' + args.sbatch_script_name
     slurm_cmd = f'sbatch --partition={args.partition} --job-name={job_name} --output={output_path} ' +\
                 f'--mail-type=END,FAIL --mail-user={args.mail_user} '
     deps = filter(lambda s: str(s) != '-1', deps)
@@ -48,6 +48,8 @@ def run_codalab(cmd, job_name, args, gpus=1, mem='16G', cpus=1, nlp=True, deps='
 def run_job(cmd, job_name, args, deps=[]):
     if args.codalab:
         return run_codalab(cmd, job_name, args, deps=deps)
+    elif args.print_command:
+        print(cmd + '\n')
     else:
         return run_sbatch(cmd, job_name, args, deps=deps)
 
@@ -136,10 +138,10 @@ def hyperparams_to_str(hyperparams, item_sep='_', key_value_sep='-', ignore_name
     sorted_hyperparams = sorted(hyperparams.items())
     return item_sep.join([str(k) + key_value_sep + str(v) for k, v in sorted_hyperparams
                           if k not in ignore_name_hypers])
- 
+
 def get_group_name(adapt_name, dataset_name, model_name):
     return adapt_name+'_'+dataset_name+'_'+model_name
- 
+
 def get_job_name(adapt_name, dataset_name, model_name, hyperparams):
     """Get the name for a run."""
     hyperparams_str = hyperparams_to_str(hyperparams)
@@ -147,7 +149,7 @@ def get_job_name(adapt_name, dataset_name, model_name, hyperparams):
 
 def group_run_to_log_path(group_name, run_name, args):
     return args.log_dir + '/' + group_name + '/' + run_name
- 
+
 def get_run_dir_path(adapt_name, dataset_name, model_name, hyperparams, args):
     """Get path to directory for a specific run (method + dataset + hyperparameters)."""
     hyperparams_str = hyperparams_to_str(hyperparams)
@@ -156,7 +158,7 @@ def get_run_dir_path(adapt_name, dataset_name, model_name, hyperparams, args):
     else:
         group_dir_path = get_group_dir_path(adapt_name, dataset_name, model_name)
     return group_dir_path + '/ '+ hyperparams_str + '/'
- 
+
 def get_group_dir_path(adapt_name, dataset_name, model_name, args):
     """Get path to directory for all runs for an adaptation method + model on a dataset."""
     if args.codalab:
@@ -164,7 +166,7 @@ def get_group_dir_path(adapt_name, dataset_name, model_name, args):
     else:
         group_name = get_group_name(adapt_name, dataset_name, model_name)
         return args.log_dir + '/'+ group_name + '/'
- 
+
 def get_config_path(args, config_rel_path):
     return args.config_dir + '/' + config_rel_path
 
@@ -247,7 +249,7 @@ def adaptation_sweep(adapt_name, dataset, model, hyperparams_list, args, deps=[]
         # Job id of -1 means we didn't run the job because it's already run.
         if job_id != -1:
             sweep_ids.append(job_id)
-    return sweep_ids 
+    return sweep_ids
 
 
 def replicated_sweep(adapt_name, dataset, model, hyperparams_list, num_replications,
@@ -268,7 +270,7 @@ def replicated_sweep(adapt_name, dataset, model, hyperparams_list, num_replicati
             # Job id of -1 means we didn't run the job because it's already run.
             if job_id != -1:
                 sweep_ids.append(job_id)
-    return sweep_ids 
+    return sweep_ids
 
 
 def adaptation_replication(adapt_name, dataset, model, num_replications, args, deps=[],
@@ -335,7 +337,7 @@ def linprobe_run(args, job_name, model, seed, config_path, features_save_path, r
     if os.path.isfile(features_save_path) and not(rerun):
         cmd = log_reg_cmd
     else:
-        cmd = extract_cmd + ' && ' + log_reg_cmd 
+        cmd = extract_cmd + ' && ' + log_reg_cmd
     if os.path.isfile(results_save_path) and not(rerun):
         return -1
     return run_job(cmd, job_name, args, deps=deps)
@@ -402,7 +404,7 @@ def get_summarize_cmd(dir_path, val_metric, secondary_val_metrics, output_metric
         kwargs['max_num'] = max_num
     code_path = args.scripts_dir + '/' + summarize_script_name
     return get_python_cmd(code_path, args.python_path, kwargs=kwargs, args=args)
- 
+
 
 def summarize_run(dir_path, job_name, val_metric, secondary_val_metrics, output_metrics, args, deps):
     """Run a job to summarize all the results in dir_path according to specified metrics."""
@@ -447,7 +449,7 @@ Dataset = namedtuple(
      'linprobe_secondary_val_metrics', 'linprobe_output_metrics',
      'config_rel_path', 'bundles', 'slurm_data_cmd', 'slurm_data_dir',
      'eval_config_rel_path'])
- 
+
 living17 = Dataset(
     name='living17',
     val_metric='test_acc/source_val_living',
@@ -872,7 +874,7 @@ dino_vit_b16 = Model(
     },
     bundles=[]
 )
- 
+
 landcover_baseline = Model(
     kwargs={
         'classname': 'models.innout_models.CNN1D',
@@ -914,27 +916,27 @@ names_to_model = {
 
 def union_dicts(d1, d2):
     return dict(d1, **d2)
- 
+
 def zip_dict_lists(dlist1, dlist2):
     dlist = []
     assert(len(dlist1) == len(dlist2))
     for i in range(len(dlist1)):
         dlist.append(union_dicts(dlist1[i], dlist2[i]))
     return dlist
- 
+
 def product_dict_lists(dlist1, dlist2):
     dlist = []
     for i in range(len(dlist1)):
         for j in range(len(dlist2)):
             dlist.append(union_dicts(dlist1[i], dlist2[j]))
     return dlist
- 
+
 def range_hyper(name, values):
     dlist = []
     for value in values:
         dlist.append({name: value})
     return dlist
- 
+
 # Append more_hyperparams to every hyperparams in hyperparams_list
 def append_to_each(hyperparams_list, more_hyperparams):
     return [union_dicts(d, more_hyperparams) for d in hyperparams_list]
@@ -1217,15 +1219,15 @@ def linprobe_experiments(args, num_replications=3, aug=True, train_mode=False, u
 
 
 def linprobe_experiments_no_aug(args, num_replications=3):
-    linprobe_experiments(args, num_replications=num_replications, aug=False) 
+    linprobe_experiments(args, num_replications=num_replications, aug=False)
 
 
 def linprobe_experiments_trainmode(args, num_replications=3):
-    linprobe_experiments(args, num_replications=num_replications, train_mode=True) 
+    linprobe_experiments(args, num_replications=num_replications, train_mode=True)
 
 
 def linprobe_experiments_usenewbnstats(args, num_replications=3):
-    linprobe_experiments(args, num_replications=num_replications, use_new_bn_stats=True) 
+    linprobe_experiments(args, num_replications=num_replications, use_new_bn_stats=True)
 
 
 def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=False, use_new_bn_stats=False):
@@ -1381,6 +1383,7 @@ if __name__ == "__main__":
                         help='Number of epochs to run job for.')
     # Note that store_true creates a default value of False.
     parser.add_argument('--codalab', action='store_true', help='run on CodaLab not slurm')
+    parser.add_argument('--print_command', action='store_true', help='only print the python commands (dont run anything).')
     parser.add_argument('--save_no_checkpoints', action='store_true', help='run on CodaLab not slurm')
     parser.add_argument('--partition', type=str, required=False, default='jag-standard',
                         help='(Slurm only) What priority to use.')
