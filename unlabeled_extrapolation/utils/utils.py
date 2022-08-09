@@ -100,10 +100,15 @@ def load_ckp(checkpoint_fpath, model, optimizer=None, scheduler=None, reset_opti
 
 
 def setup_logging(log_dir, level=logging.DEBUG):
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    logging.getLogger().setLevel(logging.INFO)
+    logger = logging.getLogger('')
+    logger.handlers = []
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
         datefmt='%Y-%m-%d:%H:%M:%S', level=level,
-        filename=log_dir+'/logs.txt', force=True)
+        filename=log_dir+'/logs.txt')
 
 
 def update_config(unparsed, config):
