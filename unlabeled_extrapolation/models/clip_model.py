@@ -99,37 +99,24 @@ class ClipModel(nn.Module):
             for param in self._classifier.parameters():
                 param.requires_grad = val
 
-    def freeze_bottom_k(self, k):
+    def get_layers(self, k):
+        visual = self._model.visual
         if self._model_name in {'ViT-B/32', 'ViT-B/16',
                                 'ViT-L/14', 'ViT-L/14@336px'}:
-            if k > 0:
-                set_requires_grad(self._model.visual.conv1, False)
-            if k > 1:
-                set_requires_grad(self._model.visual.ln_pre, False)
-            if k > 2:
-                resblocks = self._model.visual.transformer.resblocks
-                n_freeze_transformers = min(k-2, len(resblocks))
-                for i in range(n_freeze_transformers):
-                    set_requires_grad(resblocks[i], False)
-                if k-2 > len(resblocks):
-                    set_requires_grad(self._model.visual.ln_post, False)
+            return ([visual.conv1, visual.ln_pre] +
+                    list(visual.transformer.resblocks) +
+                    [visual.ln_post, self._classifier])
         elif self._model_name in {'RN50'}:
-            visual = self._model.visual
-            if k > 0:
-                set_requires_grad(visual.conv1, False)
-                set_requires_grad(visual.conv2, False)
-                set_requires_grad(visual.conv3, False)
-                set_requires_grad(visual.bn1, False)
-                set_requires_grad(visual.bn2, False)
-                set_requires_grad(visual.bn3, False)
-            layers = [visual.layer1, visual.layer2, visual.layer3, visual.layer3,
-                      visual.attnpool]
-            if k > 1:
-                n_freeze_upper = min(k-1, len(layers))
-                for i in range(n_freeze_upper):
-                    set_requires_grad(layers[i], False)
+            return [visual.conv1, visual.bn1, visual.conv2, visual.bn2,
+                    visual.conv3, visual.bn3, visual.layer1, visual.layer2,
+                    visual.layer3, visual.layer3, visual.attnpool, self._classifier]
         else:
             raise NotImplementedError
+
+    def freeze_bottom_k(self, k):
+        layers = self.get_layers(k)
+        for i in range(k):
+            set_requires_grad(layers[i], False)
 
     def new_last_layer(self, num_classes):
         num_in_features = self._model.visual.output_dim
