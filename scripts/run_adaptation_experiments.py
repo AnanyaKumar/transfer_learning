@@ -67,7 +67,7 @@ def format_key_value(k, v):
     return f'--{k}=' + str(v)
 
 
-def get_python_cmd(code_path, python_path='python', kwargs=None, args=None):
+def get_python_cmd(code_path, python_path='python', kwargs=None, args=None, overwrite_options=None):
     if kwargs is not None:
         # Make sure to keep the space at the end.
         opts = ''.join([f"{format_key_value(k, v)} " for k, v in kwargs.items()])
@@ -78,6 +78,8 @@ def get_python_cmd(code_path, python_path='python', kwargs=None, args=None):
     python_cmd += opts
     if args.codalab:
         python_cmd += ' --nowandb '
+    if overwrite_options is not None:
+        python_cmd += ' ' + overwrite_options + ' '
     return python_cmd
 
 
@@ -86,7 +88,7 @@ def group_run_to_log_path(group_name, run_name, args):
 
 
 def get_baseline_experiment_cmd(config_path, run_name, group_name, project_name, root_prefix,
-                                kwargs, args, run_saved=False):
+                                kwargs, args, run_saved=False, overwrite_options=None):
     # If run_saved, then we ignore root_prefix since we get this from the config.
     kwargs = deepcopy(kwargs)
     # Sometimes we might want to run from a saved json config file, in a custom location.
@@ -108,16 +110,18 @@ def get_baseline_experiment_cmd(config_path, run_name, group_name, project_name,
     kwargs['run_name'] = run_name
     code_path = args.code_dir + '/' + 'baseline_train.py'
     return (get_python_cmd(code_path=code_path, python_path=args.python_path, kwargs=kwargs,
-                           args=args),
+                           args=args, overwrite_options=overwrite_options),
             kwargs['log_dir'])
 
 
 def config_run(args, kwargs, config_path, run_name, group_name, project_name,
-               dataset_copy_cmd=None, root_prefix=None, run_saved=False, deps=[], rerun=False):
+               dataset_copy_cmd=None, root_prefix=None, run_saved=False, deps=[], rerun=False,
+               overwrite_options=None):
     # If rerun is False, don't rerun if the log firectory exists and contains stats.tsv.
     cmd, log_dir = get_baseline_experiment_cmd(
         config_path=config_path, run_name=run_name, group_name=group_name,
-        project_name=project_name, root_prefix=root_prefix, kwargs=kwargs, args=args, run_saved=run_saved)
+        project_name=project_name, root_prefix=root_prefix, kwargs=kwargs, args=args,
+        run_saved=run_saved, overwrite_options=overwrite_options)
     if dataset_copy_cmd is not None and not args.codalab:
         cmd = dataset_copy_cmd + ' && ' + cmd
     job_name = group_name + '_' + run_name
@@ -212,10 +216,11 @@ def run_adapt_sweep(adapt_name, dataset, model, hyperparams, args, deps=[], reru
     if dataset.slurm_data_cmd is not None:
         dataset_copy_cmd = dataset.slurm_data_cmd.format(scripts_dir=args.scripts_dir)
     deps = add_dataset_model_deps(deps, args, dataset, model)
+    overwrite_options = dataset.overwrite_options
     return config_run(args, kwargs=kwargs, config_path=config_path,
         run_name=run_name, group_name=group_name, project_name=project_name,
         dataset_copy_cmd=dataset_copy_cmd, root_prefix=dataset.slurm_data_dir,
-        deps=deps, rerun=rerun)
+        deps=deps, rerun=rerun, overwrite_options=overwrite_options)
 
 
 def run_adapt_replication(adapt_name, dataset, model, seed, args, deps=[],
@@ -233,10 +238,11 @@ def run_adapt_replication(adapt_name, dataset, model, seed, args, deps=[],
     if dataset.slurm_data_cmd is not None:
         dataset_copy_cmd = dataset.slurm_data_cmd.format(scripts_dir=args.scripts_dir)
     deps = add_dataset_model_deps(deps, args, dataset, model)
+    overwrite_options = dataset.overwrite_options
     return config_run(args, kwargs=kwargs, config_path=best_config_path ,
         run_name=run_name, group_name=group_name, project_name=project_name,
         dataset_copy_cmd=dataset_copy_cmd, root_prefix=dataset.slurm_data_dir,
-        deps=deps, run_saved=True, rerun=rerun)
+        deps=deps, run_saved=True, rerun=rerun, overwrite_options=overwrite_options)
 
 
 def adaptation_sweep(adapt_name, dataset, model, hyperparams_list, args, deps=[], rerun=False,
@@ -311,7 +317,8 @@ def adaptation_experiment(adapt_name, dataset, model, hyperparams_list, num_repl
 
 def linprobe_run(args, job_name, model, seed, config_path, features_save_path, results_save_path,
                  weights_save_path, val_metric, num_reg_values=50, deps=[], rerun=False, aug=True,
-                 root_prefix='', train_mode=False, use_new_bn_stats=False):
+                 root_prefix='', train_mode=False, use_new_bn_stats=False,
+                 overwrite_options=None):
     extract_code_path = args.code_dir + '/extract_features.py'
     kwargs = {}
     add_model_to_kwargs(kwargs, args, model)
@@ -325,7 +332,7 @@ def linprobe_run(args, job_name, model, seed, config_path, features_save_path, r
     # If no augmentation, then use test transform for train.
     kwargs['use_test_transforms_for_train'] = not(aug)
     extract_cmd = get_python_cmd(code_path=extract_code_path, python_path=args.python_path,
-                                 kwargs=kwargs, args=args)
+                                 kwargs=kwargs, args=args, overwrite_options=overwrite_options)
     log_reg_code_path = args.code_dir + '/log_reg_sk.py'
     kwargs = {
         'load_path': features_save_path, 'results_save_path': results_save_path,
@@ -353,6 +360,7 @@ def run_linprobe_replication(adapt_name, dataset, model, seed, args, deps=[], re
     weights_save_path = group_dir_path + '/weights_' + str(seed) + '.pkl'
     val_metric = dataset.val_metric
     job_name = get_group_name(adapt_name, dataset.name, args.model_name) + '_' + str(seed)
+    overwrite_options = dataset.overwrite_options
     deps = add_dataset_model_deps(deps, args, dataset, model)
     if not(args.codalab):
         root_prefix = dataset.slurm_data_dir
@@ -361,7 +369,8 @@ def run_linprobe_replication(adapt_name, dataset, model, seed, args, deps=[], re
     return linprobe_run(
         args, job_name, model, seed, config_path, features_save_path, results_save_path,
         weights_save_path, val_metric, deps=deps, rerun=rerun, aug=aug, root_prefix=root_prefix,
-        train_mode=train_mode, use_new_bn_stats=use_new_bn_stats)
+        train_mode=train_mode, use_new_bn_stats=use_new_bn_stats,
+        overwrite_options=overwrite_options)
 
 
 def linprobe_experiment(adapt_name, dataset, model, num_replications, args, deps=[], rerun=False,
@@ -443,12 +452,14 @@ def summarize_linprobe(adapt_name, dataset, model, args, deps, max_num=None):
 # If linprobe_secondary_val_metrics is None, use secondary_val_metrics.
 # TODO: slurm_data_dir should populate root_prefix in configs, which it
 # does not do at the moment.
+fields = ['name', 'val_metric', 'secondary_val_metrics', 'output_metrics',
+    'linprobe_secondary_val_metrics', 'linprobe_output_metrics',
+    'config_rel_path', 'bundles', 'slurm_data_cmd', 'slurm_data_dir',
+    'eval_config_rel_path', 'overwrite_options']
+
 Dataset = namedtuple(
-    'Dataset',
-    ['name', 'val_metric', 'secondary_val_metrics', 'output_metrics',
-     'linprobe_secondary_val_metrics', 'linprobe_output_metrics',
-     'config_rel_path', 'bundles', 'slurm_data_cmd', 'slurm_data_dir',
-     'eval_config_rel_path'])
+    'Dataset', fields, defaults=[None] * len(fields)
+)
 
 living17 = Dataset(
     name='living17',
@@ -497,6 +508,24 @@ celeba = Dataset(
 
 waterbirds = Dataset(
     name='waterbirds',
+    val_metric='test_acc/val',
+    secondary_val_metrics=['LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    config_rel_path='adaptation/waterbirds.yaml',
+    bundles=['waterbirds_pickle'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    eval_config_rel_path='adaptation/waterbirds_eval.yaml')
+
+waterbirds_background = Dataset(
+    name='waterbirds_background',
+    overwrite_options=' --overwrite_dataset_name=waterbirds-background ',
     val_metric='test_acc/val',
     secondary_val_metrics=['LAST'],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
@@ -745,6 +774,7 @@ names_to_datasets = {
     'waterbirds': waterbirds,  # This dataset doesn't normalize.
     'waterbirds_augs': waterbirds_augs,  # This dataset doesn't normalize.
     'waterbirds_norm': waterbirds_norm,  # This dataset normalizes.
+    'waterbirds_background': waterbirds_background,
     # 'landcover': landcover,
     # 'landcover_auxin': landcover_auxin,
 }
@@ -1034,16 +1064,17 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
     sweep_lrs = SWEEP_LRS
-    if 'imagenet' in args.datasets or 'imagenet_augs' in args.datasets:
+    if len(args.datasets) > 1:
+        print('WARNING: learning rates sweeps will not be done properly with > 1 dataset.\n\n')
+    if 'imagenet' in args.datasets[0]:
         if len(args.datasets) > 1:
             raise ValueError('ImageNet uses custom learning rates, so launch it separately.')
         if imagenet_lp_ft_phase2:
             sweep_lrs = [0.00001, 0.00003, 0.0001]
         else:
             sweep_lrs = [0.0001, 0.0003, 0.001]
-    if ('waterbirds' in args.datasets or 'waterbirds_augs' in args.datasets or
-        'waterbirds_norm' in args.datasets):
-        sweep_lrs += [1e-5]
+    if 'waterbirds' in args.datasets[0]:
+        sweep_lrs = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3]
     if side_tune:
         adapt_name += '_side_tune'
         sweep_lrs = sweep_lrs + [3e-2, 1e-1, 3e-1, 1.0, 3.0, 10.0]
@@ -1052,9 +1083,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
             sweep_lrs = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
     elif val_mode:
         adapt_name += '_valmode'
-        if ('waterbirds' not in args.datasets and 'waterbirds_augs' not in args.datasets and
-            'waterbirds_norm' not in args.datasets and
-            'imagenet' not in args.datasets and 'imagenet_augs' not in args.datasets):
+        if ('waterbirds' not in args.datasets[0] and 'imagenet' not in args.datasets[0]):
             sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
     if no_augmentation:
         adapt_name += '_no_augmentation'
@@ -1077,8 +1106,14 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         adapt_name += '_epochs' + str(args.epochs)
     # Set hyperparameters
     if args.only_one_run:
-        # TODO: how to choose which one to run? 1e-3 does well in practice.
-        hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
+        if 'waterbirds' in args.datasets[0] and (args.freeze_bottom_k is None or
+            args.freeze_bottom_k == 0):
+            hyperparams_list = range_hyper('optimizer.args.lr', [1e-3])
+        elif 1e-3 in sweep_lrs:
+            # 1e-3 is a good default value for fine-tuning (with SGD).
+            hyperparams_list = range_hyper('optimizer.args.lr', [1e-3])
+        else:
+            hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
         # TODO: remove this?
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
