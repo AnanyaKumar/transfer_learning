@@ -595,6 +595,14 @@ def update_net_eval_mode(config):
             logging.warning('Linear probing, so setting unspecified use_net_val_mode to True')
 
 
+def update_dataset_names(config):
+    if 'overwrite_dataset_name' in config and config['overwrite_dataset_name'] is not None:
+        new_dataset_name = config['overwrite_dataset_name']
+        for test_dataset_config in config['test_datasets']:
+            test_dataset_config['args']['dataset_name'] = new_dataset_name
+        config['train_dataset']['args']['dataset_name'] = new_dataset_name
+
+
 def set_random_seed(seed):
     if seed is not None:
         torch.manual_seed(seed)
@@ -620,6 +628,10 @@ def preprocess_config(config, config_path):
         # shutil.copy(args.config, log_dir+'/original_config.yaml')
         # If no_augmentation option in config, then use test_transforms for training.
         update_train_transform(config)
+        # Update dataset names, if overwrite_dataset_name is specified. This is useful
+        # if we want to run the same experiments on variants of a dataset (e.g., 
+        # waterbirds-background (vs. original waterbirds experiment which uses foreground).
+        update_dataset_names(config)
 
 
 def setup():
