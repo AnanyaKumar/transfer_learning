@@ -99,22 +99,27 @@ class ClipModel(nn.Module):
             for param in self._classifier.parameters():
                 param.requires_grad = val
 
-    def get_layers(self, k):
+    def get_layers(self):
         visual = self._model.visual
         if self._model_name in {'ViT-B/32', 'ViT-B/16',
                                 'ViT-L/14', 'ViT-L/14@336px'}:
-            return ([visual.conv1, visual.ln_pre] +
-                    list(visual.transformer.resblocks) +
-                    [visual.ln_post, self._classifier])
+            layers = ([visual.conv1, visual.ln_pre] +
+                      list(visual.transformer.resblocks) +
+                      [visual.ln_post])
         elif self._model_name in {'RN50'}:
-            return [visual.conv1, visual.bn1, visual.conv2, visual.bn2,
-                    visual.conv3, visual.bn3, visual.layer1, visual.layer2,
-                    visual.layer3, visual.layer3, visual.attnpool, self._classifier]
+            layers = [visual.conv1, visual.bn1, visual.conv2, visual.bn2,
+                      visual.conv3, visual.bn3, visual.layer1, visual.layer2,
+                      visual.layer3, visual.layer3, visual.attnpool]
         else:
             raise NotImplementedError
+        if self._classifier is not None:
+            layers = layers + [self._classifier]
+        return layers
 
     def freeze_bottom_k(self, k):
-        layers = self.get_layers(k)
+        layers = self.get_layers()
+        if k > len(layers):
+            raise ValueError(f"k {k} should be less than number of layers {len(layers)}")
         for i in range(k):
             set_requires_grad(layers[i], False)
 
@@ -134,6 +139,6 @@ class ClipModel(nn.Module):
 
     def get_feature_extractor(self):
         raise NotImplementedError('Be careful, we need to normalize image first before encoding it.')
-    
+
     def get_features(self, x):
         return self._model.encode_image(normalize_transform(x))
