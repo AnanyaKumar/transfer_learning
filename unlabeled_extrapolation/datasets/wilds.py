@@ -10,8 +10,12 @@ class WILDS(Dataset):
     def __init__(self, dataset_name, split, root, meta_selector=None, transform=None, download=False, return_meta=False):
         # Split can be train, id_val, id_test, val, test.
         super().__init__()
-        full_dataset = get_dataset(dataset=dataset_name, download=download, root_dir=root)
+        parent_dataset_name = dataset_name
+        if 'waterbirds' in dataset_name:
+            parent_dataset_name = 'waterbirds'
+        full_dataset = get_dataset(dataset=parent_dataset_name, download=download, root_dir=root)
         dataset = full_dataset.get_subset(split, transform=None)
+        self._dataset_name = dataset_name
         self._transform = transform
         self._dataset = dataset
         self._indices = None
@@ -34,6 +38,8 @@ class WILDS(Dataset):
             assert(tuple(z) == self._meta_selector)
         x = x.convert('RGB') 
         x = self._transform(x)
+        if 'waterbirds' in self._dataset_name and 'background' in self._dataset_name:
+            y = z[0]
         if self._return_meta:
             return x, y, z
         return x, y
