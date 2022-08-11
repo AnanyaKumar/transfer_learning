@@ -256,6 +256,31 @@ def set_requires_grad(component, val):
         param.requires_grad = val
 
 
+_grad_layer_name = 'train/grad_layer_'
+_normalized_grad_layer_name = 'train/normalized_grad_layer_'
+
+
+def add_layer_grad_stats(net, loss_dict, config, cur_batch_size):
+    if getattr(net, 'get_layers', None) is None or 'no_log_grads' in config:
+        return
+    layers = net.get_layers()
+    for i in range(len(layers)):
+        cur_layer = list(layers[i].parameters())
+        if not cur_layer[0].requires_grad:
+            continue
+        if _grad_layer_name + str(i) not in loss_dict:
+            loss_dict[_grad_layer_name + str(i)] = Accumulator()
+        if _normalized_grad_layer_name + str(i) not in loss_dict:
+            loss_dict[_normalized_grad_layer_name + str(i)] = Accumulator()
+        grads = [p.grad.detach().cpu().numpy() for p in cur_layer]
+        grad_norms_squared = [np.linalg.norm(g) ** 2 for g in grads]
+        grad_norm = np.sqrt(np.sum(grad_norms_squared)) / cur_batch_size
+        loss_dict[_grad_layer_name + str(i)].add_value(grad_norm)
+        num_params = np.sum([p.numel() for p in cur_layer])
+        normalized_grad_norm = grad_norm / np.sqrt(num_params)
+        loss_dict[_normalized_grad_layer_name + str(i)].add_value(normalized_grad_norm)
+
+
 def train(epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
           test_loaders, max_test_examples, weight_dict_initial):
     # Returns a dictionary with epoch, train/loss and train/acc.
@@ -311,6 +336,8 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
             loss_dict['train/model_loss'].add_value(opt_loss.tolist())
         else:
             loss.backward()
+        # Collect the gradients at each layer.
+        add_layer_grad_stats(net, loss_dict, config, cur_batch_size=len(labels))
         optimizer.step() 
         num_examples += len(labels)
         outputs, loss, train_preds = None, None, None  # Try to force garbage collection.
