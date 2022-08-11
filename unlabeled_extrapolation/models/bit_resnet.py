@@ -1,3 +1,4 @@
+# Note: this model does normalization.
 # Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +21,9 @@ from collections import OrderedDict  # pylint: disable=g-importing-member
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+import numpy as np
+from torchvision.transforms import Normalize
 
 
 class StdConv2d(nn.Conv2d):
@@ -172,6 +176,62 @@ class ResNetV2(nn.Module):
       for bname, block in self.body.named_children():
         for uname, unit in block.named_children():
           unit.load_from(weights, prefix=f'{prefix}{bname}/{uname}/')
+        
+        
+normalize_transform = Normalize(
+    mean=(0.5, 0.5, 0.5),
+    std=(0.5, 0.5, 0.5))
+
+
+class BitResNet(nn.Module):
+    
+    def __init__(self, model_name, pretrained_weights_dir='.', normalize=True):
+        super().__init__()
+        if model_name not in KNOWN_MODELS:
+            raise ValueError(f'model_name ({model_name}) not found in KNOWN_MODELS ({KNOWN_MODELS})')
+        self._model_name = model_name
+        self._model = KNOWN_MODELS[model_name](head_size=1000)
+        self._model.load_from(np.load(pretrained_weights_dir + f'/{model_name}-ILSVRC2012.npz'))
+        self._normalize = normalize
+        
+    def forward(self, x):
+        if self._normalize:
+            x = normalize_transform(x)
+        return self._model(x)
+
+    def set_requires_grad(self, val):
+        for param in self._model.parameters():
+            param.requires_grad = val
+
+    def get_layers(self):
+        layers = [self._model.root] + list(self._model.body) + [self._model.head]
+        return layers
+
+    def freeze_bottom_k(self, k):
+        layers = self.get_layers()
+        if k > len(layers):
+            raise ValueError(f"k {k} should be less than number of layers {len(layers)}")
+        for i in range(k):
+            set_requires_grad(layers[i], False)
+
+    def new_last_layer(self, num_classes):
+        num_features = self._model.head.gn.num_channels
+        self._model.head.conv = nn.Conv2d(num_features, num_classes, kernel_size=(1, 1), stride=(1, 1))
+
+    def add_probe(self, probe):
+        raise NotImplementedError('Not Implemented yet.')
+
+    def get_last_layer(self):
+        return self._model.head.conv
+
+    def set_last_layer(self, coef, intercept):
+        raise NotImplementedError('Not Implemented yet.')
+
+    def get_feature_extractor(self):
+        raise NotImplementedError('Not Implemented yet.')
+
+    def get_features(self, x):
+        raise NotImplementedError('Not Implemented yet.')
 
 
 KNOWN_MODELS = OrderedDict([
