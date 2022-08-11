@@ -185,13 +185,13 @@ normalize_transform = Normalize(
 
 class BitResNet(nn.Module):
     
-    def __init__(self, model_name, pretrained_weights_dir='.', normalize=True):
+    def __init__(self, model_name, checkpoint_path=None, normalize=True):
         super().__init__()
         if model_name not in KNOWN_MODELS:
             raise ValueError(f'model_name ({model_name}) not found in KNOWN_MODELS ({KNOWN_MODELS})')
         self._model_name = model_name
         self._model = KNOWN_MODELS[model_name](head_size=1000)
-        self._model.load_from(np.load(pretrained_weights_dir + f'/{model_name}-ILSVRC2012.npz'))
+        self._model.load_from(np.load(checkpoint_path))
         self._normalize = normalize
         
     def forward(self, x):
