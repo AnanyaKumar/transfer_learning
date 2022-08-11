@@ -36,12 +36,15 @@ class VitModel(nn.Module):
         if self._classifier is None:
             return features
         return self._classifier(features)
-
-    def freeze_bottom_k(self, k):
+    def get_layers(self):
         patch_embed = self._model.patch_embed
         layers = [patch_embed, patch_embed]  # To streamline with CLIP ViT.
         layers += list(self._model.blocks)
         layers += [self._classifier]
+        return layers
+
+    def freeze_bottom_k(self, k):
+        layers = self.get_layers()
         for i in range(min(k, len(layers))):
             set_requires_grad(layers[i], False)
 
