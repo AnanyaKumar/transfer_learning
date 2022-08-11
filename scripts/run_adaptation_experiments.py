@@ -905,6 +905,15 @@ dino_vit_b16 = Model(
     bundles=[]
 )
 
+bit_resnet_50 = Model(
+    kwargs={
+        'classname': 'models.bit_resnet.BitResNet',
+        'args.model_name': 'BiT-M-R50x1',
+        'checkpoint_rel_path': 'BiT-M-R50x1-ILSVRC2012.npz',
+    },
+    bundles=[]
+}
+
 landcover_baseline = Model(
     kwargs={
         'classname': 'models.innout_models.CNN1D',
@@ -936,6 +945,7 @@ names_to_model = {
     'clip_vit_l14': clip_vit_l14,
     'scratch_vit_b16_clipstyle': scratch_vit_b16_clipstyle,
     'dino_vit_b16': dino_vit_b16,
+    'bit_resnet_50': bit_resnet_50,
     'landcover_baseline': landcover_baseline,
     'landcover_auxin': landcover_auxin,
 }
