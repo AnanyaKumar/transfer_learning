@@ -1,4 +1,4 @@
-# Thanks to Michael Xie for these utilities.
+# Thanks to Michael Xie for inital version of these utilities.
 
 import ast
 from copy import deepcopy
@@ -164,4 +164,9 @@ def to_device(obj, device):
         return res
     else:
         return obj.to(device)
+
+
+def set_requires_grad(component, val):
+    for param in component.parameters():
+        param.requires_grad = val
 
