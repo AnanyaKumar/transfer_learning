@@ -25,6 +25,7 @@ import torch.nn.functional as F
 import numpy as np
 from torchvision.transforms import Normalize
 
+import unlabeled_extrapolation.utils.utils as utils
 
 class StdConv2d(nn.Conv2d):
 
@@ -212,7 +213,7 @@ class BitResNet(nn.Module):
         if k > len(layers):
             raise ValueError(f"k {k} should be less than number of layers {len(layers)}")
         for i in range(k):
-            set_requires_grad(layers[i], False)
+            utils.set_requires_grad(layers[i], False)
 
     def new_last_layer(self, num_classes):
         num_features = self._model.head.gn.num_channels

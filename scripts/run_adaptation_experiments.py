@@ -912,7 +912,7 @@ bit_resnet_50 = Model(
         'checkpoint_rel_path': 'BiT-M-R50x1-ILSVRC2012.npz',
     },
     bundles=[]
-}
+)
 
 landcover_baseline = Model(
     kwargs={
