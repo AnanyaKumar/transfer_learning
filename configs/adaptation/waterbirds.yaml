@@ -5,7 +5,7 @@ inherit:
 
 num_classes: 2
 epochs: &epochs 100
-batch_size: 32
+batch_size: 16
 save_no_checkpoints: True
 
 model:
