@@ -1,0 +1,39 @@
+
+inherit:
+  - resnet50_transfer.yaml 
+  - datasets_waterbirds.yaml
+
+num_classes: 2
+epochs: &epochs 100
+batch_size: 16
+save_no_checkpoints: True
+
+model:
+  classname: models.clip_model.ClipModel
+  args:
+    model_name: 'ViT-B/16'
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
+
+
+train_dataset:
+    name: 'train'
+    classname: datasets.wilds.WILDS
+    args:
+        root: 'wilds/data/'
+        dataset_name: 'waterbirds'
+        split: 'train'
+        subsampled_meta: True
+    transforms:
+        - classname: unlabeled_extrapolation.datasets.transforms.Resize
+          args:
+              size: 224
+              interpolation: 'bicubic'
+        - classname: torchvision.transforms.CenterCrop
+          args:
+              size: 224
+        - classname: torchvision.transforms.ToTensor
+
