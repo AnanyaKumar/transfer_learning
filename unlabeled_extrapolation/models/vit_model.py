@@ -1,4 +1,4 @@
-
+# Note: this model does normalization.
 from collections import OrderedDict
 import torchvision.models as models
 from torchvision.models import resnet50
@@ -10,6 +10,11 @@ from torchvision.transforms import Normalize
 
 
 MODELS = {'dino_vits16', 'dino_vits8', 'dino_vitb16', 'dino_vitb8'}
+
+
+normalize_transform = Normalize(
+    mean=(0.485, 0.456, 0.406),
+    std=[0.228, 0.224, 0.225])
 
 
 def set_requires_grad(component, val):
@@ -36,6 +41,7 @@ class VitModel(nn.Module):
         if self._classifier is None:
             return features
         return self._classifier(features)
+
     def get_layers(self):
         patch_embed = self._model.patch_embed
         layers = [patch_embed, patch_embed]  # To streamline with CLIP ViT.
@@ -70,7 +76,7 @@ class VitModel(nn.Module):
         model_utils.set_linear_layer(self._classifier, coef, intercept)
 
     def get_feature_extractor(self):
-        return self._model
+        raise NotImplementedError('Be careful, we need to normalize image first before encoding it.')
 
     def get_features(self, x):
-        return self._model(x)
+        return self._model(normalize_transform(x))
