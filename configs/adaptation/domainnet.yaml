@@ -5,6 +5,8 @@ inherit:
 
 num_classes: 40
 epochs: &epochs 50  # Very small dataset so run for longer.
+batch_size: 32
+save_no_checkpoints: True
 
 model:
   classname: models.clip_model.ClipModel
