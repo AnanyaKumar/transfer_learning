@@ -1,4 +1,4 @@
-
+# Note: this model does normalization.
 import clip
 from collections import OrderedDict
 import torchvision.models as models
