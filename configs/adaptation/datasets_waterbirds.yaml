@@ -9,7 +9,6 @@ train_dataset:
         root: 'wilds/data/'
         dataset_name: 'waterbirds'
         split: 'train'
-        download: 'true'
     transforms:
         - classname: unlabeled_extrapolation.datasets.transforms.Resize
           args:

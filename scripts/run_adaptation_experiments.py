@@ -523,8 +523,8 @@ waterbirds = Dataset(
     slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_eval.yaml')
 
-waterbirds_rmsprop = Dataset(
-    name='waterbirds_rmsprop',
+waterbirds_label_balanced = Dataset(
+    name='waterbirds_label_balanced',
     val_metric='test_acc/val',
     secondary_val_metrics=['LAST'],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
@@ -534,12 +534,28 @@ waterbirds_rmsprop = Dataset(
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
         'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
-    config_rel_path='adaptation/waterbirds.yaml',
+    config_rel_path='adaptation/waterbirds_label_balanced.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
     slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
-    eval_config_rel_path='adaptation/waterbirds_eval.yaml')
+    eval_config_rel_path='adaptation/waterbirds_label_balanced_eval.yaml')
 
+waterbirds_group_balanced = Dataset(
+    name='waterbirds_group_balanced',
+    val_metric='test_acc/val',
+    secondary_val_metrics=['LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    config_rel_path='adaptation/waterbirds_group_balanced.yaml',
+    bundles=['waterbirds_pickle'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    eval_config_rel_path='adaptation/waterbirds_group_balanced_eval.yaml')
 
 waterbirds_background = Dataset(
     name='waterbirds_background',
@@ -792,8 +808,9 @@ names_to_datasets = {
     'waterbirds': waterbirds,  # This dataset doesn't normalize.
     'waterbirds_augs': waterbirds_augs,  # This dataset doesn't normalize.
     'waterbirds_norm': waterbirds_norm,  # This dataset normalizes.
-    'waterbirds_rmsprop': waterbirds_rmsprop,
     'waterbirds_background': waterbirds_background,
+    'waterbirds_group_balanced': waterbirds_group_balanced,
+    'waterbirds_label_balanced': waterbirds_label_balanced,
     # 'landcover': landcover,
     # 'landcover_auxin': landcover_auxin,
 }
