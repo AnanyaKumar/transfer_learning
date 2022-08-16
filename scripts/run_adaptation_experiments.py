@@ -523,6 +523,24 @@ waterbirds = Dataset(
     slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_eval.yaml')
 
+waterbirds_rmsprop = Dataset(
+    name='waterbirds_rmsprop',
+    val_metric='test_acc/val',
+    secondary_val_metrics=['LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    config_rel_path='adaptation/waterbirds.yaml',
+    bundles=['waterbirds_pickle'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    eval_config_rel_path='adaptation/waterbirds_eval.yaml')
+
+
 waterbirds_background = Dataset(
     name='waterbirds_background',
     overwrite_options=' --overwrite_dataset_name=waterbirds-background ',
@@ -774,6 +792,7 @@ names_to_datasets = {
     'waterbirds': waterbirds,  # This dataset doesn't normalize.
     'waterbirds_augs': waterbirds_augs,  # This dataset doesn't normalize.
     'waterbirds_norm': waterbirds_norm,  # This dataset normalizes.
+    'waterbirds_rmsprop': waterbirds_rmsprop,
     'waterbirds_background': waterbirds_background,
     # 'landcover': landcover,
     # 'landcover_auxin': landcover_auxin,
@@ -1114,6 +1133,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         adapt_name = 'l2sp'
     if args.epochs is not None:
         adapt_name += '_epochs' + str(args.epochs)
+    if args.optimizer is not None:
+        sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
     # Set hyperparameters
     if args.only_one_run:
         if 'waterbirds' in args.datasets[0] and (args.freeze_bottom_k is None or
@@ -1144,6 +1165,10 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         hyperparams_list = append_to_each(
             hyperparams_list, {'freeze_bottom_k': args.freeze_bottom_k})
         adapt_name += '_freeze_bottom_' + str(args.freeze_bottom_k)
+    if args.optimizer is not None:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'optimizer.classname': args.optimizer})
+        adapt_name += '_opt_' + args.optimizer
     if args.full_ft_epoch is not None:
         hyperparams_list = append_to_each(
             hyperparams_list, {'full_ft_epoch': args.full_ft_epoch})
@@ -1186,7 +1211,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     for dataset in datasets:
         all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
-            num_replications=num_replications, args=args, ignore_name_hypers={'checkpoint_path'})
+            num_replications=num_replications, args=args, ignore_name_hypers={'checkpoint_path', 'optimizer.classname'})
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
@@ -1275,7 +1300,7 @@ def linprobe_experiments_usenewbnstats(args, num_replications=3):
     linprobe_experiments(args, num_replications=num_replications, use_new_bn_stats=True)
 
 
-def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=False, use_new_bn_stats=False):
+def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=False, use_new_bn_stats=False, l2sp=False):
     if args.epochs is not None:
         raise ValueError('Does not support epochs yet.')
     adapt_name = 'lp_then_ft'
@@ -1304,6 +1329,15 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
     if args.epochs is not None:
         hyperparams_list = append_to_each(hyperparams_list, {'epochs': args.epochs})
         hyperparams_list = append_to_each(hyperparams_list, {'scheduler.args.T_max': args.epochs})
+    if args.optimizer is not None: 
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'optimizer.classname': args.optimizer})
+        adapt_name += '_opt_' + args.optimizer 
+    if l2sp:
+        # Note: tried 1.0, 0.1, 0.01, 0.001, 0.0001 on Living-17
+        # 0.01 worked best ID, and 0.1 worked best OOD but did 0.4% worse than fine-tuning ID.
+        adapt_name += '_l2sp'
+        hyperparams_list = append_to_each(hyperparams_list, {'l2sp_weight': 0.01})
     if args.save_no_checkpoints:
         hyperparams_list = append_to_each(hyperparams_list, {'save_no_checkpoints': True})
     for dataset in datasets:
@@ -1320,12 +1354,16 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
             adapt_name=adapt_name, dataset=dataset, model=model,
             hyperparams_list=cur_hyperparams_list, num_replications=num_replications,
             replication_hyperparams_list=replication_hyperparams_list, args=args,
-            ignore_name_hypers={'linear_probe_checkpoint_path'})
+            ignore_name_hypers={'linear_probe_checkpoint_path', 'optimizer.classname'})
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
 def lp_then_ft_valmode_experiments(args, num_replications=3):
     lp_then_ft_experiments(args, num_replications=num_replications, val_mode=True)
+
+
+def lp_then_ft_l2sp_experiments(args, num_replications=3):
+    lp_then_ft_experiments(args, num_replications=num_replications, val_mode=True, l2sp=True)
 
 
 def lp_then_ft_trainmode_experiments(args, num_replications=3):
@@ -1393,6 +1431,7 @@ def main(args):
         'ft_val_mode_experiment': ft_val_mode_experiment,
         'fine_tuning_no_augmentation_experiments': fine_tuning_no_augmentation_experiments,
         'l2sp_experiments': l2sp_experiments,
+        'lp_then_ft_l2sp_experiments': lp_then_ft_l2sp_experiments,
         'side_tune_experiments': side_tune_experiments,
         'side_tune_val_mode_experiments': side_tune_val_mode_experiments,
         'ft_imnet_lp_ft_phase_2_experiments': ft_imnet_lp_ft_phase_2_experiments,
@@ -1426,6 +1465,8 @@ if __name__ == "__main__":
                         help='Base seed, we typically add to this seed for replication runs.')
     parser.add_argument('--epochs', type=int, required=False, default=None,
                         help='Number of epochs to run job for.')
+    parser.add_argument('--optimizer', type=str, required=False, default=None,
+                        help='Class name of optimizer to use, e.g., torch.optim.Adam')
     # Note that store_true creates a default value of False.
     parser.add_argument('--codalab', action='store_true', help='run on CodaLab not slurm')
     parser.add_argument('--print_command', action='store_true', help='only print the python commands (dont run anything).')

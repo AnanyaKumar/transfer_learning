@@ -387,6 +387,10 @@ def get_params(layers):
     return params
 
 
+def check_value_not_none(d, k, v):
+    return k in d and d[k] == v
+
+
 def main(config, log_dir, checkpoints_dir):
     # Set up datasets and loaders.
     logging.info("Entering main.")
@@ -636,6 +640,15 @@ def set_random_seed(seed):
         np.random.seed(seed + 111)
 
 
+def update_optimizer_args(config):
+    if config['optimizer']['classname'] in [
+        'torch.optim.Adam', 'torch.optim.AdamW', 'torch.optim.RMSprop']:
+        # These optimizers don't have a momentum term.
+        # A bit of a hack so we can just pass in torch.optim.Adam as a command line arg,
+        # without having to rework the config.
+        del config['optimizer']['args']['momentum']
+
+
 def preprocess_config(config, config_path):
     # If it's not a json config (e.g. if it's yaml) then process it. 
     if not config_path.endswith('.json'):
@@ -659,6 +672,8 @@ def preprocess_config(config, config_path):
         # if we want to run the same experiments on variants of a dataset (e.g., 
         # waterbirds-background (vs. original waterbirds experiment which uses foreground).
         update_dataset_names(config)
+        # Update optimizer arguments.
+        update_optimizer_args(config)
 
 
 def setup():
