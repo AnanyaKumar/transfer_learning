@@ -282,7 +282,7 @@ def add_layer_grad_stats(net, loss_dict, config, cur_batch_size):
 
 
 def train(epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
-          test_loaders, max_test_examples, weight_dict_initial):
+          test_loaders, max_test_examples, weight_dict_initial, batch_scheduler=None):
     # Returns a dictionary with epoch, train/loss and train/acc.
     # Train model.
     training_state = net.training
@@ -338,7 +338,11 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
             loss.backward()
         # Collect the gradients at each layer.
         add_layer_grad_stats(net, loss_dict, config, cur_batch_size=len(labels))
-        optimizer.step() 
+        if check_exists_not_none(config, 'max_grad_norm'):
+            torch.nn.utils.clip_grad_norm_(net.parameters(), config['max_grad_norm'])
+        optimizer.step()
+        if batch_scheduler is not None:
+            batch_scheduler.step()
         num_examples += len(labels)
         outputs, loss, train_preds = None, None, None  # Try to force garbage collection.
         def should_log(log_interval):
@@ -357,6 +361,8 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
                 wandb.log(stats)
     reset_state(net, training_state)
     train_stats = {'epoch': epoch}
+    if batch_scheduler is not None:
+        train_stats['train/batch_scheduler_lr'] = batch_scheduler.get_lr()
     for key in loss_dict:
         train_stats[key] = loss_dict[key].get_mean()
     return train_stats
@@ -387,7 +393,11 @@ def get_params(layers):
     return params
 
 
-def check_value_not_none(d, k, v):
+def check_exists_not_none(d, k):
+    return k in d and d[k] != None
+
+
+def check_exists_value(d, k, v):
     return k in d and d[k] == v
 
 
@@ -430,9 +440,25 @@ def main(config, log_dir, checkpoints_dir):
             config['optimizer'], update_args={'params': param_groups})
     else:
         optimizer = utils.initialize(
-            config['optimizer'], update_args={'params': net.parameters()})
-    scheduler = utils.initialize(
-        config['scheduler'], update_args={'optimizer': optimizer})
+            config['optimizer'], update_args={'params': net.parameters()}) 
+    # If batch scheduler is specified, then use a batch scheduler that updates the learning
+    # rate every step. Otherwise, update the learning rate every epoch.
+    batch_scheduler = None
+    scheduler = None
+    if check_exists_not_none(config, 'batch_scheduler'):
+        # TODO: add batch scheduler.
+        num_batches = len(train_loader)
+        num_training_steps  = num_batches * config['epochs']
+        num_warmup_steps = int(0.1 * num_training_steps)
+        batch_scheduler = utils.initialize(
+            config['batch_scheduler'], update_args={
+                'optimizer': optimizer,
+                'num_warmup_steps': num_warmup_steps,
+                'num_training_steps': num_training_steps,
+        })
+    else:
+        scheduler = utils.initialize(
+            config['scheduler'], update_args={'optimizer': optimizer})
     # Training loop.
     best_stats = {}
     best_accs = {}  # Used to save checkpoints of best models on some datasets.
@@ -459,6 +485,7 @@ def main(config, log_dir, checkpoints_dir):
         if epoch % config['save_freq'] == 0 and (
             'save_no_checkpoints' not in config or not config['save_no_checkpoints']):
             cur_ckp_filename = 'ckp_' + str(epoch)
+            # TODO: update to save batch scheduler if specified?
             utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, cur_ckp_filename)
             if (prev_ckp_path is not None and not(config['save_all_checkpoints'])):
                 os.remove(prev_ckp_path)
@@ -474,8 +501,11 @@ def main(config, log_dir, checkpoints_dir):
         # One epoch of model training.
         train_stats = train(
            epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
-           test_loaders, max_test_examples, weight_dict_initial) 
-        scheduler.step()
+           test_loaders, max_test_examples, weight_dict_initial, batch_scheduler) 
+        # Call scheduler to update learning rate, unless we have a batch scheduler, in which
+        # case we will update the learning rate every step.
+        if not check_exists_not_none(config, 'batch_scheduler'):
+            scheduler.step()
         # Get test stats across all test sets.
         test_stats = get_all_test_stats(
             epoch, test_loaders, max_test_examples, config, net, criterion, device,
