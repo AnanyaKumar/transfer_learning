@@ -13,7 +13,8 @@ model:
   args:
     model_name: 'ViT-B/16'
 
-scheduler:
-  classname: torch.optim.lr_scheduler.CosineAnnealingLR
-  args:
-    T_max: *epochs
+max_grad_norm: 1.0
+
+batch_scheduler:
+  classname: transformers.get_cosine_schedule_with_warmup
+  args: {}

@@ -523,6 +523,23 @@ waterbirds = Dataset(
     slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_eval.yaml')
 
+waterbirds_clipped_warmup = Dataset(
+    name='waterbirds_clipped_warmup',
+    val_metric='test_acc/val',
+    secondary_val_metrics=['LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    config_rel_path='adaptation/waterbirds_clipped_warmup.yaml',
+    bundles=['waterbirds_pickle'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    eval_config_rel_path='adaptation/waterbirds_clipped_warmup_eval.yaml')
+
 waterbirds_label_balanced = Dataset(
     name='waterbirds_label_balanced',
     val_metric='test_acc/val',
@@ -808,6 +825,7 @@ names_to_datasets = {
     'waterbirds': waterbirds,  # This dataset doesn't normalize.
     'waterbirds_augs': waterbirds_augs,  # This dataset doesn't normalize.
     'waterbirds_norm': waterbirds_norm,  # This dataset normalizes.
+    'waterbirds_clipped_warmup': waterbirds_clipped_warmup,
     'waterbirds_background': waterbirds_background,
     'waterbirds_group_balanced': waterbirds_group_balanced,
     'waterbirds_label_balanced': waterbirds_label_balanced,
@@ -941,6 +959,30 @@ dino_vit_b16 = Model(
     bundles=[]
 )
 
+deit_vit_b16 = Model(
+    kwargs={
+        'classname': 'models.vit_model.VitModel',
+        'args.model_name': 'deit_base_patch16_224',
+    },
+    bundles=[]
+)
+
+timm_vit_b16 = Model(
+    kwargs={
+        'classname': 'models.vit_model.VitModel',
+        'args.model_name': 'timm.vit_base_patch16_224',
+    },
+    bundles=[]
+)
+
+timm_vit_b16_in21k = Model(
+    kwargs={
+        'classname': 'models.vit_model.VitModel',
+        'args.model_name': 'timm.vit_base_patch16_224_in21k',
+    },
+    bundles=[]
+)
+
 bit_resnet_50 = Model(
     kwargs={
         'classname': 'models.bit_resnet.BitResNet',
@@ -977,8 +1019,11 @@ names_to_model = {
     'sup_resnet50_norm': sup_resnet50_norm,
     'mocotp_fmow_resnet50': mocotp_fmow_resnet50,
     'clip_resnet50': clip_resnet50,
+    'deit_vit_b16': deit_vit_b16,
     'clip_vit_b16': clip_vit_b16,
     'clip_vit_l14': clip_vit_l14,
+    'timm_vit_b16': timm_vit_b16,
+    'timm_vit_b16_in21k': timm_vit_b16_in21k,
     'scratch_vit_b16_clipstyle': scratch_vit_b16_clipstyle,
     'dino_vit_b16': dino_vit_b16,
     'bit_resnet_50': bit_resnet_50,
