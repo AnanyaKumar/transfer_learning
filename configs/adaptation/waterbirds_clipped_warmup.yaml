@@ -16,5 +16,6 @@ model:
 max_grad_norm: 1.0
 
 batch_scheduler:
-  classname: transformers.get_cosine_schedule_with_warmup
+  classname: unlabeled_extrapolation.utils.schedulers.CosineScheduleWithWarmup
   args: {}
+
