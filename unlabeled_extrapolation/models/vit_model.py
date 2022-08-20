@@ -39,47 +39,57 @@ def get_timm_name(model_name):
     return model_name[5:]
 
 
+def get_timm_transform(model_name):
+    timm_name = get_timm_name(model_name)
+    config = resolve_data_config({}, model=model_name)
+    normalize_transform = Normalize(mean=config['mean'], std=config['std'])
+    return normalize_transform
+
+
 class VitModel(nn.Module):
 
     def __init__(self, model_name):
         super().__init__()
         if model_name not in MODELS and not(is_timm_vit_name(model_name)):
             raise ValueError(f'model_name must be in {MODELS} but was {model_name}')
+        self._model_name = model_name
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         # Note that model has both a language and vision part.
         if is_timm_vit_name(model_name):
             model = timm.create_model(get_timm_name(model_name), pretrained=True)
+            self._normalize_transform = get_timm_transform(model_name)
         elif 'dino' in model_name:
             model = torch.hub.load('facebookresearch/dino:main', model_name, force_reload=True)
         elif 'deit' in model_name:
             model = torch.hub.load('facebookresearch/deit:main', model_name, force_reload=True)
         if self._device == 'cuda':
             model.cuda()
-        self._model_name = model_name
-        if 'deit' in model_name or is_timm_vit_name(model_name):
+        if 'deit' in model_name:
             self._model = nn.Sequential(*list(model.children())[:-1])
         else:
             self._model = model
         self._classifier = None
 
     def forward(self, x):
+        if is_timm_vit_name(self._model_name):
+            return self._model(self._normalize_transform(x)) 
         features = self.get_features(x)
         if self._classifier is None:
             return features
         return self._classifier(features)
 
     def get_layers(self):
-        if 'deit' in self._model_name or is_timm_vit_name(self._model_name):
+        if 'deit' in self._model_name:
             patch_embed = self._model[0]
             blocks = self._model[2]
         else:
             patch_embed = self._model.patch_embed
-            self._model.blocks
+            blocks = self._model.blocks
         layers = [patch_embed, patch_embed]  # To streamline with CLIP ViT.
         layers += list(blocks)
         # Note: Deit and timm vit have a layernorm after the transformer blocks, which I'm ignoring
         # for now.
-        layers += [self._classifier]
+        layers += [self.get_last_layer()]
         return layers
 
     def freeze_bottom_k(self, k):
@@ -95,21 +105,31 @@ class VitModel(nn.Module):
                 param.requires_grad = val
 
     def new_last_layer(self, num_classes):
-        if 'deit' in self._model_name or is_timm_vit_name(self._model_name):
+        if 'deit' in self._model_name:
             num_in_features = self._model[3].normalized_shape[0]
         else:
             num_in_features = self._model.norm.normalized_shape[0]
-        self._classifier = nn.Linear(num_in_features, num_classes)
-        self._classifier.to(self._device)
+        if is_timm_vit_name(self._model_name):
+            self._model.head = nn.Linear(num_in_features, num_classes)
+            self._model.head.to(self._device)
+        else:
+            self._classifier = nn.Linear(num_in_features, num_classes)
+            self._classifier.to(self._device)
 
     def add_probe(self, probe):
-        self._classifier = probe
+        if is_timm_vit_name(self._model_name):
+            self._model.head = probe
+        else:
+            self._classifier = probe
 
     def get_last_layer(self):
-        return self._classifier
+        if is_timm_vit_name(self._model_name):
+            return self._model.head
+        else:
+            return self._classifier
 
     def set_last_layer(self, coef, intercept):
-        model_utils.set_linear_layer(self._classifier, coef, intercept)
+        model_utils.set_linear_layer(self.get_last_layer(), coef, intercept)
 
     def get_feature_extractor(self):
         raise NotImplementedError('Be careful, we need to normalize image first before encoding it.')
@@ -119,11 +139,6 @@ class VitModel(nn.Module):
         # https://github.com/facebookresearch/deit/blob/main/datasets.py which calls
         # the timm library create_transform, which uses these imagenet defaults.
         if is_timm_vit_name(self._model_name):
-            timm_name = get_timm_name(self._model_name)
-            config = resolve_data_config({}, model=self._model_name)
-            normalize_transform = Normalize(mean=config['mean'], std=config['std'])
-            cls_features = self._model(normalize_transform(x))[:,0]
-            assert(len(cls_features.shape) == 2)
-            return cls_features
+            raise NotImplementedError('Need to implement this for timm models.') 
         else:
             return self._model(default_imnet_transform(x))
