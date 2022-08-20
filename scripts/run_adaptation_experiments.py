@@ -509,10 +509,10 @@ celeba = Dataset(
 waterbirds = Dataset(
     name='waterbirds',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST'],
+    secondary_val_metrics=['LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST'],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -526,10 +526,10 @@ waterbirds = Dataset(
 waterbirds_clipped_warmup = Dataset(
     name='waterbirds_clipped_warmup',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST'],
+    secondary_val_metrics=['LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST',],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -546,7 +546,7 @@ waterbirds_label_balanced = Dataset(
     secondary_val_metrics=['LAST'],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST',],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -560,10 +560,10 @@ waterbirds_label_balanced = Dataset(
 waterbirds_group_balanced = Dataset(
     name='waterbirds_group_balanced',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST'],
+    secondary_val_metrics=['LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST',],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -578,10 +578,10 @@ waterbirds_background = Dataset(
     name='waterbirds_background',
     overwrite_options=' --overwrite_dataset_name=waterbirds-background ',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST'],
+    secondary_val_metrics=['LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST',],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -595,10 +595,10 @@ waterbirds_background = Dataset(
 waterbirds_norm = Dataset(
     name='waterbirds_norm',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST'],
+    secondary_val_metrics=['LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST',],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -612,10 +612,10 @@ waterbirds_norm = Dataset(
 waterbirds_augs = Dataset(
     name='waterbirds_augs',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST'],
+    secondary_val_metrics=['LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST',],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -1470,6 +1470,20 @@ def spray_domainnet_jags(args):
         subprocess.run(shlex.split(cmd))
 
 
+def summarize_dataset(args):
+    assert len(args.datasets) == 1
+    dataset = names_to_datasets[args.datasets[0]]
+    cmd = 'python scripts/summarize_all_results.py '
+    cmd += '--results_dir_glob=logs/*' + dataset.name + '* '
+    cmd += '--val_metrics ' + dataset.val_metric + ' '
+    cmd += ' '.join(dataset.secondary_val_metrics) + ' '
+    cmd += '--output_metrics ' + ' '.join(dataset.output_metrics) + ' '
+    cmd += '--output_file=tmp.tsv'
+    print(cmd)
+    if not args.print_command:
+        os.system(cmd)
+
+
 def main(args):
     experiment_to_fns = {
         'spray_celeba_jags': spray_celeba_jags,
@@ -1499,6 +1513,7 @@ def main(args):
         'ft_imnet_lp_ft_phase_2_experiments': ft_imnet_lp_ft_phase_2_experiments,
         'ft_imnet_lp_ft_phase_2_val_mode_experiments': ft_imnet_lp_ft_phase_2_val_mode_experiments,
         'fine_tuning_mixup_sweep_experiments': fine_tuning_mixup_sweep_experiments,
+        'summarize_dataset': summarize_dataset,
     }
     if args.experiment in experiment_to_fns:
         experiment_to_fns[args.experiment](args)
