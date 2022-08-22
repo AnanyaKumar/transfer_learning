@@ -81,8 +81,7 @@ def get_test_stats(config, net, test_loader, criterion, device, epoch, loader_na
             correct = (predicted == labels.detach().cpu().numpy())
             val_acc.add_values(correct.tolist())
             loss = criterion(outputs, labels).cpu()
-            loss_list = loss.tolist()
-            val_loss.add_value(loss_list)
+            val_loss.add_value(float(loss.detach().cpu()) / len(images))
             num_examples += len(images)
             if num_examples >= max_examples:
                 logging.info("Breaking after %d examples.", num_examples)
@@ -286,6 +285,10 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
     # Returns a dictionary with epoch, train/loss and train/acc.
     # Train model.
     training_state = net.training
+    if 'use_net_val_mode' in config and config['use_net_val_mode']:
+        net.eval()
+    else:
+        net.train()
     logging.info("\nEpoch #{}".format(epoch))
     loss_dict = {
         'train/loss': Accumulator(),
@@ -304,49 +307,61 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
             mixup = Mixup(num_classes=config['num_classes'], mixup_alpha=config['mixup_alpha'])
         else:
             mixup = Mixup(num_classes=config['num_classes'])
+    # Should we split each batch into multiple parts so we don't run out of GPU memory.
+    batch_splits = 1
+    if check_exists_not_none(config, 'batch_splits'):
+        batch_splits = config['batch_splits']
     for i, data in enumerate(train_loader, 0):
-        if 'use_net_val_mode' in config and config['use_net_val_mode']:
-            net.eval()
-        else:
-            net.train()
-        # get the inputs; data is a list of [inputs, labels]
-        if config['use_cuda']:
-            data = utils.to_device(data, device)
-        inputs, labels = data
-        if 'use_mixup' in config and config['use_mixup']:
-            inputs, labels = mixup(inputs, labels)
         optimizer.zero_grad()
-        outputs = net(inputs)
-        loss = criterion(outputs, labels)
+        all_inputs, all_labels = data
+        if 'use_mixup' in config and config['use_mixup']:
+            all_inputs, all_labels = mixup(all_inputs, all_labels)
         if 'l2sp_weight' in config:
             weight_dict, _ = get_param_weights_counts(net, detach=False)
             l2sp_loss = config['l2sp_weight'] * get_l2_dist(weight_dict_initial, weight_dict)
             loss_dict['train/l2sp_loss'].add_value(l2sp_loss.tolist())
-            loss += l2sp_loss
-        _, train_preds = torch.max(outputs.data, axis=1)
-        loss_dict['train/loss'].add_value(loss.tolist())
-        if 'use_mixup' in config and config['use_mixup']:
-            _, max_labels = torch.max(labels.data, axis=1)
-            loss_dict['train/acc'].add_values((train_preds == max_labels).tolist())
-        else:
-            loss_dict['train/acc'].add_values((train_preds == labels).tolist())
-        if 'model_loss' in config:
-            opt_loss = model_loss(net, inputs, labels)
-            opt_loss.backward()
-            loss_dict['train/model_loss'].add_value(opt_loss.tolist())
-        else:
-            loss.backward()
+            l2sp_loss.backward()
+            del l2sp_loss
+        # Split up the batch so we can do the backward pass on a GPU, accumulate gradients
+        # across the split.
+        split_inputs = torch.split(
+            all_inputs, split_size_or_sections=len(all_inputs) // batch_splits)
+        split_labels = torch.split(
+            all_labels, split_size_or_sections=len(all_labels) // batch_splits)
+        for j in range(batch_splits):
+            inputs, labels = split_inputs[j], split_labels[j]
+            if config['use_cuda']:
+                inputs, labels = inputs.to(device), labels.to(device)
+            outputs = net(inputs)
+            loss = criterion(outputs, labels)
+            _, train_preds = torch.max(outputs.data, axis=1)
+            assert len(loss.shape) == 0
+            loss_dict['train/loss'].add_value(float(loss.detach().cpu()) / len(inputs))
+            if 'use_mixup' in config and config['use_mixup']:
+                _, max_labels = torch.max(labels.data, axis=1)
+                loss_dict['train/acc'].add_values((train_preds == max_labels).tolist())
+            else:
+                loss_dict['train/acc'].add_values((train_preds == labels).tolist())
+            if 'model_loss' in config:
+                opt_loss = model_loss(net, inputs, labels)
+                opt_loss.backward()
+                assert len(opt_loss.shape) == 0
+                loss_dict['train/model_loss'].add_value(float(opt_loss.detach().cpu()))
+                del opt_loss
+            else:
+                loss.backward()
+            del inputs, labels, loss
         # Collect the gradients at each layer.
-        add_layer_grad_stats(net, loss_dict, config, cur_batch_size=len(labels))
+        add_layer_grad_stats(net, loss_dict, config, cur_batch_size=len(all_labels))
         if check_exists_not_none(config, 'max_grad_norm'):
             torch.nn.utils.clip_grad_norm_(net.parameters(), config['max_grad_norm'])
         optimizer.step()
         if batch_scheduler is not None:
             batch_scheduler.step()
-        num_examples += len(labels)
+        num_examples += len(all_labels)
         outputs, loss, train_preds = None, None, None  # Try to force garbage collection.
         def should_log(log_interval):
-            return num_examples // log_interval > (num_examples - len(labels)) // log_interval
+            return num_examples // log_interval > (num_examples - len(all_labels)) // log_interval
         if should_log(config['log_interval']):
             for k in loss_dict:
                 logging.info(
