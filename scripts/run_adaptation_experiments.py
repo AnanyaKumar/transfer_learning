@@ -523,6 +523,24 @@ waterbirds = Dataset(
     slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_eval.yaml')
 
+waterbirds_large_batch = Dataset(
+    name='waterbirds_large_batch',
+    val_metric='test_acc/val',
+    secondary_val_metrics=['LAST', 'WORST',],
+    output_metrics=['epoch', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
+        'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test'],
+    config_rel_path='adaptation/waterbirds_large_batch.yaml',
+    bundles=['waterbirds_pickle'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    eval_config_rel_path='adaptation/waterbirds_large_batch_eval.yaml')
+
+
 waterbirds_clipped_warmup = Dataset(
     name='waterbirds_clipped_warmup',
     val_metric='test_acc/val',
@@ -823,6 +841,7 @@ names_to_datasets = {
     'living17_noaugs': living17_noaugs,
     'celeba': celeba,
     'waterbirds': waterbirds,  # This dataset doesn't normalize.
+    'waterbirds_large_batch': waterbirds_large_batch,
     'waterbirds_augs': waterbirds_augs,  # This dataset doesn't normalize.
     'waterbirds_norm': waterbirds_norm,  # This dataset normalizes.
     'waterbirds_clipped_warmup': waterbirds_clipped_warmup,
