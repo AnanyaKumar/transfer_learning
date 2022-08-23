@@ -6,7 +6,7 @@ inherit:
 num_classes: 2
 epochs: &epochs 100
 batch_size: 512
-batch_splits: 16
+batch_splits: 32
 save_no_checkpoints: True
 
 model:
@@ -14,7 +14,9 @@ model:
   args:
     model_name: 'ViT-B/16'
 
-scheduler:
-  classname: torch.optim.lr_scheduler.CosineAnnealingLR
-  args:
-    T_max: *epochs
+max_grad_norm: 1.0
+
+batch_scheduler:
+  classname: unlabeled_extrapolation.utils.schedulers.CosineScheduleWithWarmup
+  args: {}
+
