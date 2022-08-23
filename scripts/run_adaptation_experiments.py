@@ -1220,7 +1220,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     if args.only_one_run:
         if 'waterbirds' in args.datasets[0] and (args.freeze_bottom_k is None or
             args.freeze_bottom_k == 0):
-            hyperparams_list = range_hyper('optimizer.args.lr', [1e-3])
+            hyperparams_list = range_hyper('optimizer.args.lr', [3e-4])
         elif 1e-3 in sweep_lrs:
             # 1e-3 is a good default value for fine-tuning (with SGD).
             hyperparams_list = range_hyper('optimizer.args.lr', [1e-3])
