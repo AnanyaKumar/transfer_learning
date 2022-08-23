@@ -81,7 +81,7 @@ def get_test_stats(config, net, test_loader, criterion, device, epoch, loader_na
             correct = (predicted == labels.detach().cpu().numpy())
             val_acc.add_values(correct.tolist())
             loss = criterion(outputs, labels).cpu()
-            val_loss.add_value(float(loss.detach().cpu()) / len(images))
+            val_loss.add_values([float(loss.detach().cpu())] * len(images))
             num_examples += len(images)
             if num_examples >= max_examples:
                 logging.info("Breaking after %d examples.", num_examples)
@@ -334,9 +334,13 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
                 inputs, labels = inputs.to(device), labels.to(device)
             outputs = net(inputs)
             loss = criterion(outputs, labels)
+            # Important: nede to adjust the loss. This assumes the reduction operation is
+            # mean.
+            if config["criterion"]["args"]["reduction"] != 'sum':
+                loss = loss * len(inputs) / len(all_inputs)
             _, train_preds = torch.max(outputs.data, axis=1)
             assert len(loss.shape) == 0
-            loss_dict['train/loss'].add_value(float(loss.detach().cpu()) / len(inputs))
+            loss_dict['train/loss'].add_values([float(loss.detach().cpu())] * len(inputs))
             if 'use_mixup' in config and config['use_mixup']:
                 _, max_labels = torch.max(labels.data, axis=1)
                 loss_dict['train/acc'].add_values((train_preds == max_labels).tolist())
@@ -464,7 +468,11 @@ def main(config, log_dir, checkpoints_dir):
         # TODO: add batch scheduler.
         num_batches = len(train_loader)
         num_training_steps  = num_batches * config['epochs']
-        num_warmup_steps = int(0.1 * num_training_steps)
+        if check_exists_not_none(config, 'warmup_frac'):
+            num_warmup_steps = int(config['warmup_frac'] * num_training_steps)
+        else:
+            num_warmup_steps = int(0.1 * num_training_steps)
+            logging.info("Warming up for %d steps", num_warmup_steps)
         batch_scheduler = utils.initialize(
             config['batch_scheduler'], update_args={
                 'optimizer': optimizer,
