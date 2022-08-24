@@ -485,7 +485,7 @@ def main(config, log_dir, checkpoints_dir):
             num_warmup_steps = int(config['warmup_frac'] * num_training_steps)
         else:
             num_warmup_steps = int(0.1 * num_training_steps)
-            logging.info("Warming up for %d steps", num_warmup_steps)
+        logging.info("Warming up for %d steps", num_warmup_steps)
         batch_scheduler = utils.initialize(
             config['batch_scheduler'], update_args={
                 'optimizer': optimizer,

@@ -15,8 +15,6 @@ model:
 
 max_grad_norm: 1.0
 
-warmup_frac: 0.25
-
 batch_scheduler:
   classname: unlabeled_extrapolation.utils.schedulers.CosineScheduleWithWarmup
   args: {}
