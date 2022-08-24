@@ -264,20 +264,33 @@ def add_layer_grad_stats(net, loss_dict, config, cur_batch_size):
         return
     layers = net.get_layers()
     for i in range(len(layers)):
-        cur_layer = list(layers[i].parameters())
-        if not cur_layer[0].requires_grad:
+        if len(layers[i]) == 1:
+            # In the older version of model code, we just return a list of layers without names.
+            layer_name = 'train/grad_layer_' + str(i)
+            normalized_layer_name = 'train/normalized_grad_layer_' + str(i)
+            cur_layer = list(layers[i].parameters())
+        else:
+            # In newer version of model code, we have a (name, layer) tuple.
+            layer_name = 'train/grad_' + layers[i][0]
+            normalized_layer_name = 'train/normalized_grad_' + layers[i][0]
+            cur_layer = list(layers[i][1].parameters())
+        if len(cur_layer) == 0 or not cur_layer[0].requires_grad:
             continue
-        if _grad_layer_name + str(i) not in loss_dict:
-            loss_dict[_grad_layer_name + str(i)] = Accumulator()
-        if _normalized_grad_layer_name + str(i) not in loss_dict:
-            loss_dict[_normalized_grad_layer_name + str(i)] = Accumulator()
+        if layer_name not in loss_dict:
+            loss_dict[layer_name] = Accumulator()
+        if normalized_layer_name not in loss_dict:
+            loss_dict[normalized_layer_name] = Accumulator()
         grads = [p.grad.detach().cpu().numpy() for p in cur_layer]
         grad_norms_squared = [np.linalg.norm(g) ** 2 for g in grads]
         grad_norm = np.sqrt(np.sum(grad_norms_squared)) / cur_batch_size
-        loss_dict[_grad_layer_name + str(i)].add_value(grad_norm)
+        loss_dict[layer_name].add_value(grad_norm)
         num_params = np.sum([p.numel() for p in cur_layer])
-        normalized_grad_norm = grad_norm / np.sqrt(num_params)
-        loss_dict[_normalized_grad_layer_name + str(i)].add_value(normalized_grad_norm)
+        if num_params == 0:
+            assert np.isclose(grad_norm, 0.0)
+            normalized_grad_norm = grad_norm
+        else:
+            normalized_grad_norm = grad_norm / np.sqrt(num_params)
+        loss_dict[normalized_layer_name].add_value(normalized_grad_norm)
 
 
 def train(epoch, config, train_loader, net, device, optimizer, criterion, model_loss,

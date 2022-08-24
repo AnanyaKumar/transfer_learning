@@ -65,6 +65,9 @@ class VitModel(nn.Module):
         if self._device == 'cuda':
             model.cuda()
         if 'deit' in model_name:
+            # deit implementation is not complete, doesn't seem to load properly, and also
+            # get_layers likely isn't handled correctly.
+            raise NotImplementedError
             self._model = nn.Sequential(*list(model.children())[:-1])
         else:
             self._model = model
@@ -83,17 +86,33 @@ class VitModel(nn.Module):
             patch_embed = self._model[0]
             blocks = self._model[2]
         else:
+            pos_embed = self._model.pos_embed
+            cls_token = self._model.cls_token
             patch_embed = self._model.patch_embed
             blocks = self._model.blocks
-        layers = [patch_embed, patch_embed]  # To streamline with CLIP ViT.
-        layers += list(blocks)
-        # Note: Deit and timm vit have a layernorm after the transformer blocks, which I'm ignoring
-        # for now.
-        layers += [self.get_last_layer()]
+        layers = [
+            ('patch_embed', patch_embed),
+            ('empty_ln_pre', nn.Module()),  # To streamline number of layers with CLIP.
+            ('pos_embed', model_utils.ParamWrapperModule(pos_embed)),
+            ('cls_token', model_utils.ParamWrapperModule(cls_token)),
+        ] 
+        for i, block in zip(range(len(blocks)), blocks):
+            layers += [
+                ('trans' + str(i) + '_norm1', block.norm1),
+                ('trans' + str(i) + '_attn_qkv', block.attn.qkv),
+                ('trans' + str(i) + '_attn_proj', block.attn.proj),
+                ('trans' + str(i) + '_norm2', block.norm2),
+                ('trans' + str(i) + '_mlp', block.mlp),
+            ]
+        if 'dino' not in self._model_name:
+            layers += [('post_norm', self._model.norm)]
+        else:
+            layers += [('empty_post_norm', nn.Module())]
+        layers += [('head', self.get_last_layer())]
         return layers
 
     def freeze_bottom_k(self, k):
-        layers = self.get_layers()
+        layers = [layer for name, layer in self.get_layers()]
         for i in range(min(k, len(layers))):
             set_requires_grad(layers[i], False)
 

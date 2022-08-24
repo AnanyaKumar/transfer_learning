@@ -103,9 +103,23 @@ class ClipModel(nn.Module):
         visual = self._model.visual
         if self._model_name in {'ViT-B/32', 'ViT-B/16',
                                 'ViT-L/14', 'ViT-L/14@336px'}:
-            layers = ([visual.conv1, visual.ln_pre] +
-                      list(visual.transformer.resblocks) +
-                      [visual.ln_post])
+            layers = [
+                ('patch_embed', visual.conv1),
+                ('ln_pre', visual.ln_pre),  # To streamline number of layers with CLIP.
+                ('pos_embed', model_utils.ParamWrapperModule(visual.positional_embedding)),
+                ('cls_token', model_utils.ParamWrapperModule(visual.class_embedding)),
+            ]
+            blocks = visual.transformer.resblocks
+            for i, block in zip(range(len(blocks)), blocks):
+                layers += [
+                    ('trans' + str(i) + '_norm1', block.norm1),
+                    ('trans' + str(i) + '_attn_qkv', block.attn.qkv),
+                    ('trans' + str(i) + '_attn_proj', block.attn.proj),
+                    ('trans' + str(i) + '_norm2', block.norm2),
+                    ('trans' + str(i) + '_mlp', block.mlp),
+                ]
+            layers += [('post_norm', visual.ln_post)]
+            layers += [('head', self.get_last_layer())]
         elif self._model_name in {'RN50'}:
             layers = [visual.conv1, visual.bn1, visual.conv2, visual.bn2,
                       visual.conv3, visual.bn3, visual.layer1, visual.layer2,

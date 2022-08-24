@@ -1184,7 +1184,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         else:
             sweep_lrs = [0.0001, 0.0003, 0.001]
     if 'waterbirds' in args.datasets[0]:
-        sweep_lrs = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3]
+        sweep_lrs = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1]
     if side_tune:
         adapt_name += '_side_tune'
         sweep_lrs = sweep_lrs + [3e-2, 1e-1, 3e-1, 1.0, 3.0, 10.0]
