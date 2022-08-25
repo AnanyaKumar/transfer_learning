@@ -366,12 +366,14 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
                 loss_dict['train/acc'].add_values((train_preds == labels).tolist())
             if 'model_loss' in config:
                 opt_loss = model_loss(net, inputs, labels)
-                opt_loss.backward()
+                if not check_exists_value(config, 'no_train', True):
+                    opt_loss.backward()
                 assert len(opt_loss.shape) == 0
                 loss_dict['train/model_loss'].add_value(float(opt_loss.detach().cpu()))
                 del opt_loss
             else:
-                loss.backward()
+                if not check_exists_value(config, 'no_train', True):
+                    loss.backward()
             del inputs, labels, loss
         # Collect the gradients at each layer.
         add_layer_grad_stats(net, loss_dict, config, cur_batch_size=len(all_labels))
@@ -760,7 +762,7 @@ def setup():
     parser.add_argument('--copy_all_folders', action='store_true',
                         help='Copy all folders (e.g. code, utils) for reproducibility.')
     parser.add_argument('--project_name', type=str,
-                        help='Name of the wandb project', required=True)
+                        help='Name of the wandb project')
     parser.add_argument('--group_name', default=None, help='Name of the wandb group (a group of runs)')
     parser.add_argument('--run_name', default=None, help='Name of the wandb run')
     parser.add_argument('--entity_name', default='p-lambda', help='Name of the team')
