@@ -112,26 +112,44 @@ class ClipModel(nn.Module):
             blocks = visual.transformer.resblocks
             for i, block in zip(range(len(blocks)), blocks):
                 layers += [
-                    ('trans' + str(i) + '_norm1', block.norm1),
-                    ('trans' + str(i) + '_attn_qkv', block.attn.qkv),
-                    ('trans' + str(i) + '_attn_proj', block.attn.proj),
-                    ('trans' + str(i) + '_norm2', block.norm2),
+                    ('trans' + str(i) + '_norm1', block.ln_1),
+                    ('trans' + str(i) + '_attn', block.attn),
+                    ('trans' + str(i) + '_norm2', block.ln_2),
                     ('trans' + str(i) + '_mlp', block.mlp),
                 ]
             layers += [('post_norm', visual.ln_post)]
             layers += [('head', self.get_last_layer())]
         elif self._model_name in {'RN50'}:
-            layers = [visual.conv1, visual.bn1, visual.conv2, visual.bn2,
-                      visual.conv3, visual.bn3, visual.layer1, visual.layer2,
-                      visual.layer3, visual.layer3, visual.attnpool]
+            layers = [
+                ('conv1', visual.conv1),
+                ('bn1', visual.bn1),
+                ('conv2', visual.conv2),
+                ('bn2', visual.bn2),
+                ('conv3', visual.conv3),
+                ('bn3', visual.bn3),
+                ('layer1', visual.layer1),
+                ('layer2', visual.layer2),
+                ('layer3', visual.layer3),
+                ('attnpool', visual.attnpool)]
         else:
             raise NotImplementedError
         if self._classifier is not None:
-            layers = layers + [self._classifier]
+            layers = layers + [('head', self._classifier)]
         return layers
 
+    def tune_bottom_k(self, k):
+        layers = [layer for name, layer in self.get_layers()]
+        if k > len(layers):
+            raise ValueError(f"k {k} should be less than number of layers {len(layers)}")
+        set_requires_grad(self._model, False)
+        for i in range(k):
+            set_requires_grad(layers[i], True)
+        # Also need to tune the prediction head because the fine-tuning task is different
+        # from pretraining.
+        set_requires_grad(layers[-1], True)
+
     def freeze_bottom_k(self, k):
-        layers = self.get_layers()
+        layers = [layer for name, layer in self.get_layers()]
         if k > len(layers):
             raise ValueError(f"k {k} should be less than number of layers {len(layers)}")
         for i in range(k):

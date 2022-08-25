@@ -1184,7 +1184,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         else:
             sweep_lrs = [0.0001, 0.0003, 0.001]
     if 'waterbirds' in args.datasets[0]:
-        sweep_lrs = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1]
+        sweep_lrs = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3]
     if side_tune:
         adapt_name += '_side_tune'
         sweep_lrs = sweep_lrs + [3e-2, 1e-1, 3e-1, 1.0, 3.0, 10.0]
@@ -1246,6 +1246,10 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         hyperparams_list = append_to_each(
             hyperparams_list, {'freeze_bottom_k': args.freeze_bottom_k})
         adapt_name += '_freeze_bottom_' + str(args.freeze_bottom_k)
+    if args.tune_bottom_k is not None:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'tune_bottom_k': args.tune_bottom_k})
+        adapt_name += '_tune_bottom_' + str(args.tune_bottom_k)
     if args.optimizer is not None:
         hyperparams_list = append_to_each(
             hyperparams_list, {'optimizer.classname': args.optimizer})
@@ -1404,6 +1408,10 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         hyperparams_list = append_to_each(
             hyperparams_list, {'freeze_bottom_k': args.freeze_bottom_k})
         adapt_name += '_freeze_bottom_' + str(args.freeze_bottom_k)
+    if args.tune_bottom_k is not None:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'tune_bottom_k': args.tune_bottom_k})
+        adapt_name += '_tune_bottom_' + str(args.tune_bottom_k)
     if args.no_replications:
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
@@ -1598,6 +1606,8 @@ if __name__ == "__main__":
                         help='Model to use', required=False)
     parser.add_argument('--freeze_bottom_k', type=int, required=False, default=None,
                         help='Freeze bottom k layers (if not specified, don\'t freeze).')
+    parser.add_argument('--tune_bottom_k', type=int, required=False, default=None,
+                        help='Tune bottom k layers (if not specified, tune everything).')
     parser.add_argument('--full_ft_epoch', type=int, required=False, default=None,
                         help='At what epoch should we unfreeze all weights and fine-tune.')
     parser.add_argument('--only_one_run', action='store_true',

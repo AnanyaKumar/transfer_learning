@@ -4,7 +4,7 @@ inherit:
   - datasets_waterbirds.yaml
 
 num_classes: 2
-epochs: &epochs 200
+epochs: &epochs 100
 batch_size: 512
 batch_splits: 16
 save_no_checkpoints: True
@@ -14,10 +14,8 @@ model:
   args:
     model_name: 'ViT-B/16'
 
-max_grad_norm: 1.0
-warmup_frac: 0.25
-
-batch_scheduler:
-  classname: unlabeled_extrapolation.utils.schedulers.CosineScheduleWithWarmup
-  args: {}
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
 

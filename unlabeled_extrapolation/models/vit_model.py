@@ -99,8 +99,7 @@ class VitModel(nn.Module):
         for i, block in zip(range(len(blocks)), blocks):
             layers += [
                 ('trans' + str(i) + '_norm1', block.norm1),
-                ('trans' + str(i) + '_attn_qkv', block.attn.qkv),
-                ('trans' + str(i) + '_attn_proj', block.attn.proj),
+                ('trans' + str(i) + '_attn', block.attn),
                 ('trans' + str(i) + '_norm2', block.norm2),
                 ('trans' + str(i) + '_mlp', block.mlp),
             ]
@@ -111,6 +110,17 @@ class VitModel(nn.Module):
         layers += [('head', self.get_last_layer())]
         return layers
 
+    def tune_bottom_k(self, k):
+        layers = [layer for name, layer in self.get_layers()]
+        if k > len(layers):
+            raise ValueError(f"k {k} should be less than number of layers {len(layers)}")
+        set_requires_grad(self._model, False)
+        for i in range(k):
+            set_requires_grad(layers[i], True)
+        # Also need to tune the prediction head because the fine-tuning task is different
+        # from pretraining.
+        set_requires_grad(layers[-1], True)
+    
     def freeze_bottom_k(self, k):
         layers = [layer for name, layer in self.get_layers()]
         for i in range(min(k, len(layers))):

@@ -153,9 +153,10 @@ def build_model(config):
     finetune = 'finetune' in config and config['finetune']
     linear_probe = 'linear_probe' in config and config['linear_probe']
     freeze_bottom_k = 'freeze_bottom_k' in config
+    tune_bottom_k = check_exists_not_none(config, 'tune_bottom_k')
     batch_norm = 'batchnorm_ft' in config and config['batchnorm_ft']
     side_tune = 'side_tune' in config and config['side_tune']
-    if finetune or linear_probe or batch_norm or side_tune:
+    if finetune or linear_probe or batch_norm or side_tune: 
         if freeze_bottom_k:
             # Currently only implemented for some models (including CLIP ViTs).
            net.freeze_bottom_k(config['freeze_bottom_k']) 
@@ -180,6 +181,10 @@ def build_model(config):
             net.add_probe(probe_net)
         else:
             net.new_last_layer(config['num_classes'])
+        if tune_bottom_k:
+            if freeze_bottom_k:
+                raise ValueError("Cannot have tune bottom k and freeze bottom k simultaneously.")
+            net.tune_bottom_k(config['tune_bottom_k'])
         if side_tune:
             # This is currently only supported for some networks like ResNet-50,
             # would need to add support for other networks.
