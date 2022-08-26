@@ -1216,8 +1216,15 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         adapt_name += '_epochs' + str(args.epochs)
     if args.optimizer is not None:
         sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
+    if args.no_replications or args.only_one_run:
+        num_replications = 1
+        # Would be num_replications = 0 if we used adaptation_experiment below.
     # Set hyperparameters
-    if args.only_one_run:
+    if args.no_train:
+        hyperparams_list = range_hyper('optimizer.args.lr', [0.0])
+        hyperparams_list = append_to_each(hyperparams_list, {'no_train': True})
+        adapt_name += '_no_train_'
+    elif args.only_one_run:
         if 'waterbirds' in args.datasets[0] and (args.freeze_bottom_k is None or
             args.freeze_bottom_k == 0):
             hyperparams_list = range_hyper('optimizer.args.lr', [3e-4])
@@ -1226,9 +1233,6 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
             hyperparams_list = range_hyper('optimizer.args.lr', [1e-3])
         else:
             hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
-        # TODO: remove this?
-        num_replications = 1
-        # Would be num_replications = 0 if we used adaptation_experiment below.
     elif mixup_sweep:
         lr_hypers = range_hyper('optimizer.args.lr', sweep_lrs)
         # TODO: add 1.0 to this as well.
@@ -1290,9 +1294,6 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
                     'torch_linprobe_epochs5_imagenet_clip_vit_b16/'
                     'epochs-5_linear_probe-True_optimizer.args.lr-0.1_scheduler.args.'
                     'T_max-5_seed-0_run0/checkpoints/ckp_best_val'})
-    if args.no_replications:
-        num_replications = 1
-        # Would be num_replications = 0 if we used adaptation_experiment below.
     for dataset in datasets:
         all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
@@ -1396,12 +1397,17 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
     linprobe_adapt_name = 'linprobe'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
-    if args.only_one_run:
-        hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
+    if args.only_one_run or args.no_replications:
         num_replications = 1
-        # Would be num_replications = 0 if we used adaptation_experiment below.
+    if args.no_train:
+        hyperparams_list = range_hyper('optimizer.args.lr', [0.0])
+        hyperparams_list = append_to_each(hyperparams_list, {'no_train': True})
+        adapt_name += '_no_train_'
+    elif args.only_one_run:
+        hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
     else:
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
+        # Would be num_replications = 0 if we used adaptation_experiment below.
     if val_mode:
         hyperparams_list = append_to_each(hyperparams_list, {'use_net_val_mode': True})
     if args.freeze_bottom_k is not None:
@@ -1412,9 +1418,6 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         hyperparams_list = append_to_each(
             hyperparams_list, {'tune_bottom_k': args.tune_bottom_k})
         adapt_name += '_tune_bottom_' + str(args.tune_bottom_k)
-    if args.no_replications:
-        num_replications = 1
-        # Would be num_replications = 0 if we used adaptation_experiment below.
     if args.epochs is not None:
         hyperparams_list = append_to_each(hyperparams_list, {'epochs': args.epochs})
         hyperparams_list = append_to_each(hyperparams_list, {'scheduler.args.T_max': args.epochs})
@@ -1615,6 +1618,8 @@ if __name__ == "__main__":
                               '(also do not run replications).'), required=False)
     parser.add_argument('--no_replications', action='store_true',
                         help='Don\'t run replication runs, only sweep.', required=False)
+    parser.add_argument('--no_train', action='store_true',
+                        help='Don\'t train model, just collect stats.', required=False)
     args, unparsed = parser.parse_known_args()
     fill_platform_specific_default_args(args)
     main(args)
