@@ -1,0 +1,25 @@
+target:
+  service: sing
+  name: msrresrchvc
+
+environment:
+  image: amlt-sing/pytorch-1.8.0
+  setup:
+    - apt-get update
+    - apt-get install git
+    - pip install ./CLIP
+    - pip install -e .
+
+code:
+  # local directory of the code. this will be uploaded to the server.
+  # $CONFIG_DIR is expanded to the directory of this config file
+  local_dir: .
+
+# data:
+#   data upload is not required for this example
+
+jobs:
+  - name: test_job
+    sku: G1-V100-P100
+    command:
+    - python unlabeled_extrapolation/baseline_train.py --config=configs/adaptation/waterbirds.yaml --root_prefix=. --log_dir=logs/debug_run1 --batch_size=16 --train_dataset.args.download=True --no_wandb
