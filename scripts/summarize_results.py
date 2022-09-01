@@ -33,7 +33,13 @@ def get_result(file_path, val_metric, output_metrics, take_max=True):
     if val_metric == 'WORST' or 'WORST' in output_metrics:
         test_acc_column_names = [s for s in df.columns if 'test_acc' in s]
         worst_accs = df[test_acc_column_names].min(axis=1)
-        df['WORST'] = worst_accs
+        df['WORST'] = worst_accs * 100
+    if val_metric == 'WATERBIRDS_VAL' or 'WATERBIRDS_VAL' in output_metrics:
+        val_accs = (df['test_acc/waterbg-waterbird-test'] * 1057.0 +
+                    df['test_acc/landbg-waterbird-test'] * 56.0 +
+                    df['test_acc/waterbg-landbird-test'] * 184.0 +
+                    df['test_acc/landbg-landbird-test'] * 3498.0) / 4795 * 100
+        df['WATERBIRDS_VAL'] = val_accs
     if val_metric is not None and val_metric != 'LAST':
         if val_metric not in df:
             raise ValueError(f'{val_metric} column not in {file_path}')

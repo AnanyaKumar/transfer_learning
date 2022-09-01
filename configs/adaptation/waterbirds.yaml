@@ -4,7 +4,7 @@ inherit:
   - datasets_waterbirds.yaml
 
 num_classes: 2
-epochs: &epochs 100
+epochs: &epochs 20
 batch_size: 32
 save_no_checkpoints: True
 
