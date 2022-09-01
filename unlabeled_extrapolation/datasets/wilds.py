@@ -24,7 +24,7 @@ def equal_subsample(list_of_lists, rng):
 
 class WILDS(Dataset):
 
-    def __init__(self, dataset_name, split, root, meta_selector=None, transform=None, download=False, return_meta=False,
+    def __init__(self, dataset_name, split, root, meta_selector=None, transform=None, download=True, return_meta=False,
                  subsampled_y=False, subsampled_meta=False, seed=0):
         # Split can be train, id_val, id_test, val, test.
         super().__init__()

@@ -170,4 +170,4 @@ class VitModel(nn.Module):
         if is_timm_vit_name(self._model_name):
             raise NotImplementedError('Need to implement this for timm models.') 
         else:
-            return self._model(default_imnet_transform(x))
+            return self._model(default_imnet_normalize(x))
