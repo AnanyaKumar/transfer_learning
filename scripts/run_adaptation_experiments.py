@@ -509,10 +509,11 @@ celeba = Dataset(
 waterbirds = Dataset(
     name='waterbirds',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST', 'WORST',],
+    secondary_val_metrics=['WATERBIRDS_VAL', 'LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST'],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test',
+        'WATERBIRDS_VAL', 'WORST'],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -520,16 +521,17 @@ waterbirds = Dataset(
     config_rel_path='adaptation/waterbirds.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/scr/biggest/ue_datasets/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_eval.yaml')
 
 waterbirds_large_batch = Dataset(
     name='waterbirds_large_batch',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST', 'WORST',],
+    secondary_val_metrics=['WATERBIRDS_VAL', 'LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST'],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test',
+        'WATERBIRDS_VAL', 'WORST'],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -544,10 +546,11 @@ waterbirds_large_batch = Dataset(
 waterbirds_clipped_warmup = Dataset(
     name='waterbirds_clipped_warmup',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST', 'WORST',],
+    secondary_val_metrics=['WATERBIRDS_VAL','LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST',],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 
+        'WATERBIRDS_VAL', 'WORST',],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -561,10 +564,11 @@ waterbirds_clipped_warmup = Dataset(
 waterbirds_label_balanced = Dataset(
     name='waterbirds_label_balanced',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST'],
+    secondary_val_metrics=['WATERBIRDS_VAL', 'LAST', 'WORST'],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST',],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 
+        'WATERBIRDS_VAL', 'WORST',],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -578,10 +582,11 @@ waterbirds_label_balanced = Dataset(
 waterbirds_group_balanced = Dataset(
     name='waterbirds_group_balanced',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST', 'WORST',],
+    secondary_val_metrics=['WATERBIRDS_VAL','LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST',],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 
+        'WATERBIRDS_VAL', 'WORST',],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -596,10 +601,11 @@ waterbirds_background = Dataset(
     name='waterbirds_background',
     overwrite_options=' --overwrite_dataset_name=waterbirds-background ',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST', 'WORST',],
+    secondary_val_metrics=['WATERBIRDS_VAL', 'LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST',],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 
+        'WATERBIRDS_VAL', 'WORST',],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -613,10 +619,11 @@ waterbirds_background = Dataset(
 waterbirds_norm = Dataset(
     name='waterbirds_norm',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST', 'WORST',],
+    secondary_val_metrics=['WATERBIRDS_VAL', 'LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST',],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 
+        'WATERBIRDS_VAL', 'WORST',],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -630,10 +637,11 @@ waterbirds_norm = Dataset(
 waterbirds_augs = Dataset(
     name='waterbirds_augs',
     val_metric='test_acc/val',
-    secondary_val_metrics=['LAST', 'WORST',],
+    secondary_val_metrics=['WATERBIRDS_VAL', 'LAST', 'WORST',],
     output_metrics=['epoch', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
-        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test', 'WORST',],
+        'test_acc/waterbg-landbird-test', 'test_acc/waterbg-waterbird-test',
+        'WATERBIRDS_VAL', 'WORST',],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/val',
         'test_acc/landbg-landbird-test', 'test_acc/landbg-waterbird-test',
@@ -1011,6 +1019,24 @@ bit_resnet_50 = Model(
     bundles=[]
 )
 
+bit_resnet_101_in21k = Model(
+    kwargs={
+        'classname': 'models.bit_resnet.BitResNet',
+        'args.model_name': 'BiT-M-R101x1',
+        'checkpoint_rel_path': 'BiT-M-R101x1.npz',
+    },
+    bundles=[]
+)
+
+bit_resnet_50_in21k = Model(
+    kwargs={
+        'classname': 'models.bit_resnet.BitResNet',
+        'args.model_name': 'BiT-M-R50x1',
+        'checkpoint_rel_path': 'BiT-M-R50x1.npz',
+    },
+    bundles=[]
+)
+
 landcover_baseline = Model(
     kwargs={
         'classname': 'models.innout_models.CNN1D',
@@ -1046,6 +1072,8 @@ names_to_model = {
     'scratch_vit_b16_clipstyle': scratch_vit_b16_clipstyle,
     'dino_vit_b16': dino_vit_b16,
     'bit_resnet_50': bit_resnet_50,
+    'bit_resnet_50_in21k': bit_resnet_50_in21k,
+    'bit_resnet_101_in21k': bit_resnet_101_in21k,
     'landcover_baseline': landcover_baseline,
     'landcover_auxin': landcover_auxin,
 }
@@ -1183,8 +1211,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
             sweep_lrs = [0.00001, 0.00003, 0.0001]
         else:
             sweep_lrs = [0.0001, 0.0003, 0.001]
-    if 'waterbirds' in args.datasets[0]:
-        sweep_lrs = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3]
+    # if 'waterbirds' in args.datasets[0]:
+    #     sweep_lrs = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3]
     if side_tune:
         adapt_name += '_side_tune'
         sweep_lrs = sweep_lrs + [3e-2, 1e-1, 3e-1, 1.0, 3.0, 10.0]
@@ -1297,7 +1325,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     for dataset in datasets:
         all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
-            num_replications=num_replications, args=args, ignore_name_hypers={'checkpoint_path', 'optimizer.classname'})
+            num_replications=num_replications, args=args,
+            ignore_name_hypers={'full_ft_epoch', 'checkpoint_path', 'optimizer.classname'})
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
@@ -1425,6 +1454,10 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         hyperparams_list = append_to_each(
             hyperparams_list, {'optimizer.classname': args.optimizer})
         adapt_name += '_opt_' + args.optimizer 
+    if args.full_ft_epoch is not None:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'full_ft_epoch': args.full_ft_epoch})
+        adapt_name += '_full_ft_epoch_' + str(args.full_ft_epoch)
     if l2sp:
         # Note: tried 1.0, 0.1, 0.01, 0.001, 0.0001 on Living-17
         # 0.01 worked best ID, and 0.1 worked best OOD but did 0.4% worse than fine-tuning ID.
@@ -1446,7 +1479,7 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
             adapt_name=adapt_name, dataset=dataset, model=model,
             hyperparams_list=cur_hyperparams_list, num_replications=num_replications,
             replication_hyperparams_list=replication_hyperparams_list, args=args,
-            ignore_name_hypers={'linear_probe_checkpoint_path', 'optimizer.classname'})
+            ignore_name_hypers={'full_ft_epoch', 'linear_probe_checkpoint_path', 'optimizer.classname'})
         print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
@@ -1471,10 +1504,13 @@ def lp_then_ft_usenewbnstats_experiments(args, num_replications=3):
 ############################################
 
 def spray_dataset_jags(copy_cmd):
-    for i in range(10, 30):
+    for i in range(10, 32):
         cmd = f'sbatch -p jag-lo --cpus-per-task=1 --gres=gpu:0 --mem=4G --nodelist=jagupard{i} ' +\
               f'scripts/run_sbatch.sh "{copy_cmd}"'
-        subprocess.run(cmd, shell=True)
+        if args.print_command:
+            print(cmd)
+        else:
+            subprocess.run(cmd, shell=True)
 
 
 def spray_celeba_jags(args):
@@ -1492,8 +1528,14 @@ def spray_imagenet_jags(args):
         f'source {args.scripts_dir}/copy_dataset.sh imagenet')
 
 
+def spray_wilds_jags(args):
+    spray_dataset_jags(
+        f'python {args.scripts_dir}/download_wilds_datasets.py --root_dir /scr/biggest/ue_datasets/wilds/data/ '
+        f'--datasets {" ".join(args.datasets)}')
+
+
 def spray_domainnet_jags(args):
-    for i in range(10, 30):
+    for i in range(10, 32):
         cmd = 'sbatch -p jag-lo --cpus-per-task=1 --gres=gpu:0 --mem=4G'
         cmd += f' --nodelist=jagupard{i} -J copy_domainnet_jag{i} -o %x.out'
         cmd += ' scripts/copy_dataset.sh domainnet'
@@ -1504,7 +1546,7 @@ def summarize_dataset(args):
     assert len(args.datasets) == 1
     dataset = names_to_datasets[args.datasets[0]]
     cmd = 'python scripts/summarize_all_results.py '
-    cmd += '--results_dir_glob=logs/*' + dataset.name + '* '
+    cmd += '--results_dir_glob=' + args.log_dir + '/*' + dataset.name + '* '
     cmd += '--val_metrics ' + dataset.val_metric + ' '
     cmd += ' '.join(dataset.secondary_val_metrics) + ' '
     cmd += '--output_metrics ' + ' '.join(dataset.output_metrics) + ' '
@@ -1520,6 +1562,7 @@ def main(args):
         'spray_fmow_jags': spray_fmow_jags,
         'spray_imagenet_jags': spray_imagenet_jags,
         'spray_domainnet_jags': spray_domainnet_jags,
+        'spray_wilds_jags': spray_wilds_jags,
         'fine_tuning_experiments': fine_tuning_experiments,
         'fine_tuning_celeba_experiments': fine_tuning_celeba_experiments,
         'linprobe_experiments': linprobe_experiments,
@@ -1589,7 +1632,7 @@ if __name__ == "__main__":
                         help='Path to dir where scripts are stored.')
     parser.add_argument('--output_dir', type=str, required=False, default='slurm_outputs/',
                         help='(Slurm only) Path to dir to store stdout for experiment.')
-    parser.add_argument('--log_dir', type=str, required=False, default=None,
+    parser.add_argument('--log_dir', type=str, required=False, default='logs/',
                         help='Path to dir where we save logs and run checkpoints.')
     parser.add_argument('--pretrained_checkpoints_dir', type=str, required=False,
                         default=None, help='Path to dir where we keep pretrained checkpoints.')

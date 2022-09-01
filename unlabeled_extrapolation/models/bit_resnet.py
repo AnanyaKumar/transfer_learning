@@ -191,7 +191,10 @@ class BitResNet(nn.Module):
         if model_name not in KNOWN_MODELS:
             raise ValueError(f'model_name ({model_name}) not found in KNOWN_MODELS ({KNOWN_MODELS})')
         self._model_name = model_name
-        self._model = KNOWN_MODELS[model_name](head_size=1000)
+        if 'ILSVRC2012' in checkpoint_path:
+            self._model = KNOWN_MODELS[model_name](head_size=1000)
+        else:
+            self._model = KNOWN_MODELS[model_name](head_size=21843)
         self._model.load_from(np.load(checkpoint_path))
         self._normalize = normalize
         
@@ -205,11 +208,14 @@ class BitResNet(nn.Module):
             param.requires_grad = val
 
     def get_layers(self):
-        layers = [self._model.root] + list(self._model.body) + [self._model.head]
+        blocks = list(self._model.body)
+        layers = ([('stem', self._model.root)] +
+                  [('conv-block-' + str(i), b) for i, b in zip(range(len(blocks)), blocks)] +
+                  [('head', self._model.head)])
         return layers
 
     def freeze_bottom_k(self, k):
-        layers = self.get_layers()
+        layers = [l for _, l in self.get_layers()]
         if k > len(layers):
             raise ValueError(f"k {k} should be less than number of layers {len(layers)}")
         for i in range(k):

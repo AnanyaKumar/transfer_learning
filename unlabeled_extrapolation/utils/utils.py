@@ -9,6 +9,11 @@ import inspect
 import torch
 from torchvision import transforms
 
+
+def count_parameters(model, trainable):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad == trainable)
+
+
 def save_json(save_path, save_dict):
     with open(save_path, 'w') as outfile:
         json.dump(save_dict, outfile)
