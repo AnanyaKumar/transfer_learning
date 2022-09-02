@@ -19,7 +19,4 @@ code:
 #   data upload is not required for this example
 
 jobs:
-  - name: test_job
-    sku: G1-V100-P100
-    command:
-    - python unlabeled_extrapolation/baseline_train.py --config=configs/adaptation/waterbirds.yaml --root_prefix=. --log_dir=$$AMLT_OUTPUT_DIR --batch_size=16 --train_dataset.args.download=True --no_wandb
+

@@ -11,6 +11,12 @@ WORKSHEET_NAME = 'nlp::ananyak-fine-tuning'
 DOCKER_IMAGE = 'ananya/unlabeled-extrapolation'
 
 
+def print_os_system(cmd, args):
+    print("Running OS command: " + cmd)
+    if not args.print_command:
+        os.system(cmd)
+
+
 def run_sbatch(cmd, job_name, args, exclude=None, deps=[]):
     output_path = args.output_dir + '/' + job_name
     sbatch_script_path = args.scripts_dir + '/' + args.sbatch_script_name
@@ -76,8 +82,8 @@ def get_python_cmd(code_path, python_path='python', kwargs=None, args=None, over
         opts = ''
     python_cmd = python_path + ' ' + code_path + ' '
     python_cmd += opts
-    if args.codalab:
-        python_cmd += ' --nowandb '
+    if args.codalab or args.amulet_option is not None:
+        python_cmd += ' --no_wandb '
     if overwrite_options is not None:
         python_cmd += ' ' + overwrite_options + ' '
     return python_cmd
@@ -95,16 +101,19 @@ def get_baseline_experiment_cmd(config_path, run_name, group_name, project_name,
     # Saved files have full dataset paths, e.g. /scr/biggest/..., so no need to add root_prefix.
     kwargs['config'] = config_path
     if not(run_saved):
-        if not(args.codalab):
-            kwargs['root_prefix'] = root_prefix
-        else:
+        if args.codalab:
             kwargs['root_prefix'] = args.codalab_data_dir
+        if args.amulet_option is not None:
+            kwargs['root_prefix'] = '.'
+        else:
+            kwargs['root_prefix'] = root_prefix
     # On slurm, we need to save locally to avoid overloading the distributed file system.
-    if not(args.codalab):
+    if args.codalab or args.amulet_option is not None:
+        kwargs['log_dir'] = args.log_dir
+    else:
         kwargs['log_dir'] = group_run_to_log_path(group_name, run_name, args)
         kwargs['tmp_par_ckp_dir'] = args.tmp_dir + '/' + group_name + '_' + run_name
-    else:
-        kwargs['log_dir'] = args.log_dir
+        
     kwargs['project_name'] = project_name
     kwargs['group_name'] = group_name
     kwargs['run_name'] = run_name
@@ -122,13 +131,16 @@ def config_run(args, kwargs, config_path, run_name, group_name, project_name,
         config_path=config_path, run_name=run_name, group_name=group_name,
         project_name=project_name, root_prefix=root_prefix, kwargs=kwargs, args=args,
         run_saved=run_saved, overwrite_options=overwrite_options)
-    if dataset_copy_cmd is not None and not args.codalab:
+    if dataset_copy_cmd is not None and not args.codalab and args.amulet_option is None:
         cmd = dataset_copy_cmd + ' && ' + cmd
     job_name = group_name + '_' + run_name
     if os.path.isfile(log_dir + '/stats.tsv') and not(rerun):
         # TODO: should we rerun if stats.tsv is not completely filled out?
         # Maybe design this a bit better.
+        # TODO: handle this for amulet as well.
         return -1
+    elif args.amulet_option is not None:
+        return job_name, cmd
     else:
         return run_job(cmd, job_name, args, deps=deps)
 
@@ -205,6 +217,7 @@ def add_model_to_kwargs(kwargs, args, model):
 
 def run_adapt_sweep(adapt_name, dataset, model, hyperparams, args, deps=[], rerun=False,
                     ignore_name_hypers={}, run_name_suffix=''):
+    """Run one job in sweep (if Amulet, then just return the command to run)."""
     run_name = hyperparams_to_str(hyperparams, ignore_name_hypers=ignore_name_hypers)
     run_name += run_name_suffix
     group_name = get_group_name(adapt_name, dataset.name, args.model_name)
@@ -213,7 +226,7 @@ def run_adapt_sweep(adapt_name, dataset, model, hyperparams, args, deps=[], reru
     add_model_to_kwargs(kwargs, args, model)
     config_path = get_config_path(args, dataset.config_rel_path)
     dataset_copy_cmd = None
-    if dataset.slurm_data_cmd is not None:
+    if dataset.slurm_data_cmd is not None and args.amulet_option is None:
         dataset_copy_cmd = dataset.slurm_data_cmd.format(scripts_dir=args.scripts_dir)
     deps = add_dataset_model_deps(deps, args, dataset, model)
     overwrite_options = dataset.overwrite_options
@@ -258,6 +271,40 @@ def adaptation_sweep(adapt_name, dataset, model, hyperparams_list, args, deps=[]
     return sweep_ids
 
 
+def get_amlt_config(experiment_name, job_names, cmds, args=None):
+    # Returns an amulet config for a sweep.
+    amlt_config = f"description: Sweep for experiment {experiment_name}\n\n"
+    if args.amulet_cluster == 'amlk8s':
+        amlt_config_path = 'scripts/amlt_config_template_amlk8s.yaml'
+    elif args.amulet_cluster == 'sing' or args.amulet_cluster == 'sing_basic':
+        amlt_config_path = 'scripts/amlt_config_template_sing.yaml'
+    else:
+        raise ValueError(f'Unknown cluster {args.cluster}')
+    with open(amlt_config_path, "r") as f:
+        amlt_config += f.read()
+    for job_name, cmd in zip(job_names, cmds):
+        amlt_config += "  - name: " + job_name + "\n"
+        amlt_config += "    sku: G1-V100\n"
+        if args.amulet_cluster == 'sing_basic':
+            amlt_config += "    sla_tier: basic\n"
+        amlt_config += "    command:\n"
+        amlt_config += "    - " + cmd + "\n"
+    return amlt_config
+
+
+def run_amlt_config(amlt_config, experiment_name, args, preemptible=False):
+    # Save the config to amlt_configs, and then run the script.
+    config_path = "amlt_configs/generated/" + experiment_name + '.yaml'
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    with open(config_path, "w") as f:
+       f.write(amlt_config)
+    # This echo trick gets rid of the prompt!
+    # Note: this preemptible option is for amltk8s, not sing.
+    cmd = "echo '\n' | amlt run -y " + config_path + " " + experiment_name # + " -t ms-shared --preemptible"
+    # Run config.
+    print_os_system(cmd, args)
+
+
 def replicated_sweep(adapt_name, dataset, model, hyperparams_list, num_replications,
                      args, deps=[], replication_hyperparams_list=[], rerun=False,
                      ignore_name_hypers={}):
@@ -276,7 +323,22 @@ def replicated_sweep(adapt_name, dataset, model, hyperparams_list, num_replicati
             # Job id of -1 means we didn't run the job because it's already run.
             if job_id != -1:
                 sweep_ids.append(job_id)
-    return sweep_ids
+    experiment_name = get_group_name(adapt_name, dataset.name, args.model_name)
+    if args.amulet_option == 'run':
+        print_os_system('amlt results ' + experiment_name, args)
+        print_os_system('amlt logs ' + experiment_name, args)
+        job_names, cmds = list(zip(*sweep_ids))
+        print(job_names)
+        amlt_config = get_amlt_config(experiment_name, job_names, cmds, args)
+        run_amlt_config(amlt_config, experiment_name, args)
+    elif args.amulet_option == 'cancel':
+        print_os_system('amlt cancel -y ' + experiment_name, args)
+    elif args.amulet_option == 'results':
+        print_os_system('amlt results ' + experiment_name, args)
+        print_os_system('amlt logs ' + experiment_name, args)
+    else:
+        assert(args.amulet_option is None)
+        return sweep_ids
 
 
 def adaptation_replication(adapt_name, dataset, model, num_replications, args, deps=[],
@@ -1177,7 +1239,8 @@ def fine_tuning_celeba_single_experiment(args, attribute_name, num_replications=
         all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
             num_replications=num_replications, args=args, ignore_name_hypers={'checkpoint_path', 'default_test_args.target_attribute', 'train_dataset.args.target_attribute'})
-        print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
+        if all_ids is not None:
+            print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
 def fine_tuning_celeba_experiments(args, linear_probe=True):
@@ -1327,7 +1390,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
             num_replications=num_replications, args=args,
             ignore_name_hypers={'full_ft_epoch', 'checkpoint_path', 'optimizer.classname'})
-        print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
+        if all_ids is not None:
+            print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
 def fine_tuning_mixup_sweep_experiments(args, num_replications=3):
@@ -1400,7 +1464,8 @@ def linprobe_experiments(args, num_replications=3, aug=True, train_mode=False, u
         all_ids = linprobe_experiment(
             adapt_name=adapt_name, dataset=dataset, model=model, num_replications=num_replications,
             args=args, aug=aug, train_mode=train_mode, use_new_bn_stats=use_new_bn_stats)
-        print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
+        if all_ids is not None:
+            print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
 def linprobe_experiments_no_aug(args, num_replications=3):
@@ -1480,7 +1545,8 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
             hyperparams_list=cur_hyperparams_list, num_replications=num_replications,
             replication_hyperparams_list=replication_hyperparams_list, args=args,
             ignore_name_hypers={'full_ft_epoch', 'linear_probe_checkpoint_path', 'optimizer.classname'})
-        print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
+        if all_ids is not None:
+            print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
 def lp_then_ft_valmode_experiments(args, num_replications=3):
@@ -1600,6 +1666,9 @@ def fill_platform_specific_default_args(args):
         args.pretrained_checkpoints_dir = (args.pretrained_checkpoints_dir if
                                            args.pretrained_checkpoints_dir else
                                            'simclr_weights/')
+    elif args.amulet_option is not None:
+        args.log_dir = '$$AMLT_OUTPUT_DIR/'
+        args.pretrained_checkpoints_dir = '/mnt/default/'
     else:
         args.log_dir = args.log_dir if args.log_dir else 'logs/'
         args.pretrained_checkpoints_dir = (args.pretrained_checkpoints_dir if
@@ -1619,6 +1688,11 @@ if __name__ == "__main__":
                         help='Class name of optimizer to use, e.g., torch.optim.Adam')
     # Note that store_true creates a default value of False.
     parser.add_argument('--codalab', action='store_true', help='run on CodaLab not slurm')
+    parser.add_argument('--amulet_option', type=str, required=False, default=None,
+                        help='{run/cancel/results} to use amulet cluster to perform corresponding operation.')
+    parser.add_argument('--amulet_cluster', type=str, required=False, default='sing',
+                        help='What amulet cluster to run on? Only relevant if amulet_option is not None. Options:'
+                             '(sing/amlk8s/sing_basic)')
     parser.add_argument('--print_command', action='store_true', help='only print the python commands (dont run anything).')
     parser.add_argument('--save_no_checkpoints', action='store_true', help='run on CodaLab not slurm')
     parser.add_argument('--partition', type=str, required=False, default='jag-standard',
