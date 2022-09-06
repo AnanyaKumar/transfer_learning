@@ -1072,6 +1072,14 @@ timm_vit_b16_in21k = Model(
     bundles=[]
 )
 
+convnext_vit_b = Model(
+    kwargs={
+        'classname': 'models.timm_model.TimmModel',
+        'args.model_name': 'convnext_base_in22k',
+    },
+    bundles=[]
+)
+
 bit_resnet_50 = Model(
     kwargs={
         'classname': 'models.bit_resnet.BitResNet',
@@ -1131,6 +1139,7 @@ names_to_model = {
     'clip_vit_l14': clip_vit_l14,
     'timm_vit_b16': timm_vit_b16,
     'timm_vit_b16_in21k': timm_vit_b16_in21k,
+    'convnext_vit_b': convnext_vit_b,
     'scratch_vit_b16_clipstyle': scratch_vit_b16_clipstyle,
     'dino_vit_b16': dino_vit_b16,
     'bit_resnet_50': bit_resnet_50,
