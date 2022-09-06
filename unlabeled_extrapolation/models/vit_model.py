@@ -41,7 +41,7 @@ def get_timm_name(model_name):
 
 def get_timm_transform(model_name):
     timm_name = get_timm_name(model_name)
-    config = resolve_data_config({}, model=model_name)
+    config = resolve_data_config({}, model=timm_name)
     normalize_transform = Normalize(mean=config['mean'], std=config['std'])
     return normalize_transform
 
@@ -103,10 +103,7 @@ class VitModel(nn.Module):
                 ('trans' + str(i) + '_norm2', block.norm2),
                 ('trans' + str(i) + '_mlp', block.mlp),
             ]
-        if 'dino' not in self._model_name:
-            layers += [('post_norm', self._model.norm)]
-        else:
-            layers += [('empty_post_norm', nn.Module())]
+        layers += [('post_norm', self._model.norm)]
         layers += [('head', self.get_last_layer())]
         return layers
 
