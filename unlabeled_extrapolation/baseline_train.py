@@ -342,11 +342,12 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
             del l2sp_loss
         # Split up the batch so we can do the backward pass on a GPU, accumulate gradients
         # across the split.
+        split_size = int(np.ceil(len(all_inputs) / batch_splits))
         split_inputs = torch.split(
-            all_inputs, split_size_or_sections=len(all_inputs) // batch_splits)
+            all_inputs, split_size_or_sections=split_size)
         split_labels = torch.split(
-            all_labels, split_size_or_sections=len(all_labels) // batch_splits)
-        for j in range(batch_splits):
+            all_labels, split_size_or_sections=split_size)
+        for j in range(len(split_inputs)):
             inputs, labels = split_inputs[j], split_labels[j]
             if config['use_cuda']:
                 inputs, labels = inputs.to(device), labels.to(device)

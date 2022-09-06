@@ -6,6 +6,8 @@ inherit:
 num_classes: 17
 epochs: &epochs 20
 save_no_checkpoints: True
+batch_size: 32
+batch_splits: 2
 
 model:
   classname: models.imnet_resnet.ResNet50
