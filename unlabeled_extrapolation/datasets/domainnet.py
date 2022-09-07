@@ -32,7 +32,7 @@ ROOT = '/u/scr/nlp/domainnet'
 SENTRY_SPLITS_ROOT = '/u/scr/nlp/domainnet/SENTRY_splits'
 
 
-def load_dataset(domains, split, version):
+def load_dataset(root, domains, split, version):
     if len(domains) == 1 and domains[0] == 'all':
         if version == 'sentry':
             domains = SENTRY_DOMAINS
@@ -42,9 +42,15 @@ def load_dataset(domains, split, version):
     data = []
     for domain in domains:
         if version == 'sentry':
-            idx_file = os.path.join(SENTRY_SPLITS_ROOT, f'{domain}_{split}_mini.txt')
+            if os.path.isdir(root + '/SENTRY_splits'):
+                idx_file = os.path.join(root, f'SENTRY_splits/{domain}_{split}_mini.txt')
+            else:
+                idx_file = os.path.join(SENTRY_SPLITS_ROOT, f'{domain}_{split}_mini.txt')
         else:
-            idx_file = os.path.join(ROOT, f'{domain}_{split}.txt')
+            if os.path.isfile(root + f'/{domain}_{split}.txt'):
+                idx_file = os.path.join(root, f'{domain}_{split}.txt')
+            else:
+                idx_file = os.path.join(ROOT, f'{domain}_{split}.txt')
         with open(idx_file, 'r') as f:
             data += [line.split() for line in f]
     return data
@@ -73,7 +79,7 @@ class DomainNet(Dataset):
         self._version = version
 
         self._unlabeled = unlabeled
-        self.data = load_dataset(domain_list, split, version)
+        self.data = load_dataset(root, domain_list, split, version)
         self.means = [0.485, 0.456, 0.406]
         self.stds = [0.228, 0.224, 0.225]
         if verbose:
