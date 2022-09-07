@@ -282,13 +282,18 @@ def get_amlt_config(experiment_name, job_names, cmds, args=None):
         raise ValueError(f'Unknown cluster {args.cluster}')
     with open(amlt_config_path, "r") as f:
         amlt_config += f.read()
-    for job_name, cmd in zip(job_names, cmds):
-        amlt_config += "  - name: " + job_name + "\n"
-        amlt_config += "    sku: G1-V100\n"
-        if args.amulet_cluster == 'sing_basic':
-            amlt_config += "    sla_tier: basic\n"
-        amlt_config += "    command:\n"
-        amlt_config += "    - " + cmd + "\n"
+    job_header = ("  - name: {}\n"
+                  "    sku: G1-V100\n")
+    if args.amulet_cluster == 'sing_basic':
+        job_header += "    sla_tier: basic\n"
+    job_header += "    command:\n"
+    if args.amulet_option == 'run_separate':
+        for job_name, cmd in zip(job_names, cmds):
+            amlt_config += job_header.format(job_name)
+            amlt_config += "    - " + cmd + "\n"
+    elif args.amulet_option == 'run':
+        amlt_config += job_header.format(experiment_name) + "    - "
+        amlt_config += " && ".join(cmds) + "\n"
     return amlt_config
 
 
@@ -324,7 +329,8 @@ def replicated_sweep(adapt_name, dataset, model, hyperparams_list, num_replicati
             if job_id != -1:
                 sweep_ids.append(job_id)
     experiment_name = get_group_name(adapt_name, dataset.name, args.model_name)
-    if args.amulet_option == 'run':
+    if args.amulet_option == 'run' or args.amulet_option == 'run_separate':
+        # 'run' will group all the runs into a single job. '
         print_os_system('amlt results ' + experiment_name, args)
         print_os_system('amlt logs ' + experiment_name, args)
         job_names, cmds = list(zip(*sweep_ids))
