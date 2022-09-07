@@ -107,11 +107,20 @@ def get_baseline_experiment_cmd(config_path, run_name, group_name, project_name,
             kwargs['root_prefix'] = '.'
         else:
             kwargs['root_prefix'] = root_prefix
-    # On slurm, we need to save locally to avoid overloading the distributed file system.
-    if args.codalab or args.amulet_option is not None:
+    if args.codalab:
         kwargs['log_dir'] = args.log_dir
+    elif args.amulet_option is not None:
+        if args.amulet_option == 'run_separate':
+            # If we run each run on a separate job, then just write results to log_dir.
+            # Amulet will organize the results into a different folder for each job.
+            kwargs['log_dir'] = args.log_dir
+        else:
+            # If we run all the runs on a single amulet job, then need to write results into
+            # a different folder for each run, to avoid conflicts.
+            kwargs['log_dir'] = args.log_dir + '/' + run_name
     else:
         kwargs['log_dir'] = group_run_to_log_path(group_name, run_name, args)
+        # On slurm, we need to save locally to avoid overloading the distributed file system.
         kwargs['tmp_par_ckp_dir'] = args.tmp_dir + '/' + group_name + '_' + run_name
         
     kwargs['project_name'] = project_name
@@ -289,12 +298,12 @@ def get_amlt_config(experiment_name, job_names, cmds, dataset, args=None):
         amlt_setup = f.read()
     if dataset.amlt_data_cmd is not None:
         dataset_copy_cmd = dataset.amlt_data_cmd.format(scripts_dir=args.scripts_dir)
-        amlt_setup += "\n      - " + dataset_copy_cmd
+        amlt_setup += "\n    - " + dataset_copy_cmd
     amlt_config = amlt_config.format(setup=amlt_setup)
     # Check if the dataset has additional setup operations, and if so add it.
     # Read and fill out the jobs section.
     job_header = ("  - name: {}\n"
-                  "    sku: G1-V100\n")
+                  "    sku: G1-V100-P100\n")
     if args.amulet_cluster == 'sing_basic':
         job_header += "    sla_tier: basic\n"
     job_header += "    command:\n"
@@ -553,7 +562,8 @@ living17 = Dataset(
     bundles=['imagenet'],
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     slurm_data_dir='/scr/biggest/',
-    eval_config_rel_path='adaptation/living17_eval.yaml')
+    eval_config_rel_path='adaptation/living17_eval.yaml',
+    amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
 living17_mixup = Dataset(
     name='living17_mixup',
@@ -568,7 +578,8 @@ living17_mixup = Dataset(
     bundles=['imagenet'],
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     slurm_data_dir='/scr/biggest/',
-    eval_config_rel_path='adaptation/living17_mixup_eval.yaml')
+    eval_config_rel_path='adaptation/living17_mixup_eval.yaml',
+    amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
 celeba = Dataset(
     name='celeba',
@@ -746,7 +757,7 @@ living17_noaugs = Dataset(
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     slurm_data_dir='/scr/biggest/',
     eval_config_rel_path='adaptation/living17_eval.yaml',
-    amlt_data_cmd='source {scripts_dir}/amlt_copy_dataset.sh imagenet')
+    amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
 living17_nonorm = Dataset(
     name='living17_nonorm',
@@ -762,7 +773,7 @@ living17_nonorm = Dataset(
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     slurm_data_dir='/scr/biggest/',
     eval_config_rel_path='adaptation/living17_nonorm_eval.yaml',
-    amlt_data_cmd='source {scripts_dir}/amlt_copy_dataset.sh imagenet')
+    amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
 entity30 = Dataset(
     name='entity30',
@@ -778,7 +789,7 @@ entity30 = Dataset(
     slurm_data_dir='/scr/biggest/',
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     eval_config_rel_path='adaptation/entity30_eval.yaml',
-    amlt_data_cmd='source {scripts_dir}/amlt_copy_dataset.sh imagenet')
+    amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
 imagenet = Dataset(
     name='imagenet',
@@ -794,7 +805,7 @@ imagenet = Dataset(
     slurm_data_dir='',
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     eval_config_rel_path='adaptation/imagenet_eval.yaml',
-    amlt_data_cmd='source {scripts_dir}/amlt_copy_dataset.sh imagenet')
+    amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
 imagenet_augs = Dataset(
     name='imagenet_augs',
@@ -810,7 +821,7 @@ imagenet_augs = Dataset(
     slurm_data_dir='',
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     eval_config_rel_path='adaptation/imagenet_augs_eval.yaml',
-    amlt_data_cmd='source {scripts_dir}/amlt_copy_dataset.sh imagenet')
+    amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
 cifar_stl = Dataset(
     name='cifar_stl',
@@ -856,7 +867,7 @@ domainnet = Dataset(
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh domainnet',
     slurm_data_dir='/scr/biggest/',
     eval_config_rel_path='adaptation/domainnet_eval.yaml',
-    amlt_data_cmd='source {scripts_dir}/amlt_copy_dataset.sh domainnet')
+    amlt_data_cmd='. {scripts_dir}/amlt_copy_domainnet.sh')
 
 fmow = Dataset(
     name='fmow',
@@ -1699,7 +1710,7 @@ def fill_platform_specific_default_args(args):
                                            'simclr_weights/')
     elif args.amulet_option is not None:
         args.log_dir = '$$AMLT_OUTPUT_DIR/'
-        args.pretrained_checkpoints_dir = '/mnt/default/'
+        args.pretrained_checkpoints_dir = '/mnt/default/pretrained_weights/'
     else:
         args.log_dir = args.log_dir if args.log_dir else 'logs/'
         args.pretrained_checkpoints_dir = (args.pretrained_checkpoints_dir if

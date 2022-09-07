@@ -76,7 +76,10 @@ class Breeds(Dataset):
         self._source = source
         self._split = split
         self._transform = transform
-        self._info_dir = info_dir
+        if os.path.isdir(root + '/BREEDS-Benchmarks'):
+            self._info_dir = root + '/BREEDS-Benchmarks/imagenet_class_hierarchy/modified'
+        else:
+            self._info_dir = info_dir
         self._data_dir = root + '/' + split
         self._idx_to_class_id, self._class_to_idx = get_classes(self._data_dir)
         breeds_func = BREEDS_SPLITS_TO_FUNC[breeds_name]
