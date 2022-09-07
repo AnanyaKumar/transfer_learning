@@ -4,11 +4,7 @@ target:
 
 environment:
   image: amlt-sing/pytorch-1.8.0
-  setup:
-    - apt-get update
-    - apt-get install git
-    - pip install ./CLIP
-    - pip install -e .
+{setup}
 
 code:
   # local directory of the code. this will be uploaded to the server.

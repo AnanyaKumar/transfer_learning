@@ -271,8 +271,9 @@ def adaptation_sweep(adapt_name, dataset, model, hyperparams_list, args, deps=[]
     return sweep_ids
 
 
-def get_amlt_config(experiment_name, job_names, cmds, args=None):
+def get_amlt_config(experiment_name, job_names, cmds, dataset, args=None):
     # Returns an amulet config for a sweep.
+    # TODO: use some better library to inject additional options into the yaml files.
     amlt_config = f"description: Sweep for experiment {experiment_name}\n\n"
     if args.amulet_cluster == 'amlk8s':
         amlt_config_path = 'scripts/amlt_config_template_amlk8s.yaml'
@@ -282,6 +283,16 @@ def get_amlt_config(experiment_name, job_names, cmds, args=None):
         raise ValueError(f'Unknown cluster {args.cluster}')
     with open(amlt_config_path, "r") as f:
         amlt_config += f.read()
+    # Read and fill out the setup.
+    setup_config_path = 'scripts/amlt_setup.yaml'
+    with open(setup_config_path, "r") as f:
+        amlt_setup = f.read()
+    if dataset.amlt_data_cmd is not None:
+        dataset_copy_cmd = dataset.amlt_data_cmd.format(scripts_dir=args.scripts_dir)
+        amlt_setup += "\n      - " + dataset_copy_cmd
+    amlt_config = amlt_config.format(setup=amlt_setup)
+    # Check if the dataset has additional setup operations, and if so add it.
+    # Read and fill out the jobs section.
     job_header = ("  - name: {}\n"
                   "    sku: G1-V100\n")
     if args.amulet_cluster == 'sing_basic':
@@ -335,7 +346,7 @@ def replicated_sweep(adapt_name, dataset, model, hyperparams_list, num_replicati
         print_os_system('amlt logs ' + experiment_name, args)
         job_names, cmds = list(zip(*sweep_ids))
         print(job_names)
-        amlt_config = get_amlt_config(experiment_name, job_names, cmds, args)
+        amlt_config = get_amlt_config(experiment_name, job_names, cmds, dataset, args)
         run_amlt_config(amlt_config, experiment_name, args)
     elif args.amulet_option == 'cancel':
         print_os_system('amlt cancel -y ' + experiment_name, args)
@@ -523,7 +534,7 @@ def summarize_linprobe(adapt_name, dataset, model, args, deps, max_num=None):
 fields = ['name', 'val_metric', 'secondary_val_metrics', 'output_metrics',
     'linprobe_secondary_val_metrics', 'linprobe_output_metrics',
     'config_rel_path', 'bundles', 'slurm_data_cmd', 'slurm_data_dir',
-    'eval_config_rel_path', 'overwrite_options']
+    'eval_config_rel_path', 'overwrite_options', 'amlt_data_cmd']
 
 Dataset = namedtuple(
     'Dataset', fields, defaults=[None] * len(fields)
@@ -734,7 +745,8 @@ living17_noaugs = Dataset(
     bundles=['imagenet'],
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     slurm_data_dir='/scr/biggest/',
-    eval_config_rel_path='adaptation/living17_eval.yaml')
+    eval_config_rel_path='adaptation/living17_eval.yaml',
+    amlt_data_cmd='source {scripts_dir}/amlt_copy_dataset.sh imagenet')
 
 living17_nonorm = Dataset(
     name='living17_nonorm',
@@ -749,7 +761,8 @@ living17_nonorm = Dataset(
     bundles=['imagenet'],
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     slurm_data_dir='/scr/biggest/',
-    eval_config_rel_path='adaptation/living17_nonorm_eval.yaml')
+    eval_config_rel_path='adaptation/living17_nonorm_eval.yaml',
+    amlt_data_cmd='source {scripts_dir}/amlt_copy_dataset.sh imagenet')
 
 entity30 = Dataset(
     name='entity30',
@@ -764,7 +777,8 @@ entity30 = Dataset(
     bundles=['imagenet'],
     slurm_data_dir='/scr/biggest/',
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
-    eval_config_rel_path='adaptation/entity30_eval.yaml')
+    eval_config_rel_path='adaptation/entity30_eval.yaml',
+    amlt_data_cmd='source {scripts_dir}/amlt_copy_dataset.sh imagenet')
 
 imagenet = Dataset(
     name='imagenet',
@@ -779,7 +793,8 @@ imagenet = Dataset(
     bundles=['imagenet'],
     slurm_data_dir='',
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
-    eval_config_rel_path='adaptation/imagenet_eval.yaml')
+    eval_config_rel_path='adaptation/imagenet_eval.yaml',
+    amlt_data_cmd='source {scripts_dir}/amlt_copy_dataset.sh imagenet')
 
 imagenet_augs = Dataset(
     name='imagenet_augs',
@@ -794,7 +809,8 @@ imagenet_augs = Dataset(
     bundles=['imagenet'],
     slurm_data_dir='',
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
-    eval_config_rel_path='adaptation/imagenet_augs_eval.yaml')
+    eval_config_rel_path='adaptation/imagenet_augs_eval.yaml',
+    amlt_data_cmd='source {scripts_dir}/amlt_copy_dataset.sh imagenet')
 
 cifar_stl = Dataset(
     name='cifar_stl',
@@ -826,7 +842,6 @@ cifar_stl_nonorm = Dataset(
     slurm_data_dir='/u/scr/ananya/',
     eval_config_rel_path='adaptation/cifar_stl_nonorm_eval.yaml')
 
-
 domainnet = Dataset(
     name='domainnet',
     val_metric='test_acc/sketch_val',
@@ -840,7 +855,8 @@ domainnet = Dataset(
     bundles=['domainnet'],
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh domainnet',
     slurm_data_dir='/scr/biggest/',
-    eval_config_rel_path='adaptation/domainnet_eval.yaml')
+    eval_config_rel_path='adaptation/domainnet_eval.yaml',
+    amlt_data_cmd='source {scripts_dir}/amlt_copy_dataset.sh domainnet')
 
 fmow = Dataset(
     name='fmow',

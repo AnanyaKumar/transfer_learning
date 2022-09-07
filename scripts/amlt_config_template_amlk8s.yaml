@@ -7,11 +7,7 @@ target:
 environment:
   image: pytorch/pytorch:latest
   registry: docker.io # any public registry can be specified here
-  setup:
-    - apt-get update
-    - apt-get install git
-    - pip install ./CLIP
-    - pip install -e .
+{setup}
 
 code:
   # local directory of the code. this will be uploaded to the server.
