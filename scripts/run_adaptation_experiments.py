@@ -303,7 +303,7 @@ def get_amlt_config(experiment_name, job_names, cmds, dataset, args=None):
     # Check if the dataset has additional setup operations, and if so add it.
     # Read and fill out the jobs section.
     job_header = ("  - name: {}\n"
-                  "    sku: G1-V100\n")
+            "    sku: G1-A100\n")
     if args.amulet_cluster == 'sing_basic':
         job_header += "    sla_tier: basic\n"
     job_header += "    command:\n"
