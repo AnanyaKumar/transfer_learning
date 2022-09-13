@@ -25,33 +25,49 @@ def remove_replication_info(s):
     return s
 
 
+def get_experiment_aggregate_summary(dir_path, val_metric, output_metrics, aggregation_metric=None):
+    # summarize_result gets a table where each row is the results for one *run*.
+    # We now summarize the information across runs in a *single* experiment.
+    # If aggregation is "MAX" then we take the max over the runs (regardless of how we early stopped in the run).
+    res, val_values_list, file_paths = summarize_results(
+            dir_path, val_metric, output_metrics)
+    if len(res) == 0:
+        return None, None, None
+    res['group'] = res['name'].apply(remove_replication_info)
+    grouped = res.groupby('group')
+    means = grouped.mean()
+    counts = grouped.count()
+    counts.drop(labels=['name', 'wandb_url'], axis=1)
+    stderrs = 1.645 * (grouped.std() / np.sqrt(counts))
+    stderrs = stderrs[means.columns]
+    min_count = grouped.count().iloc[:,0].min()
+    if val_metric == 'LAST' and (aggregation_metric is None or aggregation_metric == 'LAST'):
+        best_row_mean = means.iloc[[-1]]
+        best_row_std = stderrs.iloc[[-1]]
+    else:
+        if aggregation_metric is None:   
+            best_group = means[val_metric].idxmax()
+        else:
+            best_group = means[aggregation_metric].idxmax()
+        best_row_mean = means.loc[[best_group]]
+        best_row_std = stderrs.loc[[best_group]]
+    best_row_mean['name'] = dir_path[5:]
+    best_row_std['name'] = dir_path[5:] + ' (stddev)'
+    for best_row in [best_row_mean, best_row_std]:
+        best_row['group'] = best_row.index
+        best_row.set_index('name')
+    return res, best_row_mean, best_row_std
+
+
 def get_all_results(val_metric, dir_paths, output_metrics):
+    # Get results for multiple experiments (each dir_path in dir_paths corresponds
+    # to one experiment).
     results, best, dirs = [], [], []
     for dir_path in dir_paths:
-        res, val_values_list, file_paths = summarize_results(
-                dir_path, val_metric, output_metrics)
-        if len(res) == 0:
+        res, best_row_mean, best_row_std = get_experiment_aggregate_summary(
+            dir_path, val_metric, output_metrics)
+        if res is None:
             continue
-        res['group'] = res['name'].apply(remove_replication_info)
-        grouped = res.groupby('group')
-        means = grouped.mean()
-        counts = grouped.count()
-        counts.drop(labels=['name', 'wandb_url'], axis=1)
-        stderrs = 1.645 * (grouped.std() / np.sqrt(counts))
-        stderrs = stderrs[means.columns]
-        min_count = grouped.count().iloc[:,0].min()
-        if val_metric == 'LAST':
-            best_row_mean = means.iloc[[-1]]
-            best_row_std = stderrs.iloc[[-1]]
-        else:
-            best_group = means[val_metric].idxmax()
-            best_row_mean = means.loc[[best_group]]
-            best_row_std = stderrs.loc[[best_group]]
-        best_row_mean['name'] = dir_path[5:]
-        best_row_std['name'] = dir_path[5:] + ' (stddev)'
-        for best_row in [best_row_mean, best_row_std]:
-            best_row['group'] = best_row.index
-            best_row.set_index('name')
         results.append(res)
         best.append((best_row_mean, best_row_std))
         dirs.append(dir_path)
