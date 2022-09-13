@@ -264,20 +264,23 @@ _grad_layer_name = 'train/grad_layer_'
 _normalized_grad_layer_name = 'train/normalized_grad_layer_'
 
 
-def add_layer_grad_stats(net, loss_dict, config, cur_batch_size):
+def add_layer_grad_stats(net, loss_dict, config):
     if getattr(net, 'get_layers', None) is None or 'no_log_grads' in config:
         return
     layers = net.get_layers()
     for i in range(len(layers)):
+    # Add norm of the weights.
         if len(layers[i]) == 1:
             # In the older version of model code, we just return a list of layers without names.
-            layer_name = 'train/grad_layer_' + str(i)
-            normalized_layer_name = 'train/normalized_grad_layer_' + str(i)
+            layer_name = 'train/grad_' + str(i)
+            normalized_layer_name = 'train/param_normalized_grad_' + str(i)
+            norm_name = 'train/norm_' + str(i)
             cur_layer = list(layers[i].parameters())
         else:
             # In newer version of model code, we have a (name, layer) tuple.
             layer_name = 'train/grad_' + layers[i][0]
-            normalized_layer_name = 'train/normalized_grad_' + layers[i][0]
+            normalized_layer_name = 'train/param_normalized_grad_' + layers[i][0]
+            norm_name = 'train/norm_' + layers[i][0]
             cur_layer = list(layers[i][1].parameters())
         if len(cur_layer) == 0 or not cur_layer[0].requires_grad:
             continue
@@ -285,10 +288,16 @@ def add_layer_grad_stats(net, loss_dict, config, cur_batch_size):
             loss_dict[layer_name] = Accumulator()
         if normalized_layer_name not in loss_dict:
             loss_dict[normalized_layer_name] = Accumulator()
+        if norm_name not in loss_dict:
+            loss_dict[norm_name] = Accumulator()
         grads = [p.grad.detach().cpu().numpy() for p in cur_layer]
         grad_norms_squared = [np.linalg.norm(g) ** 2 for g in grads]
-        grad_norm = np.sqrt(np.sum(grad_norms_squared)) / cur_batch_size
+        # Don't divide by batch size, because the loss is already the mean over the batch.
+        grad_norm = np.sqrt(np.sum(grad_norms_squared))
         loss_dict[layer_name].add_value(grad_norm)
+        norms_squared = [np.linalg.norm(p.data.detach().cpu().numpy()) ** 2 for p in cur_layer]
+        norm = np.sqrt(np.sum(norms_squared))
+        loss_dict[norm_name].add_value(norm)
         num_params = np.sum([p.numel() for p in cur_layer])
         if num_params == 0:
             assert np.isclose(grad_norm, 0.0)
@@ -367,20 +376,19 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
                 loss_dict['train/acc'].add_values((train_preds == labels).tolist())
             if 'model_loss' in config:
                 opt_loss = model_loss(net, inputs, labels)
-                if not check_exists_value(config, 'no_train', True):
-                    opt_loss.backward()
+                opt_loss.backward()
                 assert len(opt_loss.shape) == 0
                 loss_dict['train/model_loss'].add_value(float(opt_loss.detach().cpu()))
                 del opt_loss
             else:
-                if not check_exists_value(config, 'no_train', True):
-                    loss.backward()
+                loss.backward()
             del inputs, labels, loss
         # Collect the gradients at each layer.
-        add_layer_grad_stats(net, loss_dict, config, cur_batch_size=len(all_labels))
+        add_layer_grad_stats(net, loss_dict, config)
         if check_exists_not_none(config, 'max_grad_norm'):
             torch.nn.utils.clip_grad_norm_(net.parameters(), config['max_grad_norm'])
-        optimizer.step()
+        if not check_exists_value(config, 'no_train', True):
+            optimizer.step()
         if batch_scheduler is not None:
             batch_scheduler.step()
         num_examples += len(all_labels)
@@ -389,9 +397,10 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
             return num_examples // log_interval > (num_examples - len(all_labels)) // log_interval
         if should_log(config['log_interval']):
             for k in loss_dict:
-                logging.info(
-                    '[%d, %5d] %s: %.3f' %
-                    (epoch + 1, num_examples, k, loss_dict[k].get_mean()))
+                if 'grad' not in k and 'norm' not in k:
+                    logging.info(
+                        '[%d, %5d] %s: %.3f' %
+                        (epoch + 1, num_examples, k, loss_dict[k].get_mean()))
         # Sometimes we want to log the test loss more often to track things better.
         if 'test_interval' in config and should_log(config['test_interval']):
             stats = get_all_test_stats(
@@ -716,7 +725,8 @@ def set_random_seed(seed):
 
 def update_optimizer_args(config):
     if config['optimizer']['classname'] in [
-        'torch.optim.Adam', 'torch.optim.AdamW', 'torch.optim.RMSprop']:
+        'torch.optim.Adam', 'torch.optim.AdamW', 'torch.optim.RMSprop', 'torch_optimizer.Lamb',
+        'torch_optimizer.lamb.Lamb']:
         # These optimizers don't have a momentum term.
         # A bit of a hack so we can just pass in torch.optim.Adam as a command line arg,
         # without having to rework the config.
