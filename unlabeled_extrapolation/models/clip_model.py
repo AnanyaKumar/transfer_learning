@@ -131,10 +131,10 @@ class ClipModel(nn.Module):
                 ('layer2', visual.layer2),
                 ('layer3', visual.layer3),
                 ('attnpool', visual.attnpool)]
+            if self._classifier is not None:
+                layers = layers + [('head', self._classifier)]
         else:
             raise NotImplementedError
-        if self._classifier is not None:
-            layers = layers + [('head', self._classifier)]
         return layers
 
     def tune_bottom_k(self, k):
