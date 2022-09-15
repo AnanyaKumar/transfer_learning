@@ -1,0 +1,19 @@
+
+inherit:
+  - resnet50_transfer.yaml 
+  - datasets_fmow_all_nonorm.yaml
+
+num_classes: 62
+epochs: &epochs 5
+batch_size: 32
+batch_splits: 2
+save_no_checkpoints: True
+
+model:
+  classname: models.imnet_resnet.ResNet50
+  args: {}
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
