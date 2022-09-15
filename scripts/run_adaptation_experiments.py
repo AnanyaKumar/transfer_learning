@@ -881,7 +881,7 @@ fmow = Dataset(
     config_rel_path='adaptation/fmow.yaml',
     bundles=['fmow'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/scr/biggest/ue_datasets/',
     eval_config_rel_path='adaptation/fmow_eval.yaml')
 
 fmow_all = Dataset(
@@ -896,8 +896,38 @@ fmow_all = Dataset(
     config_rel_path='adaptation/fmow_all.yaml',
     bundles=['fmow'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/scr/biggest/ue_datasets/',
     eval_config_rel_path='adaptation/fmow_all_eval.yaml')
+
+fmow_all_nonorm = Dataset(
+    name='fmow_all_nonorm',
+    val_metric='test_acc/ood_val',
+    secondary_val_metrics=['test_acc/id_val', 'test_acc/ood_test', 'test_acc/africa_test', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
+        'test_acc/ood_test', 'test_acc/africa_test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
+        'test_acc/ood_test', 'test_acc/africa_test'],
+    config_rel_path='adaptation/fmow_all_nonorm.yaml',
+    bundles=['fmow'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/scr/biggest/ue_datasets/',
+    eval_config_rel_path='adaptation/fmow_all_nonorm_eval.yaml')
+
+fmow_all_nonorm_weakaugs = Dataset(
+    name='fmow_all_nonorm_weakaugs',
+    val_metric='test_acc/ood_val',
+    secondary_val_metrics=['test_acc/id_val', 'test_acc/ood_test', 'test_acc/africa_test', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
+        'test_acc/ood_test', 'test_acc/africa_test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
+        'test_acc/ood_test', 'test_acc/africa_test'],
+    config_rel_path='adaptation/fmow_all_nonorm_weakaugs.yaml',
+    bundles=['fmow'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/scr/biggest/ue_datasets/',
+    eval_config_rel_path='adaptation/fmow_all_nonorm_weakaugs_eval.yaml')
 
 landcover = Dataset(
     name='landcover',
@@ -941,6 +971,8 @@ names_to_datasets = {
     'domainnet': domainnet,
     'fmow': fmow,
     'fmow_all': fmow_all,
+    'fmow_all_nonorm': fmow_all_nonorm,
+    'fmow_all_nonorm_weakaugs': fmow_all_nonorm_weakaugs,
     'living17_noaugs': living17_noaugs,
     'celeba': celeba,
     'waterbirds': waterbirds,  # This dataset doesn't normalize.
@@ -1611,9 +1643,16 @@ def lp_then_ft_usenewbnstats_experiments(args, num_replications=3):
 ## Functions to spray dataset on jags.
 ############################################
 
-def spray_dataset_jags(copy_cmd):
-    for i in range(10, 32):
-        cmd = f'sbatch -p jag-lo --cpus-per-task=1 --gres=gpu:0 --mem=4G --nodelist=jagupard{i} ' +\
+def spray_dataset(copy_cmd):
+    # for i in range(10, 32):
+    #     cmd = f'sbatch -p jag-lo --cpus-per-task=1 --gres=gpu:0 --mem=4G --nodelist=jagupard{i} ' +\
+    #           f'scripts/run_sbatch.sh "{copy_cmd}"'
+    #     if args.print_command:
+    #         print(cmd)
+    #     else:
+    #         subprocess.run(cmd, shell=True)
+     for i in range(1,9):
+        cmd = f'sbatch -p sphinx --cpus-per-task=1 --gres=gpu:0 --mem=4G --nodelist=sphinx{i} ' +\
               f'scripts/run_sbatch.sh "{copy_cmd}"'
         if args.print_command:
             print(cmd)
@@ -1621,23 +1660,24 @@ def spray_dataset_jags(copy_cmd):
             subprocess.run(cmd, shell=True)
 
 
+
 def spray_celeba_jags(args):
-    spray_dataset_jags(
+    spray_dataset(
         f'source {args.scripts_dir}/copy_local.sh /u/scr/ananya/celeba.tar.gz')
 
 
 def spray_fmow_jags(args):
-    spray_dataset_jags(
+    spray_dataset(
         f'source {args.scripts_dir}/copy_local.sh /u/scr/nlp/wilds/data/fmow_v1.1.tar.gz wilds/data')
 
 
 def spray_imagenet_jags(args):
-    spray_dataset_jags(
+    spray_dataset(
         f'source {args.scripts_dir}/copy_dataset.sh imagenet')
 
 
 def spray_wilds_jags(args):
-    spray_dataset_jags(
+    spray_dataset(
         f'python {args.scripts_dir}/download_wilds_datasets.py --root_dir /scr/biggest/ue_datasets/wilds/data/ '
         f'--datasets {" ".join(args.datasets)}')
 
