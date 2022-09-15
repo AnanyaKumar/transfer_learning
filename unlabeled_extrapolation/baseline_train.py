@@ -25,6 +25,7 @@ import numpy as np
 from unlabeled_extrapolation.models import resnet
 from unlabeled_extrapolation.utils.accumulator import Accumulator
 import unlabeled_extrapolation.utils.utils as utils
+import unlabeled_extrapolation.utils.schedulers as schedulers
 from timm.data.mixup import Mixup
 
 log_level = logging.INFO
@@ -494,7 +495,15 @@ def main(config, log_dir, checkpoints_dir):
     # rate every step. Otherwise, update the learning rate every epoch.
     batch_scheduler = None
     scheduler = None
-    if check_exists_not_none(config, 'batch_scheduler'):
+    if check_exists_value(config, 'layer-wise-tune', True):
+        logging.info('Layer-wise tuning.')
+        num_epochs = config['epochs']
+        scheduler = schedulers.LayerWiseSchedule(optimizer, num_epochs)
+    elif check_exists_value(config, 'layer-wise-tune-cosine', True):
+        logging.info('Layer-wise tuning with cosine decay.')
+        num_epochs = config['epochs']
+        scheduler = schedulers.LayerWiseSchedule(optimizer, num_epochs, cosine=True)
+    elif check_exists_not_none(config, 'batch_scheduler'):
         # TODO: add batch scheduler.
         num_batches = len(train_loader)
         num_training_steps  = num_batches * config['epochs']
@@ -510,6 +519,7 @@ def main(config, log_dir, checkpoints_dir):
                 'num_training_steps': num_training_steps,
         })
     else:
+        # TODO: does this update number of epochs?
         scheduler = utils.initialize(
             config['scheduler'], update_args={'optimizer': optimizer})
     # Training loop.
@@ -533,7 +543,30 @@ def main(config, log_dir, checkpoints_dir):
     if 'l2sp_weight' in config:
         weight_dict_initial, _ = get_param_weights_counts(net, detach=True)
 
-    for epoch in range(config['epochs']):
+    num_epochs = config['epochs']
+    for epoch in range(num_epochs):
+        if (check_exists_value(config, 'layer-wise-tune', True) or
+            check_exists_value(config, 'layer-wise-tune-cosine', True)):
+            # Get number of transformer layers.
+            num_layers = len(net.get_layers())
+            num_trans_layers = (num_layers - 6) / 4
+            # Get number of transformer layers to freeze.
+            num_trans_tune = int(float(epoch) / num_epochs * (num_trans_layers + 1))
+            if num_trans_tune > num_trans_layers:
+                num_trans_tune = num_trans_layers
+            num_trans_freeze = num_epochs - num_trans_tune
+            # COnvert to number of layers to freeze.
+            num_layers_freeze = num_trans_freeze * 4 + 4
+            # Set all grads to True.
+            set_requires_grad(net, True)
+            # Call freeze.
+            net.freeze_bottom_k(num_layers_freeze)
+            # Print statistics about number of parameters tuning, layers frozen, etc.
+            num_trainable_params = count_parameters(net, True)
+            num_params = count_parameters(net, False) + num_trainable_params
+            logging.info(f'Freezing {num_layers_freeze} layers out of {num_layers}')
+            logging.info(f' = freezing {num_trans_freeze} transformer blocks out of {num_trans_layers}')
+            logging.info(f'Fine-tuning {num_trainable_params} of {num_params} parameters.')
         # Save checkpoint once in a while.
         if epoch % config['save_freq'] == 0 and (
             'save_no_checkpoints' not in config or not config['save_no_checkpoints']):
