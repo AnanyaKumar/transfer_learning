@@ -105,7 +105,7 @@ ACL_STRING=${ACL_STRING: : -1} # Remove trailing comma
 if [ ! -d "$dst_folder" ]; then
     mkdir -p $dst_folder
     mkdir -p $dst_folder/tmp
-    setfacl -d -m $ACL_STRING $dst_folder # Set default permissions for folder
+    # setfacl -d -m $ACL_STRING $dst_folder # Set default permissions for folder
 fi
 
 a1=$RANDOM
@@ -129,7 +129,7 @@ elif [ "$dataset_name" = domainnet ]; then
         echo "Copying DomainNet files to $dst_folder"
         cp $dataset_src $dst_folder
         unzip -q $dst_folder/domainnet.zip -d $dst_folder
-        setfacl -Rm $ACL_STRING $dst_folder
+        # setfacl -Rm $ACL_STRING $dst_folder
     fi
 fi
 

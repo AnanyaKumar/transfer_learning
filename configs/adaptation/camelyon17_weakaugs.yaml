@@ -1,10 +1,10 @@
 
 inherit:
   - resnet50_transfer.yaml 
-  - datasets_fmow_all_nonorm.yaml
+  - datasets_camelyon17_weakaugs.yaml
 
-num_classes: 62
-epochs: &epochs 20
+num_classes: 2
+epochs: &epochs 3
 batch_size: 32
 batch_splits: 2
 save_no_checkpoints: True

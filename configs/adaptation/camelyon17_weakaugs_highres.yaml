@@ -1,0 +1,66 @@
+
+inherit:
+  - resnet50_transfer.yaml 
+
+num_classes: 2
+epochs: &epochs 3
+batch_size: 32
+batch_splits: 2
+save_no_checkpoints: True
+
+model:
+  classname: models.imnet_resnet.ResNet50
+  args: {}
+
+scheduler:
+  classname: torch.optim.lr_scheduler.CosineAnnealingLR
+  args:
+    T_max: *epochs
+
+root_prefix: '/u/scr/nlp/'
+
+train_dataset:
+    name: 'train'
+    classname: datasets.wilds.WILDS
+    args:
+        dataset_name: 'camelyon17'
+        split: 'train'
+        root: 'wilds/data'
+    transforms:
+        - classname: unlabeled_extrapolation.datasets.transforms.Resize
+          args:
+              size: [336, 336]
+              interpolation: 'bicubic'
+        - classname: torchvision.transforms.RandomHorizontalFlip  
+        - classname: torchvision.transforms.ToTensor
+
+default_test_transforms:
+    - classname: unlabeled_extrapolation.datasets.transforms.Resize
+      args:
+          size: [336, 336]
+          interpolation: 'bicubic'
+    - classname: torchvision.transforms.ToTensor
+
+test_datasets:
+    - name: 'id_val'
+      classname: datasets.wilds.WILDS
+      args:
+          dataset_name: 'camelyon17'
+          split: 'id_val'
+          root: 'wilds/data'
+    - name: 'ood_val'
+      classname: datasets.wilds.WILDS
+      args:
+          dataset_name: 'camelyon17'
+          split: 'val'
+          root: 'wilds/data'
+    - name: 'ood_test'
+      classname: datasets.wilds.WILDS
+      args:
+          dataset_name: 'camelyon17'
+          split: 'test'
+          root: 'wilds/data'
+
+early_stop_dataset_names:
+    - 'id_val'
+    - 'ood_val'

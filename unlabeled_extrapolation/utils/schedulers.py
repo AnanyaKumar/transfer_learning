@@ -22,19 +22,21 @@ class CosineScheduleWithWarmup(LambdaLR):
 
 class LayerWiseSchedule(LambdaLR):
     """Linear warm up and then cosine annealing of the learning rate."""
-    def __init__(self, optimizer, num_epochs, cosine=False, num_cycles=0.5, last_epoch=-1):
+    def __init__(self, optimizer, num_epochs, warmup_epochs=0, decay_exp=3.73, cosine=False, num_cycles=0.5, last_epoch=-1):
         self.num_epochs = num_epochs
         self.num_cycles = num_cycles
         self.cosine = cosine
+        self.decay_exp = decay_exp
+        self.warmup_epochs = warmup_epochs
         super(LayerWiseSchedule, self).__init__(optimizer, self.lr_lambda, last_epoch=last_epoch)
 
     def lr_lambda(self, current_epoch):
-        progress = float(current_epoch) / float(max(1, self.num_epochs))
+        progress = float(max(0, current_epoch - self.warmup_epochs)) / float(max(1, self.num_epochs - self.warmup_epochs))
         # num_layers_tuning = int(progress * (num_layers + 1))
         # assert num_layers_tuning >= 0
         # if num_layers_tuning > num_layers:
         #     num_layers_tuning = num_layers
-        lr_multiplier = np.exp(3.73 * (1.0 - progress))
+        lr_multiplier = np.exp(self.decay_exp * (1.0 - progress))
         if self.cosine:
             lr_multiplier *= max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(self.num_cycles) * 2.0 * progress)))
         return lr_multiplier
