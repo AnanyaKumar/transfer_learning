@@ -1391,7 +1391,7 @@ def fine_tuning_celeba_experiments(args, linear_probe=True):
 
 def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
                             val_mode=False, no_augmentation=False, l2sp=False, side_tune=False,
-                            imagenet_lp_ft_phase2=False, mixup_sweep=False):
+                            imagenet_lp_ft_phase2=False, mixup_sweep=False, options_dict=options_dict):
     adapt_name = 'full_ft'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
@@ -1507,6 +1507,10 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         hyperparams_list = append_to_each(
             hyperparams_list, {'full_ft_epoch': args.full_ft_epoch})
         adapt_name += '_full_ft_epoch_' + str(args.full_ft_epoch)
+    if options_dict != {}:
+        hyperparams_list = append_to_each(
+            hyperparams_list, options_dict)
+        adapt_name += '_' + '_'.join(options_dict.keys())
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
     if linear_probe:
         hyperparams_list = append_to_each(hyperparams_list, {'linear_probe': True})
@@ -1634,7 +1638,8 @@ def linprobe_experiments_usenewbnstats(args, num_replications=3):
     linprobe_experiments(args, num_replications=num_replications, use_new_bn_stats=True)
 
 
-def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=False, use_new_bn_stats=False, l2sp=False):
+def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=False, use_new_bn_stats=False, l2sp=False,
+                           options_dict={}):
     if args.epochs is not None:
         raise ValueError('Does not support epochs yet.')
     adapt_name = 'lp_then_ft'
@@ -1700,6 +1705,10 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         hyperparams_list = append_to_each(
             hyperparams_list, {'full_ft_epoch': args.full_ft_epoch})
         adapt_name += '_full_ft_epoch_' + str(args.full_ft_epoch)
+    if options_dict != {}:
+        hyperparams_list = append_to_each(
+            hyperparams_list, options_dict)
+        adapt_name += '_' + '_'.join(options_dict.keys())
     if l2sp:
         # Note: tried 1.0, 0.1, 0.01, 0.001, 0.0001 on Living-17
         # 0.01 worked best ID, and 0.1 worked best OOD but did 0.4% worse than fine-tuning ID.
@@ -1726,8 +1735,8 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
             print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
 
-def lp_then_ft_valmode_experiments(args, num_replications=3):
-    lp_then_ft_experiments(args, num_replications=num_replications, val_mode=True)
+def lp_then_ft_valmode_experiments(args, num_replications=3, options_dict={}):
+    lp_then_ft_experiments(args, num_replications=num_replications, val_mode=True, options_dict=options_dict)
 
 
 def lp_then_ft_l2sp_experiments(args, num_replications=3):
@@ -1808,7 +1817,7 @@ def summarize_dataset(args):
         os.system(cmd)
 
 
-def main(args):
+def main(args, options_dict={}):
     experiment_to_fns = {
         'spray_celeba_jags': spray_celeba_jags,
         'spray_fmow_jags': spray_fmow_jags,
@@ -1841,7 +1850,10 @@ def main(args):
         'summarize_dataset': summarize_dataset,
     }
     if args.experiment in experiment_to_fns:
-        experiment_to_fns[args.experiment](args)
+        if options_dict != {}:
+            experiment_to_fns[args.experiment](args)
+        else:
+            experiment_to_fns[args.experiment](args, options_dict=options_dict)
     else:
         raise ValueError(f'Experiment {args.experiment} does not exist.')
 
@@ -1860,6 +1872,14 @@ def fill_platform_specific_default_args(args):
         args.pretrained_checkpoints_dir = (args.pretrained_checkpoints_dir if
                                            args.pretrained_checkpoints_dir else
                                            '/u/scr/ananya/simclr_weights/')
+
+
+def get_unparsed_options_dict(unparsed):
+    options_dict = {}
+    for unparsed_option in unparsed:
+        option_name, val = unparsed_option.split('=')
+        options_dict[option_name] = val
+    return options_dict
 
 
 if __name__ == "__main__":
@@ -1934,4 +1954,6 @@ if __name__ == "__main__":
     
     args, unparsed = parser.parse_known_args()
     fill_platform_specific_default_args(args)
-    main(args)
+    options_dict = get_unparsed_options_dict(unparsed)
+    print('options_dict', options_dict)
+    main(args, options_dict)
