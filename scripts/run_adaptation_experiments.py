@@ -929,6 +929,51 @@ fmow_all_nonorm_weakaugs = Dataset(
     slurm_data_dir='/scr/biggest/ue_datasets/',
     eval_config_rel_path='adaptation/fmow_all_nonorm_weakaugs_eval.yaml')
 
+fmow_all_nonorm_weakaugs_highres = Dataset(
+    name='fmow_all_nonorm_weakaugs_highres',
+    val_metric='test_acc/ood_val',
+    secondary_val_metrics=['test_acc/id_val', 'test_acc/ood_test', 'test_acc/africa_test', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
+        'test_acc/ood_test', 'test_acc/africa_test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
+        'test_acc/ood_test', 'test_acc/africa_test'],
+    config_rel_path='adaptation/fmow_all_nonorm_weakaugs_highres.yaml',
+    bundles=['fmow'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/scr/biggest/ue_datasets/',
+    eval_config_rel_path='adaptation/fmow_all_nonorm_weakaugs_highres_eval.yaml')
+
+camelyon17_weakaugs = Dataset(
+    name='camelyon17_weakaugs',
+    val_metric='test_acc/ood_val',
+    secondary_val_metrics=['test_acc/id_val', 'test_acc/ood_test', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
+        'test_acc/ood_test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
+        'test_acc/ood_test'],
+    config_rel_path='adaptation/camelyon17_weakaugs.yaml',
+    bundles=['camelyon17'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/scr/biggest/ue_datasets/',
+    eval_config_rel_path='adaptation/camelyon17_weakaugs_eval.yaml')
+
+camelyon17_weakaugs_highres = Dataset(
+    name='camelyon17_weakaugs_highres',
+    val_metric='test_acc/ood_val',
+    secondary_val_metrics=['test_acc/id_val', 'test_acc/ood_test', 'LAST'],
+    output_metrics=['epoch', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
+        'test_acc/ood_test'],
+    linprobe_secondary_val_metrics=None,
+    linprobe_output_metrics=['C', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
+        'test_acc/ood_test'],
+    config_rel_path='adaptation/camelyon17_weakaugs_highres.yaml',
+    bundles=['camelyon17'],
+    slurm_data_cmd=None,
+    slurm_data_dir='/scr/biggest/ue_datasets/',
+    eval_config_rel_path='adaptation/camelyon17_weakaugs_highres_eval.yaml')
+
 landcover = Dataset(
     name='landcover',
     val_metric='test_acc/nonafrica-val',
@@ -973,6 +1018,9 @@ names_to_datasets = {
     'fmow_all': fmow_all,
     'fmow_all_nonorm': fmow_all_nonorm,
     'fmow_all_nonorm_weakaugs': fmow_all_nonorm_weakaugs,
+    'fmow_all_nonorm_weakaugs_highres': fmow_all_nonorm_weakaugs_highres,
+    'camelyon17_weakaugs': camelyon17_weakaugs,
+    'camelyon17_weakaugs_highres': camelyon17_weakaugs_highres,
     'living17_noaugs': living17_noaugs,
     'celeba': celeba,
     'waterbirds': waterbirds,  # This dataset doesn't normalize.
@@ -1083,6 +1131,14 @@ clip_vit_l14 = Model(
     kwargs={
         'classname': 'models.clip_model.ClipModel',
         'args.model_name': 'ViT-L/14',
+    },
+    bundles=[]
+)
+
+clip_vit_l14_highres = Model(
+    kwargs={
+        'classname': 'models.clip_model.ClipModel',
+        'args.model_name': 'ViT-L/14@336px',
     },
     bundles=[]
 )
@@ -1202,6 +1258,7 @@ names_to_model = {
     'deit_vit_b16': deit_vit_b16,
     'clip_vit_b16': clip_vit_b16,
     'clip_vit_l14': clip_vit_l14,
+    'clip_vit_l14_highres': clip_vit_l14_highres,
     'timm_vit_b16': timm_vit_b16,
     'timm_vit_b16_in21k': timm_vit_b16_in21k,
     'convnext_vit_b': convnext_vit_b,
@@ -1380,6 +1437,11 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     if args.epochs is not None:
         adapt_name += '_epochs' + str(args.epochs)
     if args.optimizer is not None:
+        if args.layer_wise_tune or args.layer_wise_tune_cosine:
+            sweep_lrs = [1e-6, 3e-6, 1e-5]
+        else:
+            sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
+    elif args.layer_wise_tune or args.layer_wise_tune_cosine:
         sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
     if args.no_replications or args.only_one_run:
         num_replications = 1
@@ -1390,6 +1452,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         hyperparams_list = append_to_each(hyperparams_list, {'no_train': True})
         adapt_name += '_no_train_'
     elif args.only_one_run:
+        if args.layer_wise_tune or args.layer_wise_tune_cosine:
+            hyperparams_list = range_hyper('optimizer.args.lr', [1e-5])
         if 'waterbirds' in args.datasets[0] and (args.freeze_bottom_k is None or
             args.freeze_bottom_k == 0):
             hyperparams_list = range_hyper('optimizer.args.lr', [3e-4])
@@ -1419,6 +1483,22 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         hyperparams_list = append_to_each(
             hyperparams_list, {'tune_bottom_k': args.tune_bottom_k})
         adapt_name += '_tune_bottom_' + str(args.tune_bottom_k)
+    if args.layer_wise_tune:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'layer-wise-tune': True})
+        adapt_name += '_layer_wise_tune_'
+    if args.layer_wise_tune_cosine:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'layer-wise-tune-cosine': True})
+        adapt_name += '_layer_wise_tune_cosine_'
+    if args.decay_exp is not None:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'decay_exp': args.decay_exp})
+        adapt_name += '_decay_exp_' + str(args.decay_exp)
+    if args.warmup_epochs is not None:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'warmup_epochs': args.warmup_epochs})
+        adapt_name += '_warmup_epochs' + str(args.warmup_epochs)
     if args.optimizer is not None:
         hyperparams_list = append_to_each(
             hyperparams_list, {'optimizer.classname': args.optimizer})
@@ -1565,6 +1645,10 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
     linprobe_adapt_name = 'linprobe'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
+    if args.optimizer is not None:
+        sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
+    elif args.layer_wise_tune or args.layer_wise_tune_cosine:
+        sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
     if args.only_one_run or args.no_replications:
         num_replications = 1
     if args.no_train:
@@ -1572,7 +1656,10 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         hyperparams_list = append_to_each(hyperparams_list, {'no_train': True})
         adapt_name += '_no_train_'
     elif args.only_one_run:
-        hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
+        if args.layer_wise_tune or args.layer_wise_tune_cosine:
+            hyperparams_list = range_hyper('optimizer.args.lr', [1e-5])       
+        else:
+            hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
     else:
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
         # Would be num_replications = 0 if we used adaptation_experiment below.
@@ -1586,6 +1673,22 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         hyperparams_list = append_to_each(
             hyperparams_list, {'tune_bottom_k': args.tune_bottom_k})
         adapt_name += '_tune_bottom_' + str(args.tune_bottom_k)
+    if args.decay_exp is not None:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'decay_exp': args.decay_exp})
+        adapt_name += '_decay_exp_' + str(args.decay_exp)
+    if args.layer_wise_tune:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'layer-wise-tune': True})
+        adapt_name += '_layer_wise_tune_'
+    if args.layer_wise_tune_cosine:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'layer-wise-tune-cosine': True})
+        adapt_name += '_layer_wise_tune_cosine_'
+    if args.warmup_epochs is not None:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'warmup_epochs': args.warmup_epochs})
+        adapt_name += '_warmup_epochs' + str(args.warmup_epochs)
     if args.epochs is not None:
         hyperparams_list = append_to_each(hyperparams_list, {'epochs': args.epochs})
         hyperparams_list = append_to_each(hyperparams_list, {'scheduler.args.T_max': args.epochs})
@@ -1644,14 +1747,15 @@ def lp_then_ft_usenewbnstats_experiments(args, num_replications=3):
 ############################################
 
 def spray_dataset(copy_cmd):
-    # for i in range(10, 32):
-    #     cmd = f'sbatch -p jag-lo --cpus-per-task=1 --gres=gpu:0 --mem=4G --nodelist=jagupard{i} ' +\
-    #           f'scripts/run_sbatch.sh "{copy_cmd}"'
-    #     if args.print_command:
-    #         print(cmd)
-    #     else:
-    #         subprocess.run(cmd, shell=True)
-     for i in range(1,9):
+    for i in range(10, 32):
+        cmd = f'sbatch -p jag-lo --cpus-per-task=1 --gres=gpu:0 --mem=4G --nodelist=jagupard{i} ' +\
+              f'scripts/run_sbatch.sh "{copy_cmd}"'
+        if args.print_command:
+            print(cmd)
+        else:
+            subprocess.run(cmd, shell=True)
+    # Exclude sphinx3 which belongs to Chris Re.
+    for i in [5]: # [1,2] + list(range(4,9)):
         cmd = f'sbatch -p sphinx --cpus-per-task=1 --gres=gpu:0 --mem=4G --nodelist=sphinx{i} ' +\
               f'scripts/run_sbatch.sh "{copy_cmd}"'
         if args.print_command:
@@ -1812,6 +1916,8 @@ if __name__ == "__main__":
                         help='Tune bottom k layers (if not specified, tune everything).')
     parser.add_argument('--full_ft_epoch', type=int, required=False, default=None,
                         help='At what epoch should we unfreeze all weights and fine-tune.')
+    parser.add_argument('--decay_exp', type=float, required=False, default=None,
+                        help='Higher decay exp means the learning rates goes down faster.')
     parser.add_argument('--only_one_run', action='store_true',
                         help=('Only run one hyperparameter setting, e.g. for debugging'
                               '(also do not run replications).'), required=False)
@@ -1819,6 +1925,13 @@ if __name__ == "__main__":
                         help='Don\'t run replication runs, only sweep.', required=False)
     parser.add_argument('--no_train', action='store_true',
                         help='Don\'t train model, just collect stats.', required=False)
+    parser.add_argument('--layer_wise_tune', action='store_true',
+                        help='Gradually unfreeze layers from top to bottom', required=False)
+    parser.add_argument('--layer_wise_tune_cosine', action='store_true',
+                        help='Gradually unfreeze layers, multiply by cosine lr', required=False)
+    parser.add_argument('--warmup_epochs', type=int, required=False, default=None,
+                        help='Number of epochs to run linear probe for.')
+    
     args, unparsed = parser.parse_known_args()
     fill_platform_specific_default_args(args)
     main(args)

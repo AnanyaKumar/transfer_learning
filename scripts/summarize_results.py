@@ -24,7 +24,7 @@ def get_result(file_path, val_metric, output_metrics, take_max=True):
     df = pd.read_csv(file_path, sep='\t')
     # The user probably wants us to output the val metric!
     if val_metric not in output_metrics and val_metric != 'LAST':
-        output_metrics += val_metric
+        output_metrics += [val_metric]
     # If needed, compute the worst among all the test_accs.
     # That is, if the user is selecting for this metric or wants it displayed.
     # I guess val_metric == 'WORST' is redundant given the previous line which will
