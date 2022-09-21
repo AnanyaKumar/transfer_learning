@@ -26,6 +26,7 @@ from unlabeled_extrapolation.models import resnet
 from unlabeled_extrapolation.utils.accumulator import Accumulator
 import unlabeled_extrapolation.utils.utils as utils
 import unlabeled_extrapolation.utils.schedulers as schedulers
+import unlabeled_extrapolation.utils.layer_wise_tuner as layer_wise_tuner
 from timm.data.mixup import Mixup
 
 log_level = logging.INFO
@@ -313,7 +314,8 @@ def add_layer_grad_stats(net, loss_dict, config):
 
 
 def train(epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
-          test_loaders, max_test_examples, weight_dict_initial, batch_scheduler=None):
+          test_loaders, max_test_examples, weight_dict_initial, batch_scheduler=None,
+          batch_lw_tuner=None):
     # Returns a dictionary with epoch, train/loss and train/acc.
     # Train model.
     training_state = net.training
@@ -395,6 +397,8 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
             optimizer.step()
         if batch_scheduler is not None:
             batch_scheduler.step()
+        if batch_lw_tuner is not None:
+            batch_lw_tuner.step()
         num_examples += len(all_labels)
         outputs, loss, train_preds = None, None, None  # Try to force garbage collection.
         def should_log(log_interval):
@@ -454,6 +458,12 @@ def check_exists_not_none(d, k):
     return k in d and d[k] != None
 
 
+def get_or_default(d, k, default):
+    if k in d and d[k] != None:
+        return d[k]
+    return default
+
+
 def check_exists_value(d, k, v):
     return k in d and d[k] == v
 
@@ -501,25 +511,34 @@ def main(config, log_dir, checkpoints_dir):
     # If batch scheduler is specified, then use a batch scheduler that updates the learning
     # rate every step. Otherwise, update the learning rate every epoch.
     batch_scheduler = None
+    batch_lw_tuner = None
     scheduler = None
-    if check_exists_not_none(config, 'decay_exp'):
-        decay_exp = config['decay_exp']
-    else:
-        decay_exp = 3.73 
-    if check_exists_not_none(config, 'warmup_epochs'):
-        warmup_epochs = config['warmup_epochs']
-    else:
-        warmup_epochs = 0
-    if check_exists_value(config, 'layer-wise-tune', True):
-        logging.info('Layer-wise tuning.')
+    decay_exp = get_or_default(config, 'decay_exp', 3.73)
+    warmup_epochs = get_or_default(config, 'warmup_epochs', 0)
+    cooldown_epochs = get_or_default(config, 'cooldown_epochs', 0)
+    if check_exists_value(config, 'batch-layer-wise-tune', True):
+        num_batches = len(train_loader)
+        num_training_steps  = num_batches * config['epochs']
+        num_warmup_steps = int(num_batches * warmup_epochs)
+        num_cooldown_steps = int(num_batches * cooldown_epochs)
+        freeze_embed = not(config['optimizer']['classname'] in non_sgd_optimizer_names)
+        batch_lw_tuner = layer_wise_tuner.LayerWiseTuner(net, num_training_steps, num_warmup_steps, num_cooldown_steps, freeze_embed)
+        logging.info('Batch layer-wise tuning.')
+        batch_scheduler = schedulers.LayerWiseSchedule(optimizer, num_training_steps, warmup_epochs=num_warmup_steps,
+                                                       cooldown_epochs=num_cooldown_steps, decay_exp=decay_exp)
+    elif check_exists_value(config, 'layer-wise-tune', True) or check_exists_value(config, 'layer-wise-tune-cosine', True):
         num_epochs = config['epochs']
-        scheduler = schedulers.LayerWiseSchedule(optimizer, num_epochs, 
-                                                 warmup_epochs=warmup_epochs, decay_exp=decay_exp)
-    elif check_exists_value(config, 'layer-wise-tune-cosine', True):
-        logging.info('Layer-wise tuning with cosine decay.')
-        num_epochs = config['epochs']
-        scheduler = schedulers.LayerWiseSchedule(optimizer, num_epochs, decay_exp=decay_exp,
-                                                 warmup_epochs=warmup_epochs, cosine=True)
+        freeze_embed = not(config['optimizer']['classname'] in non_sgd_optimizer_names)
+        lw_tuner = layer_wise_tuner.LayerWiseTuner(net, num_epochs, warmup_epochs, cooldown_epochs, freeze_embed)
+        if check_exists_value(config, 'layer-wise-tune', True):
+            logging.info('Layer-wise tuning.')
+            scheduler = schedulers.LayerWiseSchedule(optimizer, num_epochs, warmup_epochs=warmup_epochs,
+                                                     cooldown_epochs=cooldown_epochs, decay_exp=decay_exp)
+        else:
+            logging.info('Layer-wise tuning with cosine decay.')
+            scheduler = schedulers.LayerWiseSchedule(optimizer, num_epochs, warmup_epochs=warmup_epochs,
+                                                     cooldown_epochs=cooldown_epochs, decay_exp=decay_exp,
+                                                     cosine=True)
     elif check_exists_not_none(config, 'batch_scheduler'):
         # TODO: add batch scheduler.
         num_batches = len(train_loader)
@@ -566,37 +585,7 @@ def main(config, log_dir, checkpoints_dir):
         if (check_exists_value(config, 'layer-wise-tune', True) or
             check_exists_value(config, 'layer-wise-tune-cosine', True)):
             # Get number of transformer layers.
-            num_layers = len(net.get_layers())
-            num_trans_layers = int((num_layers - 6) / 4)
-            # Get number of transformer layers to freeze.
-            effective_epoch = max(0, epoch - warmup_epochs)
-            effective_num_epochs = max(1, num_epochs - warmup_epochs)
-            if effective_num_epochs == 1:
-                num_trans_tune = num_trans_layers
-            else:
-                num_trans_tune = int(float(effective_epoch) / (effective_num_epochs-1) * num_trans_layers)
-            if num_trans_tune > num_trans_layers:
-                num_trans_tune = num_trans_layers
-            num_trans_freeze = num_trans_layers - num_trans_tune
-            # Convert to number of layers to freeze.
-            if num_trans_freeze == num_trans_layers:
-                # If we are tuning the head, don't tune the post layer norm.
-                num_layers_freeze = num_trans_freeze * 4 + 5
-            elif num_trans_freeze == 0:
-                if config['optimizer']['classname'] in non_sgd_optimizer_names:
-                    num_layers_freeze = 0
-                else:
-                    num_layers_freeze = 2
-            else:
-                num_layers_freeze = num_trans_freeze * 4 + 4
-            # Set all grads to True.
-            set_requires_grad(net, True)
-            # Call freeze.
-            # TODO: Q: should we freeze pos embedding and cls token?
-            net.freeze_bottom_k(num_layers_freeze)
-            # Print statistics about number of parameters tuning, layers frozen, etc.
-            logging.info(f'Freezing {num_layers_freeze} layers out of {num_layers}')
-            logging.info(f' = freezing {num_trans_freeze} transformer blocks out of {num_trans_layers}')
+            lw_tuner.step()
         # Save checkpoint once in a while.
         if epoch % config['save_freq'] == 0 and (
             'save_no_checkpoints' not in config or not config['save_no_checkpoints']):
@@ -617,7 +606,7 @@ def main(config, log_dir, checkpoints_dir):
         # One epoch of model training.
         train_stats = train(
            epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
-           test_loaders, max_test_examples, weight_dict_initial, batch_scheduler) 
+           test_loaders, max_test_examples, weight_dict_initial, batch_scheduler, batch_lw_tuner) 
         # Add number of layers frozen to train_stats.
         if (check_exists_value(config, 'layer-wise-tune', True) or
             check_exists_value(config, 'layer-wise-tune-cosine', True)):

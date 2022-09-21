@@ -137,6 +137,28 @@ class ClipModel(nn.Module):
             raise NotImplementedError
         return layers
 
+    def get_num_trans_layers(self):
+        visual = self._model.visual
+        return len(visual.transformer.resblocks)
+
+    def freeze_bottom_trans(self, num_trans_freeze, freeze_embed):
+        num_trans_layers = self.get_num_trans_layers()
+        if num_trans_freeze == num_trans_layers:
+            # If we are tuning the head, don't tune the post layer norm.
+            num_layers_freeze = num_trans_freeze * 4 + 5
+        elif num_trans_freeze == 0:
+            if freeze_embed:
+                num_layers_freeze = 2
+            else:
+                num_layers_freeze = 0
+        else:
+            num_layers_freeze = num_trans_freeze * 4 + 4
+        # Set all grads to True.
+        set_requires_grad(self, True)
+        # Call freeze.
+        # TODO: Q: should we freeze pos embedding and cls token?
+        self.freeze_bottom_k(num_layers_freeze)
+
     def tune_bottom_k(self, k):
         layers = [layer for name, layer in self.get_layers()]
         if k > len(layers):

@@ -22,16 +22,21 @@ class CosineScheduleWithWarmup(LambdaLR):
 
 class LayerWiseSchedule(LambdaLR):
     """Linear warm up and then cosine annealing of the learning rate."""
-    def __init__(self, optimizer, num_epochs, warmup_epochs=0, decay_exp=3.73, cosine=False, num_cycles=0.5, last_epoch=-1):
+    def __init__(self, optimizer, num_epochs, warmup_epochs=0, cooldown_epochs=0, decay_exp=3.73, cosine=False, num_cycles=0.5, last_epoch=-1):
         self.num_epochs = num_epochs
         self.num_cycles = num_cycles
         self.cosine = cosine
         self.decay_exp = decay_exp
         self.warmup_epochs = warmup_epochs
+        self.cooldown_epochs = cooldown_epochs
         super(LayerWiseSchedule, self).__init__(optimizer, self.lr_lambda, last_epoch=last_epoch)
 
     def lr_lambda(self, current_epoch):
-        progress = float(max(0, current_epoch - self.warmup_epochs)) / float(max(1, self.num_epochs - self.warmup_epochs))
+        effective_curr_epoch = max(0, current_epoch - self.warmup_epochs)
+        effective_total_epochs = max(1, self.num_epochs - self.warmup_epochs - self.cooldown_epochs)
+        if current_epoch >= self.num_epochs - self.cooldown_epochs or effective_total_epochs == 1:
+            return 1.0
+        progress = float(effective_curr_epoch) / float(effective_total_epochs - 1.0)
         # num_layers_tuning = int(progress * (num_layers + 1))
         # assert num_layers_tuning >= 0
         # if num_layers_tuning > num_layers:
