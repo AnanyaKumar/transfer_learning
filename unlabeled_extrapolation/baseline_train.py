@@ -607,14 +607,9 @@ def main(config, log_dir, checkpoints_dir):
         train_stats = train(
            epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
            test_loaders, max_test_examples, weight_dict_initial, batch_scheduler, batch_lw_tuner) 
-        # Add number of layers frozen to train_stats.
-        if (check_exists_value(config, 'layer-wise-tune', True) or
-            check_exists_value(config, 'layer-wise-tune-cosine', True)):
-            train_stats['num_trans_freeze'] = num_trans_freeze
-            train_stats['num_layers_freeze'] = num_layers_freeze
         # Call scheduler to update learning rate, unless we have a batch scheduler, in which
         # case we will update the learning rate every step.
-        if not check_exists_not_none(config, 'batch_scheduler'):
+        if batch_scheduler is None:
             scheduler.step()
         # Get test stats across all test sets.
         test_stats = get_all_test_stats(
