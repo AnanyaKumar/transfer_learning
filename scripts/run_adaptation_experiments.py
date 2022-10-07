@@ -285,15 +285,15 @@ def get_amlt_config(experiment_name, job_names, cmds, dataset, args=None):
     # TODO: use some better library to inject additional options into the yaml files.
     amlt_config = f"description: Sweep for experiment {experiment_name}\n\n"
     if args.amulet_cluster == 'amlk8s':
-        amlt_config_path = 'scripts/amlt_config_template_amlk8s.yaml'
+        amlt_config_path = 'amlt_scripts/amlt_config_template_amlk8s.yaml'
     elif args.amulet_cluster == 'sing' or args.amulet_cluster == 'sing_basic':
-        amlt_config_path = 'scripts/amlt_config_template_sing.yaml'
+        amlt_config_path = 'amlt_scripts/amlt_config_template_sing.yaml'
     else:
         raise ValueError(f'Unknown cluster {args.cluster}')
     with open(amlt_config_path, "r") as f:
         amlt_config += f.read()
     # Read and fill out the setup.
-    setup_config_path = 'scripts/amlt_setup.yaml'
+    setup_config_path = 'amlt_scripts/amlt_setup.yaml'
     with open(setup_config_path, "r") as f:
         amlt_setup = f.read()
     if dataset.amlt_data_cmd is not None:
