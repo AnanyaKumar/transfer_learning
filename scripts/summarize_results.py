@@ -21,6 +21,7 @@ def get_parent_folder(file_path):
 
 
 def get_result(file_path, val_metric, output_metrics, take_max=True):
+    # Get the result for a single run.
     df = pd.read_csv(file_path, sep='\t')
     # The user probably wants us to output the val metric!
     if val_metric not in output_metrics and val_metric != 'LAST':
@@ -68,9 +69,12 @@ def get_result(file_path, val_metric, output_metrics, take_max=True):
     else:
         run_name = [('name', file_path[file_path.rfind('/')+1:-4])]
         best_res = run_name + best_res
-    return best_res, best_value
+    # len(df) is the number of epochs
+    assert len(df) == df['epoch'].max() + 1
+    return best_res, best_value, len(df)
 
-def summarize_results(results_dir, val_metric, output_metrics, replication=False, use_all=False, max_num=None):
+def summarize_results(results_dir, val_metric, output_metrics, max_num=None):
+    # Get results for all runs in an experiment.
     # If use_all is True, then look at all stats.tsv files.
     # Otherwise, if replication is True look for replication files, if false ignore replicatin files.
     # max_num is for linear probing, and uses only the first max_num runs.
@@ -81,15 +85,14 @@ def summarize_results(results_dir, val_metric, output_metrics, replication=False
     # the same validation metric.
     file_paths = sorted(file_paths)
     results_list, val_values_list = [], []
+    num_epochs_list = []
     for file_path in file_paths:
         if max_num is not None and int(file_path[-5]) >= max_num:
             continue
-        parent_folder = get_parent_folder(file_path)
-        if use_all or (('replication' in parent_folder and replication) or
-                       ('replication' not in parent_folder and not replication)):
-            res_row, val_value = get_result(file_path, val_metric, output_metrics)
-            results_list.append(OrderedDict(res_row))
-            val_values_list.append(val_value)
+        res_row, val_value, num_epochs = get_result(file_path, val_metric, output_metrics)
+        results_list.append(OrderedDict(res_row))
+        val_values_list.append(val_value)
+        num_epochs_list.append(num_epochs)
     res = pd.DataFrame(results_list)
     for col in res.columns:
         if 'epoch' in col:
@@ -97,7 +100,7 @@ def summarize_results(results_dir, val_metric, output_metrics, replication=False
         if 'acc' in col:
             res[col] = res[col] * 100
     res = res.round(4)
-    return res, val_values_list, file_paths
+    return res, val_values_list, file_paths, num_epochs_list
 
 if __name__ == '__main__':
     # Higher is better when we pick val_metric, so use it for accuracies not losses.

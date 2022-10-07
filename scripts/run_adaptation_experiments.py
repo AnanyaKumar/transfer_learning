@@ -1391,7 +1391,7 @@ def fine_tuning_celeba_experiments(args, linear_probe=True):
 
 def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
                             val_mode=False, no_augmentation=False, l2sp=False, side_tune=False,
-                            imagenet_lp_ft_phase2=False, mixup_sweep=False, options_dict=options_dict):
+                            imagenet_lp_ft_phase2=False, mixup_sweep=False, options_dict={}):
     adapt_name = 'full_ft'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
@@ -1441,8 +1441,9 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
             sweep_lrs = [1e-6, 3e-6, 1e-5]
         else:
             sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
-    elif args.layer_wise_tune or args.layer_wise_tune_cosine:
+    elif args.layer_wise_tune or args.layer_wise_tune_cosine or args.batch_layer_wise_tune:
         sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
+        # Note for fmow I also tried 3e-4 and 1e-3.
     if args.no_replications or args.only_one_run:
         num_replications = 1
         # Would be num_replications = 0 if we used adaptation_experiment below.
@@ -1491,6 +1492,10 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         hyperparams_list = append_to_each(
             hyperparams_list, {'layer-wise-tune-cosine': True})
         adapt_name += '_layer_wise_tune_cosine_'
+    if args.batch_layer_wise_tune:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'batch-layer-wise-tune': True})
+        adapt_name += '_batch_layer_wise_tune'
     if args.decay_exp is not None:
         hyperparams_list = append_to_each(
             hyperparams_list, {'decay_exp': args.decay_exp})
@@ -1510,7 +1515,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
     if options_dict != {}:
         hyperparams_list = append_to_each(
             hyperparams_list, options_dict)
-        adapt_name += '_' + '_'.join(options_dict.keys())
+        adapt_name += '_' + hyperparams_to_str(options_dict)
     hyperparams_list = append_to_each(hyperparams_list, {'seed': args.seed})
     if linear_probe:
         hyperparams_list = append_to_each(hyperparams_list, {'linear_probe': True})
@@ -1544,10 +1549,12 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
                     'epochs-5_linear_probe-True_optimizer.args.lr-0.1_scheduler.args.'
                     'T_max-5_seed-0_run0/checkpoints/ckp_best_val'})
     for dataset in datasets:
+        ignore_name_hypers=set(options_dict.keys()).union({'batch-layer-wise-tune',
+            'full_ft_epoch', 'linear_probe_checkpoint_path', 'optimizer.classname'})
         all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
             num_replications=num_replications, args=args,
-            ignore_name_hypers={'full_ft_epoch', 'checkpoint_path', 'optimizer.classname'})
+            ignore_name_hypers=ignore_name_hypers) 
         if all_ids is not None:
             print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
@@ -1652,7 +1659,7 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
     model = names_to_model[args.model_name]
     if args.optimizer is not None:
         sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
-    elif args.layer_wise_tune or args.layer_wise_tune_cosine:
+    elif args.layer_wise_tune or args.layer_wise_tune_cosine or args.batch_layer_wise_tune:
         sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
     if args.only_one_run or args.no_replications:
         num_replications = 1
@@ -1686,6 +1693,10 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         hyperparams_list = append_to_each(
             hyperparams_list, {'layer-wise-tune': True})
         adapt_name += '_layer_wise_tune_'
+    if args.batch_layer_wise_tune:
+        hyperparams_list = append_to_each(
+            hyperparams_list, {'batch-layer-wise-tune': True})
+        adapt_name += '_batch_layer_wise_tune'
     if args.layer_wise_tune_cosine:
         hyperparams_list = append_to_each(
             hyperparams_list, {'layer-wise-tune-cosine': True})
@@ -1708,7 +1719,7 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
     if options_dict != {}:
         hyperparams_list = append_to_each(
             hyperparams_list, options_dict)
-        adapt_name += '_' + '_'.join(options_dict.keys())
+        adapt_name += '_' + hyperparams_to_str(options_dict.keys())
     if l2sp:
         # Note: tried 1.0, 0.1, 0.01, 0.001, 0.0001 on Living-17
         # 0.01 worked best ID, and 0.1 worked best OOD but did 0.4% worse than fine-tuning ID.
@@ -1726,11 +1737,13 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         for i in range(num_replications):
             replication_hyperparams_list.append({
                 'linear_probe_checkpoint_path': linprobe_group_path + '/weights_' + str(i) + '.pkl'})
+        ignore_name_hypers=set(options_dict.keys()).union({'batch-layer-wise-tune',
+                'full_ft_epoch', 'linear_probe_checkpoint_path', 'optimizer.classname'})
         all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model,
             hyperparams_list=cur_hyperparams_list, num_replications=num_replications,
             replication_hyperparams_list=replication_hyperparams_list, args=args,
-            ignore_name_hypers={'full_ft_epoch', 'linear_probe_checkpoint_path', 'optimizer.classname'})
+            ignore_name_hypers=ignore_name_hypers)
         if all_ids is not None:
             print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
@@ -1850,7 +1863,7 @@ def main(args, options_dict={}):
         'summarize_dataset': summarize_dataset,
     }
     if args.experiment in experiment_to_fns:
-        if options_dict != {}:
+        if options_dict == {}:
             experiment_to_fns[args.experiment](args)
         else:
             experiment_to_fns[args.experiment](args, options_dict=options_dict)
@@ -1876,8 +1889,10 @@ def fill_platform_specific_default_args(args):
 
 def get_unparsed_options_dict(unparsed):
     options_dict = {}
+    print(unparsed)
     for unparsed_option in unparsed:
         option_name, val = unparsed_option.split('=')
+        option_name = option_name[2:]
         options_dict[option_name] = val
     return options_dict
 
@@ -1946,6 +1961,8 @@ if __name__ == "__main__":
     parser.add_argument('--no_train', action='store_true',
                         help='Don\'t train model, just collect stats.', required=False)
     parser.add_argument('--layer_wise_tune', action='store_true',
+                        help='Gradually unfreeze layers from top to bottom', required=False)
+    parser.add_argument('--batch_layer_wise_tune', action='store_true',
                         help='Gradually unfreeze layers from top to bottom', required=False)
     parser.add_argument('--layer_wise_tune_cosine', action='store_true',
                         help='Gradually unfreeze layers, multiply by cosine lr', required=False)
