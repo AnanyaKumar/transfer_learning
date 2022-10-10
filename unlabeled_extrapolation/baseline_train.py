@@ -100,14 +100,17 @@ def get_test_stats(config, net, test_loader, criterion, device, epoch, loader_na
         elif (config['train_dataset']['classname'] == 'datasets.wilds.WILDS' and
               config['train_dataset']['args']['dataset_name'] == 'camelyon17'):
             dataset_name = 'camelyon17'
+        logging.info('dataset_name: ' + dataset_name)
         split_name = loader_name
         if split_name == 'ood_val':
             split_name = 'val'
         elif split_name == 'ood_test':
             split_name = 'test'
+        logging.info('split_name: ' + split_name)
         seed = config['seed']
         file_name = '{dataset}_split:{split}_seed:{seed}_epoch:{epoch}_pred.csv'.format(
             dataset=dataset_name, split=split_name, seed=seed, epoch=epoch)
+        logging.info('file_name: ' + file_name)
         file_path = log_dir + '/model_preds/' + file_name
         with open(file_name, "w") as f:
             f.write(pred_string)
