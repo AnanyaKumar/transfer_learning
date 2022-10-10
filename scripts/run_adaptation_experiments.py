@@ -1965,7 +1965,7 @@ if __name__ == "__main__":
     parser.add_argument('--only_one_run', action='store_true',
                         help=('Only run one hyperparameter setting, e.g. for debugging'
                               '(also do not run replications).'), required=False)
-    parser.add_argument('--replications_one_run', action='store_true',
+    parser.add_argument('--replication_one_run', action='store_true',
                         help='Only run one hyperparameter setting, but all replications.',
                         required=False)
     parser.add_argument('--no_replications', action='store_true',
