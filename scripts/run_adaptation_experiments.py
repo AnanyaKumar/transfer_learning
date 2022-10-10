@@ -1348,6 +1348,8 @@ def fine_tuning_celeba_single_experiment(args, attribute_name, num_replications=
     if args.only_one_run:
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs[0])
         num_replications = 1
+    elif args.replication_one_run:
+        hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs[0])
         # Would be num_replications = 0 if we used adaptation_experiment below.
     else:
         hyperparams_list = range_hyper('optimizer.args.lr', sweep_lrs)
@@ -1452,7 +1454,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         hyperparams_list = range_hyper('optimizer.args.lr', [0.0])
         hyperparams_list = append_to_each(hyperparams_list, {'no_train': True})
         adapt_name += '_no_train_'
-    elif args.only_one_run:
+    elif args.only_one_run or args.replication_one_run:
         if args.layer_wise_tune or args.layer_wise_tune_cosine:
             hyperparams_list = range_hyper('optimizer.args.lr', [1e-5])
         if 'waterbirds' in args.datasets[0] and (args.freeze_bottom_k is None or
@@ -1463,6 +1465,10 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
             hyperparams_list = range_hyper('optimizer.args.lr', [1e-3])
         else:
             hyperparams_list = range_hyper('optimizer.args.lr', [sweep_lrs[0]])
+        if 'fmow' in args.datasets[0] and args.optimizer is None:
+            hyperparams_list = range_hyper('optimizer.args.lr', [3e-4])  # TODO: change
+        elif 'camelyon17' in args.datasets[0] and args.optimizer is None:
+            hyperparams_list = range_hyper('optimizer.args.lr', [3e-4])  # TODO: change
     elif mixup_sweep:
         lr_hypers = range_hyper('optimizer.args.lr', sweep_lrs)
         # TODO: add 1.0 to this as well.
@@ -1667,7 +1673,7 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         hyperparams_list = range_hyper('optimizer.args.lr', [0.0])
         hyperparams_list = append_to_each(hyperparams_list, {'no_train': True})
         adapt_name += '_no_train_'
-    elif args.only_one_run:
+    elif args.only_one_run or args.replication_one_run:
         if args.layer_wise_tune or args.layer_wise_tune_cosine:
             hyperparams_list = range_hyper('optimizer.args.lr', [1e-5])       
         else:
@@ -1956,6 +1962,9 @@ if __name__ == "__main__":
     parser.add_argument('--only_one_run', action='store_true',
                         help=('Only run one hyperparameter setting, e.g. for debugging'
                               '(also do not run replications).'), required=False)
+    parser.add_argument('--replications_one_run', action='store_true',
+                        help='Only run one hyperparameter setting, but all replications.',
+                        required=False)
     parser.add_argument('--no_replications', action='store_true',
                         help='Don\'t run replication runs, only sweep.', required=False)
     parser.add_argument('--no_train', action='store_true',

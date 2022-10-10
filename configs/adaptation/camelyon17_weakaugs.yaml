@@ -8,6 +8,7 @@ epochs: &epochs 3
 batch_size: 32
 batch_splits: 2
 save_no_checkpoints: True
+save_wilds_model_preds: True
 
 model:
   classname: models.imnet_resnet.ResNet50

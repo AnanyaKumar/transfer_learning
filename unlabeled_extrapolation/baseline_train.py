@@ -92,7 +92,26 @@ def get_test_stats(config, net, test_loader, criterion, device, epoch, loader_na
             if num_examples >= max_examples:
                 logging.info("Breaking after %d examples.", num_examples)
                 break
-    if 'save_model_preds' in config and config.save_model_preds:
+    if check_exists_value(config, 'save_wilds_model_preds', True):
+        pred_strings = [str(p) for p in preds]
+        pred_string = '\n'.join(pred_strings)
+        if config['train_dataset']['classname'] == 'datasets.fmow.Fmow':
+            dataset_name = 'fmow'
+        elif (config['train_dataset']['classname'] == 'datasets.wilds.WILDS' and
+              config['train_dataset']['args']['dataset_name'] == 'camelyon17'):
+            dataset_name = 'camelyon17'
+        split_name = loader_name
+        if split_name == 'ood_val':
+            split_name = 'val'
+        elif split_name == 'ood_test':
+            split_name = 'test'
+        seed = config['seed']
+        file_name = '{dataset}_split:{split}_seed:{seed}_epoch:{epoch}_pred.csv'.format(
+            dataset=dataset_name, split=split_name, seed=seed, epoch=epoch)
+        file_path = log_dir + '/model_preds/' + file_name
+        with open(file_name, "w") as f:
+            f.write(pred_string)
+    elif check_exists_value(config, 'save_model_preds', True):
         preds = np.concatenate(predicted_list)
         labels = np.concatenate(labels_list)
         pickle_name = log_dir+'/model_preds/'+loader_name+'_'+str(epoch)+'_preds.pkl'
@@ -473,6 +492,7 @@ def main(config, log_dir, checkpoints_dir):
     logging.info("Entering main.")
     train_loader = get_train_loader(config)  
     # Set up test loaders.
+    # shuffle is always False so test examples are in the order they're presented.
     test_loaders, max_test_examples = get_test_loaders(config)
     # Create model.
     net = build_model(config)
@@ -861,7 +881,8 @@ def setup():
     # transform for every test datset.
     preprocess_config(config, args.config) 
     # If we should save model preds, then save them.
-    if 'save_model_preds' in config and config.save_model_preds:
+    if (('save_model_preds' in config and config.save_model_preds) or
+        ('save_wilds_model_preds' in config and config.save_wilds_model_preds)):
         os.makedirs(log_dir + '/model_preds/')
     # Setup wandb.
     setup_wandb(args, config)
