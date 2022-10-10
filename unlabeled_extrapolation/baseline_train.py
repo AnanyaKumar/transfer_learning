@@ -878,8 +878,12 @@ def setup():
             config = json.load(json_file)
     else:
         config = quinine.Quinfig(args.config)
+    logging.info('config before command line')
+    logging.info(config)
     # Update config with command line arguments.
     utils.update_config(unparsed, config)
+    logging.info('config after command line')
+    logging.info(config)
     # This makes specifying certain things more convenient, e.g. don't have to specify a
     # transform for every test datset.
     preprocess_config(config, args.config) 
