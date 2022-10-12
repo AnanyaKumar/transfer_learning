@@ -5,8 +5,9 @@ inherit:
 num_classes: 62
 epochs: &epochs 5
 batch_size: 32
-batch_splits: 2
+batch_splits: 4
 save_no_checkpoints: True
+save_wilds_model_preds: True
 
 model:
   classname: models.imnet_resnet.ResNet50
@@ -52,6 +53,12 @@ test_datasets:
           split: 'id_val'
           regions: ['all']
           root: 'wilds/data'
+    - name: 'id_test'
+      classname: datasets.fmow.Fmow
+      args:
+          split: 'id_test'
+          regions: ['all']
+          root: 'wilds/data'
     - name: 'ood_val'
       classname: datasets.fmow.Fmow
       args:
@@ -64,7 +71,6 @@ test_datasets:
           split: 'test'
           regions: ['all']
           root: 'wilds/data'
-
     - name: 'africa_test'
       classname: datasets.fmow.Fmow
       args:
