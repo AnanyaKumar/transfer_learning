@@ -6,6 +6,9 @@ import torch
 from torch import nn
 from . import model_utils
 from torchvision.transforms import Normalize
+
+import unlabeled_extrapolation.utils.utils as utils
+
 try:
     from models import swav_resnet50
 except:
@@ -95,6 +98,24 @@ class ResNet50(nn.Module):
         # Add a side network, as per the side-tuning paper.
         # In many of their experiments, this is also a ResNet-50 like the original network.
         self._side_network = ResNet50()
+
+    def get_layers(self):
+        stem = nn.ModuleList([self._model.conv1, self._model.bn1, self._model.relu, self._model.maxpool])
+        layers = ([('stem', stem)] +
+                  [('layer1', self._model.layer1)] +
+                  [('layer2', self._model.layer2)] +
+                  [('layer3', self._model.layer3)] +
+                  [('layer4', self._model.layer4)] +
+                  [('avgpool', self._model.avgpool)] +
+                  [('head', self._model.fc)])
+        return layers
+
+    def freeze_bottom_k(self, k):
+        layers = [l for _, l in self.get_layers()]
+        if k > len(layers):
+            raise ValueError(f"k {k} should be less than number of layers {len(layers)}")
+        for i in range(k):
+            utils.set_requires_grad(layers[i], False)
 
     def new_last_layer(self, num_classes):
         num_in_features = self._model.fc.in_features

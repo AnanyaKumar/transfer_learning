@@ -1391,7 +1391,7 @@ def fine_tuning_celeba_experiments(args, linear_probe=True):
 
 
 
-def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
+def fine_tuning_experiments(args, num_replications=10, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
                             val_mode=False, no_augmentation=False, l2sp=False, side_tune=False,
                             imagenet_lp_ft_phase2=False, mixup_sweep=False, options_dict={}):
     adapt_name = 'full_ft'

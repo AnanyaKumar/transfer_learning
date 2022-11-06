@@ -64,7 +64,11 @@ def get_test_stats(config, net, test_loader, criterion, device, epoch, loader_na
     training_state = net.training
     net.eval()
     num_examples = 0
-    if 'save_model_preds' in config and config.save_model_preds:
+    save_model_preds = False
+    if (check_exists_value(config, 'save_wilds_model_preds', True) or
+        check_exists_value(config, 'save_model_preds', True)):
+        save_model_preds = True
+    if save_model_preds:
         predicted_list = []
         labels_list = []
     with torch.no_grad():
@@ -81,7 +85,7 @@ def get_test_stats(config, net, test_loader, criterion, device, epoch, loader_na
             else:
                 _, predicted = torch.max(outputs.data, dim=1)
                 predicted = predicted.detach().cpu().numpy()
-            if 'save_model_preds' in config and config.save_model_preds:
+            if save_model_preds:
                 predicted_list.append(predicted)
                 labels_list.append(labels.detach().cpu().numpy())
             correct = (predicted == labels.detach().cpu().numpy())
@@ -93,6 +97,7 @@ def get_test_stats(config, net, test_loader, criterion, device, epoch, loader_na
                 logging.info("Breaking after %d examples.", num_examples)
                 break
     if check_exists_value(config, 'save_wilds_model_preds', True):
+        preds = np.concatenate(predicted_list)
         pred_strings = [str(p) for p in preds]
         pred_string = '\n'.join(pred_strings)
         if config['train_dataset']['classname'] == 'datasets.fmow.Fmow':
@@ -112,7 +117,7 @@ def get_test_stats(config, net, test_loader, criterion, device, epoch, loader_na
             dataset=dataset_name, split=split_name, seed=seed, epoch=epoch)
         logging.info('file_name: ' + file_name)
         file_path = log_dir + '/model_preds/' + file_name
-        with open(file_name, "w") as f:
+        with open(file_path, "w") as f:
             f.write(pred_string)
     elif check_exists_value(config, 'save_model_preds', True):
         preds = np.concatenate(predicted_list)
@@ -878,12 +883,8 @@ def setup():
             config = json.load(json_file)
     else:
         config = quinine.Quinfig(args.config)
-    logging.info('config before command line')
-    logging.info(config)
     # Update config with command line arguments.
     utils.update_config(unparsed, config)
-    logging.info('config after command line')
-    logging.info(config)
     # This makes specifying certain things more convenient, e.g. don't have to specify a
     # transform for every test datset.
     preprocess_config(config, args.config) 

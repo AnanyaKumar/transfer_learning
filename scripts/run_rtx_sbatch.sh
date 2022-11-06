@@ -4,6 +4,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --exclude=jagupard[10-25]
+#SBATCH --account=nlp
 
 # Print execute commands in the log.
 set -x
