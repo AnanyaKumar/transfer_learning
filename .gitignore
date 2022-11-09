@@ -1,6 +1,7 @@
 **amlt_configs/**
 .amltconfig
 **amlt_scripts**
+**.pkl
 
 **tmp.tsv**
 **slurm_outputs**

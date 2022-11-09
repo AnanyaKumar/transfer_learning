@@ -533,6 +533,25 @@ def main(config, log_dir, checkpoints_dir):
         ]
         optimizer = utils.initialize(
             config['optimizer'], update_args={'params': param_groups})
+    elif 'embed_layer_lr_multiplier' in config:
+        layers = [l for n, l in net.get_layers()]
+        embed_params = get_params(layers[:2])
+        other_params = get_params(layers[2:])
+        # count number of params, check that it's same as model.
+        net_count = count_parameters(net, trainable=True)
+        embed_count = sum([p.numel() for p in embed_params])
+        other_count = sum([p.numel() for p in other_params])
+        logging.info('total params: %d, opt params: %d', net_count, embed_count + other_count)
+        # Set different lr for embedding layer.
+        other_lr = config['optimizer']['args']['lr']
+        embed_lr = config['embed_layer_lr_multiplier'] * other_lr
+        logging.info('Using lr %f for embed layer, %d params', embed_lr, len(embed_params))
+        param_groups = [
+            {'params': other_params},
+            {'params': embed_params, 'lr': embed_lr}
+        ]
+        optimizer = utils.initialize(
+            config['optimizer'], update_args={'params': param_groups})
     else:
         optimizer = utils.initialize(
             config['optimizer'], update_args={'params': net.parameters()}) 

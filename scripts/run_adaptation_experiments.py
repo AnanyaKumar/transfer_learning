@@ -7,7 +7,7 @@ import shlex
 import subprocess
 
 PROJECT_NAME = 'finetuning'
-WORKSHEET_NAME = 'nlp::ananyak-fine-tuning'
+WORKSHEET_NAME = 'public::fine-tuning-distorts-iclr'
 DOCKER_IMAGE = 'ananya/unlabeled-extrapolation'
 
 
@@ -29,10 +29,11 @@ def run_sbatch(cmd, job_name, args, exclude=None, deps=[]):
     slurm_cmd += f' {sbatch_script_path} '
     slurm_cmd += f'"{cmd}"'
     print(slurm_cmd + '\n')
-    output = subprocess.check_output(shlex.split(slurm_cmd)).decode('utf8')
-    job_names = list(re.findall(r'\d+', output))
-    assert(len(job_names) == 1)
-    return job_names[0]
+    if not(args.print_command):
+        output = subprocess.check_output(shlex.split(slurm_cmd)).decode('utf8')
+        job_names = list(re.findall(r'\d+', output))
+        assert(len(job_names) == 1)
+        return job_names[0]
 
 
 def run_codalab(cmd, job_name, args, gpus=1, mem='16G', cpus=1, nlp=True, deps=''):
@@ -44,18 +45,17 @@ def run_codalab(cmd, job_name, args, gpus=1, mem='16G', cpus=1, nlp=True, deps='
         nlp_opt = ''
     cl_deps_str = ':' + ' :'.join(deps)
     bundles = ':unlabeled_extrapolation :scripts :configs ' + cl_deps_str + ' '
-    makedirs = '"export PYTHONPATH="."; export PYTHONPATH="' + args.code_dir + '"; '
+    makedirs = '"export PYTHONPATH=\'.\'; export PYTHONPATH=\'' + args.code_dir + '\'; '
     codalab_cmd = prefix + nlp_opt + bundles + makedirs + cmd + '"'
-    print(codalab_cmd)
-    subprocess.run(shlex.split(codalab_cmd))
-    return job_name
+    print(codalab_cmd + '\n')
+    if not(args.print_command):
+        subprocess.run(shlex.split(codalab_cmd))
+        return job_name
 
 
 def run_job(cmd, job_name, args, deps=[]):
     if args.codalab:
         return run_codalab(cmd, job_name, args, deps=deps)
-    elif args.print_command:
-        print(cmd + '\n')
     else:
         return run_sbatch(cmd, job_name, args, deps=deps)
 
@@ -103,7 +103,7 @@ def get_baseline_experiment_cmd(config_path, run_name, group_name, project_name,
     if not(run_saved):
         if args.codalab:
             kwargs['root_prefix'] = args.codalab_data_dir
-        if args.amulet_option is not None:
+        elif args.amulet_option is not None:
             kwargs['root_prefix'] = '.'
         else:
             kwargs['root_prefix'] = root_prefix
@@ -833,7 +833,7 @@ cifar_stl = Dataset(
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/cifar10-test',
         'test_acc/stl-test', 'test_acc/imnet-n-cifar'],
     config_rel_path='adaptation/cifar_stl.yaml',
-    bundles=['cifar_stl'],
+    bundles=['cifar10_dataset', 'stl10_dataset'],
     slurm_data_cmd=None,
     slurm_data_dir='/u/scr/ananya/',
     eval_config_rel_path='adaptation/cifar_stl_eval.yaml')
