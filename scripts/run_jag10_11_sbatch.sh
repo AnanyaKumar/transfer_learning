@@ -4,9 +4,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=jag-standard
 #SBATCH --mem=16G
+#SBATCH --exclude=jagupard[15-31]
 #SBATCH --account=nlp
-#SBATCH --exclude=jagupard[13,14,15,17,18]
-# #SBATCH --exclude=jagupard[14,17,18,20]
 
 # Print execute commands in the log.
 set -x
