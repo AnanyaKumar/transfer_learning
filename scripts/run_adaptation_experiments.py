@@ -1193,6 +1193,54 @@ timm_vit_b16_in21k = Model(
     bundles=[]
 )
 
+timm_vit_l32_in21k = Model(
+    kwargs={
+        'classname': 'models.vit_model.VitModel',
+        'args.model_name': 'timm.vit_large_patch32_224_in21k',
+    },
+    bundles=[]
+)
+
+timm_vit_l16_in21k = Model(
+    kwargs={
+        'classname': 'models.vit_model.VitModel',
+        'args.model_name': 'timm.vit_large_patch16_224_in21k',
+    },
+    bundles=[]
+)
+
+timm_vit_h14_in21k = Model(
+    kwargs={
+        'classname': 'models.vit_model.VitModel',
+        'args.model_name': 'timm.vit_huge_patch14_224_in21k',
+    },
+    bundles=[]
+)
+
+timm_clip_vit_l14 = Model(
+    kwargs={
+        'classname': 'models.vit_model.VitModel',
+        'args.model_name': 'timm.vit_large_patch14_224_clip_laion2b',
+    },
+    bundles=[]
+)
+
+timm_clip_vit_h14 = Model(
+    kwargs={
+        'classname': 'models.vit_model.VitModel',
+        'args.model_name': 'timm.vit_huge_patch14_224_clip_laion2b',
+    },
+    bundles=[]
+)
+
+timm_clip_vit_g14 = Model(
+    kwargs={
+        'classname': 'models.vit_model.VitModel',
+        'args.model_name': 'timm.vit_giant_patch14_224_clip_laion2b',
+    },
+    bundles=[]
+)
+
 convnext_vit_b = Model(
     kwargs={
         'classname': 'models.timm_model.TimmModel',
@@ -1259,8 +1307,14 @@ names_to_model = {
     'clip_vit_b16': clip_vit_b16,
     'clip_vit_l14': clip_vit_l14,
     'clip_vit_l14_highres': clip_vit_l14_highres,
+    'timm_vit_l32_in21k': timm_vit_l32_in21k,
+    'timm_vit_l16_in21k': timm_vit_l16_in21k,
+    'timm_vit_h14_in21k': timm_vit_h14_in21k,
     'timm_vit_b16': timm_vit_b16,
     'timm_vit_b16_in21k': timm_vit_b16_in21k,
+    'timm_clip_vit_l14': timm_clip_vit_l14,
+    'timm_clip_vit_h14': timm_clip_vit_h14,
+    'timm_clip_vit_g14': timm_clip_vit_g14,
     'convnext_vit_b': convnext_vit_b,
     'scratch_vit_b16_clipstyle': scratch_vit_b16_clipstyle,
     'dino_vit_b16': dino_vit_b16,
