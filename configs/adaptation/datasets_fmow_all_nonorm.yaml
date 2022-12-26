@@ -1,5 +1,5 @@
 
-root_prefix: '/u/scr/nlp/'
+root_prefix: '/u/scr/nlp/wilds/data/'
 
 # Add augmentations, and change normalization a bit.
 # The difference is swav augmentation has a 0.228 instead of 0.229 (lol)
@@ -10,7 +10,7 @@ train_dataset:
     args:
         split: 'train'
         regions: ['all'] 
-        root: 'wilds/data'
+        root: ''
     transforms:
         - classname: torchvision.transforms.RandomResizedCrop
           args:
@@ -28,26 +28,26 @@ test_datasets:
       args:
           split: 'id_val'
           regions: ['all']
-          root: 'wilds/data'
+          root: ''
     - name: 'ood_val'
       classname: datasets.fmow.Fmow
       args:
           split: 'val'
           regions: ['all']
-          root: 'wilds/data'
+          root: ''
     - name: 'ood_test'
       classname: datasets.fmow.Fmow
       args:
           split: 'test'
           regions: ['all']
-          root: 'wilds/data'
+          root: ''
 
     - name: 'africa_test'
       classname: datasets.fmow.Fmow
       args:
           split: 'test'
           regions: [2]
-          root: 'wilds/data'
+          root: ''
 
 early_stop_dataset_names:
     - 'id_val'

@@ -9,6 +9,7 @@ from collections import OrderedDict
 import os
 import shlex
 import shutil
+import sys
 import uuid
 import re
 import glob
@@ -38,7 +39,7 @@ def get_experiment_aggregate_summary(dir_path, val_metric, output_metrics, aggre
     grouped = res.groupby('group')
     means = grouped.mean()
     counts = grouped.count()
-    counts.drop(labels=['name', 'wandb_url'], axis=1)
+    counts.drop(labels=['name'], axis=1)
     stderrs = 1.645 * (grouped.std() / np.sqrt(counts))
     stderrs = stderrs[means.columns]
     min_count = grouped.count().iloc[:,0].min()
@@ -57,6 +58,15 @@ def get_experiment_aggregate_summary(dir_path, val_metric, output_metrics, aggre
     for best_row in [best_row_mean, best_row_std]:
         best_row['group'] = best_row.index
         best_row.set_index('name')
+    # Output results.json for the current sweep.
+    # This is especially useful for displaying results in CodaLab worksheets.
+    def codalab_reformat(s):
+      return s.replace('/', '_')
+    new_columns = [codalab_reformat(s) for s in best_row_mean.columns]
+    best_row_mean.columns = new_columns
+    json_output = best_row_mean.iloc[0].to_json()
+    json_file = open(dir_path + '/results.json', "w")
+    json_file.write(json_output)
     return res, best_row_mean, best_row_std, num_epochs_list
 
 
@@ -87,7 +97,13 @@ if __name__ == '__main__':
     parser.add_argument('--output_file', type=str,
                         help='Path to output results, should end with .tsv')
     parser.add_argument('-s', action='store_true', help="Short version: Do not show column names")
+    # The following option is particularly useful for Codalab, where we just want to summarize all runs
+    # in a single experiment and store the json file.
+    parser.add_argument('--one_experiment_json', action='store_true', help="Summarize single experiment in json")
     args = parser.parse_args()
+    if args.one_experiment_json:
+        get_experiment_aggregate_summary(args.results_dir_glob, args.val_metrics[0], args.output_metrics)
+        sys.exit(0)
     # Get all folders satisfying glob.
     dir_paths = glob.glob(args.results_dir_glob, recursive=False)
     dir_paths = [dir_path for dir_path in dir_paths if 'linprobe' not in dir_path or 'torch_linprobe' in dir_path]
