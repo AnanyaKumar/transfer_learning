@@ -45,12 +45,13 @@ def run_codalab(cmd, job_name, args, gpus=1, mem='16G', cpus=1, nlp=True, deps='
         nlp_opt = ''
     cl_deps_str = ':' + ' :'.join(deps)
     bundles = ':unlabeled_extrapolation :scripts :configs ' + cl_deps_str + ' '
-    makedirs = '"export PYTHONPATH=\'.\'; export PYTHONPATH=\'' + args.code_dir + '\'; '
+    makedirs = '"export PYTHONPATH=\'.\'; '
+    # export PYTHONPATH=\'' + args.code_dir + '\'; '
     codalab_cmd = prefix + nlp_opt + bundles + makedirs + cmd + '"'
     print(codalab_cmd + '\n')
     if not(args.print_command):
         subprocess.run(shlex.split(codalab_cmd))
-        return job_name
+    return job_name
 
 
 def run_job(cmd, job_name, args, deps=[]):
@@ -461,17 +462,28 @@ def run_linprobe_replication(adapt_name, dataset, model, seed, args, deps=[], re
         overwrite_options=overwrite_options)
 
 
-def linprobe_experiment(adapt_name, dataset, model, num_replications, args, deps=[], rerun=False,
+def linprobe_experiment(adapt_name, dataset, model_name, num_replications, args, deps=[], rerun=False,
                         aug=True, train_mode=False, use_new_bn_stats=False):
+    model = names_to_model[model_name]
     replication_ids = []
     for i in range(num_replications):
         job_id = run_linprobe_replication(adapt_name, dataset, model, seed=i, args=args,
                                           deps=deps, rerun=rerun, aug=aug, train_mode=train_mode,
                                           use_new_bn_stats=use_new_bn_stats)
         replication_ids.append(job_id)
-    summarize_id = summarize_linprobe(adapt_name, dataset, model, args, deps=replication_ids, max_num=num_replications)
-    all_ids = replication_ids + [summarize_id]
-    return [summarize_id], all_ids
+    if not args.codalab:
+        summarize_id = summarize_linprobe(adapt_name, dataset, model, args, deps=replication_ids, max_num=num_replications)
+        all_ids = replication_ids + [summarize_id]
+        return [summarize_id], all_ids
+    else:
+        # If Codalab, add sweep experiment, with deps.
+        codalab_summarize_cmd = get_codalab_summarize_linprobe_python_cmd(dataset)
+        summarize_job_name = get_group_name(adapt_name, dataset.name, model_name) + '_summarize'
+        summarize_id = run_job(
+            cmd=codalab_summarize_cmd, job_name=summarize_job_name, args=args, deps=replication_ids)
+        all_ids = replication_ids + [summarize_id]
+        return [summarize_id], all_ids
+
 
 
 ############################################
@@ -826,12 +838,12 @@ imagenet_augs = Dataset(
 cifar_stl = Dataset(
     name='cifar_stl',
     val_metric='test_acc/cifar10-test',
-    secondary_val_metrics=['test_acc/stl-test', 'test_acc/imnet-n-cifar', 'LAST'],
+    secondary_val_metrics=['test_acc/stl-test', 'LAST'],
     output_metrics=['epoch', 'train/acc', 'test_acc/cifar10-test',
-        'test_acc/stl-test', 'test_acc/imnet-n-cifar'],
+        'test_acc/stl-test'],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/cifar10-test',
-        'test_acc/stl-test', 'test_acc/imnet-n-cifar'],
+        'test_acc/stl-test'],
     config_rel_path='adaptation/cifar_stl.yaml',
     bundles=['cifar10_dataset', 'stl10_dataset'],
     slurm_data_cmd=None,
@@ -843,10 +855,10 @@ cifar_stl_nonorm = Dataset(
     val_metric='test_acc/cifar10-test',
     secondary_val_metrics=['test_acc/stl-test', 'test_acc/imnet-n-cifar', 'LAST'],
     output_metrics=['epoch', 'train/acc', 'test_acc/cifar10-test',
-        'test_acc/stl-test', 'test_acc/imnet-n-cifar'],
+        'test_acc/stl-test'],
     linprobe_secondary_val_metrics=None,
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/cifar10-test',
-        'test_acc/stl-test', 'test_acc/imnet-n-cifar'],
+        'test_acc/stl-test'],
     config_rel_path='adaptation/cifar_stl_nonorm.yaml',
     bundles=['cifar_stl'],
     slurm_data_cmd=None,
@@ -881,7 +893,7 @@ fmow = Dataset(
     config_rel_path='adaptation/fmow.yaml',
     bundles=['fmow'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/',
+    slurm_data_dir='/scr/biggest/ue_datasets/wilds/data/',
     eval_config_rel_path='adaptation/fmow_eval.yaml')
 
 fmow_all = Dataset(
@@ -896,7 +908,7 @@ fmow_all = Dataset(
     config_rel_path='adaptation/fmow_all.yaml',
     bundles=['fmow'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/',
+    slurm_data_dir='/scr/biggest/ue_datasets/wilds/data/',
     eval_config_rel_path='adaptation/fmow_all_eval.yaml')
 
 fmow_all_nonorm = Dataset(
@@ -911,7 +923,7 @@ fmow_all_nonorm = Dataset(
     config_rel_path='adaptation/fmow_all_nonorm.yaml',
     bundles=['fmow'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/',
+    slurm_data_dir='/scr/biggest/ue_datasets/wilds/data/',
     eval_config_rel_path='adaptation/fmow_all_nonorm_eval.yaml')
 
 fmow_all_nonorm_weakaugs = Dataset(
@@ -926,7 +938,7 @@ fmow_all_nonorm_weakaugs = Dataset(
     config_rel_path='adaptation/fmow_all_nonorm_weakaugs.yaml',
     bundles=['fmow'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/',
+    slurm_data_dir='/scr/biggest/ue_datasets/wilds/data/',
     eval_config_rel_path='adaptation/fmow_all_nonorm_weakaugs_eval.yaml')
 
 fmow_all_nonorm_weakaugs_highres = Dataset(
@@ -941,7 +953,7 @@ fmow_all_nonorm_weakaugs_highres = Dataset(
     config_rel_path='adaptation/fmow_all_nonorm_weakaugs_highres.yaml',
     bundles=['fmow'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/',
+    slurm_data_dir='/scr/biggest/ue_datasets/wilds/data/',
     eval_config_rel_path='adaptation/fmow_all_nonorm_weakaugs_highres_eval.yaml')
 
 camelyon17_weakaugs = Dataset(
@@ -1361,7 +1373,7 @@ def append_to_each(hyperparams_list, more_hyperparams):
 ## Main experiments.
 ############################################
 
-SWEEP_LRS = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
+SWEEP_LRS = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
 
 def get_datasets(args):
     print(args.datasets)
@@ -1445,7 +1457,7 @@ def fine_tuning_celeba_experiments(args, linear_probe=True):
 
 
 
-def fine_tuning_experiments(args, num_replications=10, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
+def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchnorm_ft=False, higher_linear_lr=False,
                             val_mode=False, no_augmentation=False, l2sp=False, side_tune=False,
                             imagenet_lp_ft_phase2=False, mixup_sweep=False, options_dict={}):
     adapt_name = 'full_ft'
@@ -1471,8 +1483,8 @@ def fine_tuning_experiments(args, num_replications=10, linear_probe=False, batch
             sweep_lrs = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
     elif val_mode:
         adapt_name += '_valmode'
-        if ('waterbirds' not in args.datasets[0] and 'imagenet' not in args.datasets[0]):
-            sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
+        # if ('waterbirds' not in args.datasets[0] and 'imagenet' not in args.datasets[0]):
+        #     sweep_lrs = [3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]
     if no_augmentation:
         adapt_name += '_no_augmentation'
     if linear_probe:
@@ -1620,6 +1632,11 @@ def fine_tuning_experiments(args, num_replications=10, linear_probe=False, batch
             ignore_name_hypers=ignore_name_hypers) 
         if all_ids is not None:
             print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
+        # If Codalab, add sweep experiment, with deps.
+        if args.codalab:
+            codalab_summarize_cmd = get_codalab_summarize_python_cmd(dataset)
+            summarize_job_name = get_group_name(adapt_name, dataset.name, args.model_name) + '_summarize'
+            run_job(cmd=codalab_summarize_cmd, job_name=summarize_job_name, args=args, deps=all_ids)
 
 
 def fine_tuning_mixup_sweep_experiments(args, num_replications=3):
@@ -1685,13 +1702,13 @@ def linprobe_experiments(args, num_replications=3, aug=True, train_mode=False, u
             raise ValueError('If use_new_bn_stats is True, train_mode must be False.')
         adapt_name += '_usenewbnstats'
     datasets = get_datasets(args)
-    model = names_to_model[args.model_name]
     if args.no_replications or args.only_one_run:
         num_replications = 1
     for dataset in datasets:
         all_ids = linprobe_experiment(
-            adapt_name=adapt_name, dataset=dataset, model=model, num_replications=num_replications,
-            args=args, aug=aug, train_mode=train_mode, use_new_bn_stats=use_new_bn_stats)
+            adapt_name=adapt_name, dataset=dataset, model_name=args.model_name,
+            num_replications=num_replications, args=args, aug=aug,
+            train_mode=train_mode, use_new_bn_stats=use_new_bn_stats)
         if all_ids is not None:
             print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
@@ -1716,7 +1733,7 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
     sweep_lrs = SWEEP_LRS
     if val_mode:
         adapt_name += '_valmode'
-        sweep_lrs = [1e-4, 3e-5, 1e-5, 3e-6, 1e-6, 3e-7]
+        # sweep_lrs = [1e-4, 3e-5, 1e-5, 3e-6, 1e-6, 3e-7]
     linprobe_adapt_name = 'linprobe'
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
@@ -1797,19 +1814,31 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         #     cur_hyperparams_list,
         #     {'linear_probe_checkpoint_path': linprobe_group_path + '/weights_0.pkl'})
         replication_hyperparams_list = []
+        deps = []
         for i in range(num_replications):
-            replication_hyperparams_list.append({
-                'linear_probe_checkpoint_path': linprobe_group_path + '/weights_' + str(i) + '.pkl'})
+            if args.codalab:
+                linprobe_job_name = get_group_name(linprobe_adapt_name, dataset.name, args.model_name) + '_' + str(i)
+                weights_path = linprobe_job_name + '/logs/weights_' + str(i) + '.pkl'
+                replication_hyperparams_list.append({
+                    'linear_probe_checkpoint_path': weights_path})
+                deps.append(linprobe_job_name)
+            else:
+                replication_hyperparams_list.append({
+                    'linear_probe_checkpoint_path': linprobe_group_path + '/weights_' + str(i) + '.pkl'})
         ignore_name_hypers=set(options_dict.keys()).union({'batch-layer-wise-tune',
                 'full_ft_epoch', 'linear_probe_checkpoint_path', 'optimizer.classname'})
         all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model,
             hyperparams_list=cur_hyperparams_list, num_replications=num_replications,
             replication_hyperparams_list=replication_hyperparams_list, args=args,
-            ignore_name_hypers=ignore_name_hypers)
+            ignore_name_hypers=ignore_name_hypers, deps=deps)
         if all_ids is not None:
             print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
-
+        # If Codalab, add sweep experiment, with deps.
+        if args.codalab:
+            codalab_summarize_cmd = get_codalab_summarize_python_cmd(dataset)
+            summarize_job_name = get_group_name(adapt_name, dataset.name, args.model_name) + '_summarize'
+            run_job(cmd=codalab_summarize_cmd, job_name=summarize_job_name, args=args, deps=all_ids)
 
 def lp_then_ft_valmode_experiments(args, num_replications=3, options_dict={}):
     lp_then_ft_experiments(args, num_replications=num_replications, val_mode=True, options_dict=options_dict)
@@ -1893,6 +1922,23 @@ def summarize_dataset(args):
         os.system(cmd)
 
 
+def get_codalab_summarize_python_cmd(dataset):
+    cmd = 'python scripts/summarize_all_results.py '
+    cmd += '--results_dir_glob=. '
+    cmd += '--val_metrics ' + dataset.val_metric + ' '
+    cmd += '--output_metrics ' + ' '.join(dataset.output_metrics) + ' '
+    cmd += '--one_experiment_json'
+    return cmd
+
+def get_codalab_summarize_linprobe_python_cmd(dataset):
+    cmd = 'python scripts/summarize_linprobe_results.py '
+    cmd += '--results_dir=. '
+    cmd += '--val_metric ' + dataset.val_metric + ' '
+    cmd += '--output_metrics ' + ' '.join(dataset.linprobe_output_metrics) + ' '
+    cmd += '--one_experiment_json'
+    return cmd
+
+
 def main(args, options_dict={}):
     experiment_to_fns = {
         'spray_celeba_jags': spray_celeba_jags,
@@ -1947,6 +1993,7 @@ def fill_platform_specific_default_args(args):
         args.log_dir = args.log_dir if args.log_dir else 'logs/'
         args.pretrained_checkpoints_dir = (args.pretrained_checkpoints_dir if
                                            args.pretrained_checkpoints_dir else
+
                                            '/u/scr/ananya/simclr_weights/')
 
 

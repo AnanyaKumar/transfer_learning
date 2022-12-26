@@ -60,7 +60,14 @@ def get_result(file_path, val_metric, output_metrics, take_max=True):
     # Get run-name and wandb from config file.
     parent_dir = Path(file_path).parent.absolute()
     config_path = parent_dir / 'config.json'
-    if os.path.isfile(config_path):
+    print(parent_dir, config_path)
+    print(Path(file_path).parent.name)
+    if Path(file_path).parent.name == 'logs':
+        # Codalab.
+        grandparent_dir = Path(file_path).parent.parent
+        run_name = [('name', grandparent_dir.name)]
+        best_res = run_name + best_res
+    elif os.path.isfile(config_path):
         with open(config_path, 'r') as f:
             config = json.load(f)
         run_name = [('name', config['run_name'])]
@@ -70,7 +77,8 @@ def get_result(file_path, val_metric, output_metrics, take_max=True):
         run_name = [('name', file_path[file_path.rfind('/')+1:-4])]
         best_res = run_name + best_res
     # len(df) is the number of epochs
-    assert len(df) == df['epoch'].max() + 1
+    if 'epoch' in df:
+        assert len(df) == df['epoch'].max() + 1
     return best_res, best_value, len(df)
 
 def summarize_results(results_dir, val_metric, output_metrics, max_num=None):

@@ -132,6 +132,7 @@ def main():
     parser.add_argument('--use_new_bn_stats', type=str,
                         help='Update batchnorm stats before producing features.', required=False,
                         default='False')
+    parser.add_argument('--no_wandb', action='store_true', help='disable W&B')
     args, unparsed = parser.parse_known_args()
     config = quinine.Quinfig(args.config)
     utils.update_config(unparsed, config) 

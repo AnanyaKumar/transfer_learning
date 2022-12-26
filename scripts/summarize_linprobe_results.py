@@ -8,6 +8,7 @@ from collections import OrderedDict
 import os
 import shlex
 import shutil
+import sys
 import uuid
 import re
 import glob
@@ -31,15 +32,28 @@ if __name__ == '__main__':
     parser.add_argument('--max_num', type=int,
                         help='Max number of lin probe runs to use.')
     parser.add_argument('-s', action='store_true', help="Short version: Do not show column names")
+    parser.add_argument('--one_experiment_json', action='store_true', help="Summarize single experiment in json")
     args = parser.parse_args()
     metrics, results_list = [], []
     # Get results for val_metric.
-    val_results, _, _ = summarize_results(
-        args.results_dir, args.val_metric, args.output_metrics, use_all=True,
+    val_results, _, _, _ = summarize_results(
+        args.results_dir, args.val_metric, args.output_metrics,
         max_num=args.max_num)
+    if args.one_experiment_json:
+        def codalab_reformat(s):
+          return s.replace('/', '_')
+        new_columns = [codalab_reformat(s) for s in val_results.columns]
+        val_results.columns = new_columns
+        json_output = val_results.iloc[0].to_json()
+        json_file = open(args.results_dir + '/results.json', "w")
+        json_file.write(json_output)
+        sys.exit(0)
+
     metrics.append(args.val_metric)
     results_list.append(val_results)
     # Get other results.
+    if args.secondary_val_metrics is None:
+        args.secondary_val_metrics = []
     for secondary_val_metric in args.secondary_val_metrics:
         secondary_results, _, _ = summarize_results(
             args.results_dir, secondary_val_metric, args.output_metrics, use_all=True, max_num=args.max_num)
