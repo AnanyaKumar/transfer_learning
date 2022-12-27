@@ -8,11 +8,13 @@
 
 # Print execute commands in the log.
 set -x
+# conda_env=unlabeled_extrapolation
 conda_env=`whoami`-ue-new
 
 # source scripts/copy_imagenet_local.sh
 source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
 conda deactivate
+# source ~/.bashrc
 conda activate $conda_env
 cd $PWD
 

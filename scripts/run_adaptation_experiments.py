@@ -104,6 +104,8 @@ def get_baseline_experiment_cmd(config_path, run_name, group_name, project_name,
     if not(run_saved):
         if args.codalab:
             kwargs['root_prefix'] = args.codalab_data_dir
+            if 'imagenet' in args.datasets[0]:
+                kwargs['test_root_prefix'] = args.codalab_data_dir
         elif args.amulet_option is not None:
             kwargs['root_prefix'] = '.'
         else:
@@ -814,7 +816,7 @@ imagenet = Dataset(
         'test_acc/renditions'],
     config_rel_path='adaptation/imagenet.yaml',
     bundles=['imagenet'],
-    slurm_data_dir='',
+    slurm_data_dir='/scr/biggest/',
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     eval_config_rel_path='adaptation/imagenet_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
@@ -830,7 +832,7 @@ imagenet_augs = Dataset(
         'test_acc/renditions'],
     config_rel_path='adaptation/imagenet_augs.yaml',
     bundles=['imagenet'],
-    slurm_data_dir='',
+    slurm_data_dir='/scr/biggest/',
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     eval_config_rel_path='adaptation/imagenet_augs_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
@@ -891,9 +893,9 @@ fmow = Dataset(
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/americas_val',
         'test_acc/africa_val', 'test_acc/europe_val'],
     config_rel_path='adaptation/fmow.yaml',
-    bundles=['fmow'],
+    bundles=['fmow_v1.1'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/wilds/data/',
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',
     eval_config_rel_path='adaptation/fmow_eval.yaml')
 
 fmow_all = Dataset(
@@ -906,9 +908,9 @@ fmow_all = Dataset(
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
         'test_acc/test', 'test_acc/africa_test'],
     config_rel_path='adaptation/fmow_all.yaml',
-    bundles=['fmow'],
+    bundles=['fmow_v1.1'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/wilds/data/',
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',
     eval_config_rel_path='adaptation/fmow_all_eval.yaml')
 
 fmow_all_nonorm = Dataset(
@@ -921,9 +923,9 @@ fmow_all_nonorm = Dataset(
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
         'test_acc/ood_test', 'test_acc/africa_test'],
     config_rel_path='adaptation/fmow_all_nonorm.yaml',
-    bundles=['fmow'],
+    bundles=['fmow_v1.1'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/wilds/data/',
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',
     eval_config_rel_path='adaptation/fmow_all_nonorm_eval.yaml')
 
 fmow_all_nonorm_weakaugs = Dataset(
@@ -936,9 +938,9 @@ fmow_all_nonorm_weakaugs = Dataset(
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
         'test_acc/ood_test', 'test_acc/africa_test'],
     config_rel_path='adaptation/fmow_all_nonorm_weakaugs.yaml',
-    bundles=['fmow'],
+    bundles=['fmow_v1.1'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/wilds/data/',
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',
     eval_config_rel_path='adaptation/fmow_all_nonorm_weakaugs_eval.yaml')
 
 fmow_all_nonorm_weakaugs_highres = Dataset(
@@ -951,9 +953,9 @@ fmow_all_nonorm_weakaugs_highres = Dataset(
     linprobe_output_metrics=['C', 'train/acc', 'test_acc/id_val', 'test_acc/ood_val',
         'test_acc/ood_test', 'test_acc/africa_test'],
     config_rel_path='adaptation/fmow_all_nonorm_weakaugs_highres.yaml',
-    bundles=['fmow'],
+    bundles=['fmow_v1.1'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/wilds/data/',
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',
     eval_config_rel_path='adaptation/fmow_all_nonorm_weakaugs_highres_eval.yaml')
 
 camelyon17_weakaugs = Dataset(
@@ -1534,7 +1536,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         # Use the best hyperparameter for fmow and camelyon17.
         if 'fmow' in args.datasets[0] and args.optimizer is None:
             adapt_name += '_best_'
-            hyperparams_list = range_hyper('optimizer.args.lr', [0.0003])
+            hyperparams_list = range_hyper('optimizer.args.lr', [0.01])
         elif 'camelyon17' in args.datasets[0] and args.optimizer is None:
             adapt_name += '_best_'
             hyperparams_list = range_hyper('optimizer.args.lr', [0.0003]) 
