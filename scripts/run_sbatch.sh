@@ -10,6 +10,7 @@
 
 # Print execute commands in the log.
 set -x
+# conda_env=unlabeled_extrapolation
 conda_env=`whoami`-ue-new
 
 # source scripts/copy_imagenet_local.sh

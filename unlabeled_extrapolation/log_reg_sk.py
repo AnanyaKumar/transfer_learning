@@ -47,6 +47,21 @@ def inv_normalize_weights(weights, intercept, features, normalize_index):
     return new_weights, new_intercept
 
 
+def pad_head(coef, intercept, classes_present):
+    # Create a map from class to index in coef
+    # Create coef and intercept of the current shape
+    # Loop over real number of classes. if index doesn't exist in classes, then initialize to 0. Otherwise use coef intercept.
+    num_classes = np.max(classes_present) + 1
+    assert num_classes >= len(classes_present)
+    assert len(classes_present) == coef.shape[0] == intercept.shape[0]
+    new_coefs = np.zeros((num_classes, coef.shape[1]))
+    new_intercept = np.zeros((num_classes,))
+    for coef_index, present_class in enumerate(list(classes_present)):
+        new_coefs[present_class, :] = coef[coef_index, :]
+        new_intercept[present_class] = intercept[coef_index]
+    return new_coefs, new_intercept
+
+
 def test_log_reg_warm_starting(features, labels, train_index, test_indices, val_index, loader_names,
                                num_cs=100, start_c=-7, end_c=2, max_iter=200, random_state=0):
     L = len(features)
@@ -103,6 +118,7 @@ def main():
                         help='Metric to select regularization on.', required=True)
     parser.add_argument('--seed', type=int,
                         help='Random seed.', required=False, default=0)
+    parser.add_argument('--no_padding', action='store_true', help='dont pad missing labels')
     args, unparsed = parser.parse_known_args()
     
     print('Running on machine ', socket.gethostname())
@@ -111,7 +127,7 @@ def main():
     if args.train_index is None:
         args.train_index = 0
     if args.test_indices is None:
-        args.test_indices = list(range(0, len(loader_names)))
+        args.test_indices = list(range(0, len(loader_names))) 
     print("Training on: ", loader_names[args.train_index])
     print("Testing on: ")
     for idx in args.test_indices:
@@ -142,6 +158,9 @@ def main():
     accs_df.to_csv(args.results_save_path, sep='\t')
     new_coef, new_intercept = inv_normalize_weights(coef, intercept, features,
                                                     normalize_index=args.train_index)
+    # Pad the head if desired, if some classes are missing from the training set, e.g., in FMoW.
+    if not(args.no_padding):
+        new_coef, new_intercept = pad_head(new_coef, new_intercept, clf.classes_)
     pickle.dump((new_coef, new_intercept, best_c, best_i), open(args.weights_save_path, 'wb'))
     # Just a redundancy check that the best classifier weights, and best weights, are the same.
     assert(np.allclose(clf.coef_, coef))

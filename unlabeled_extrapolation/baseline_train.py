@@ -783,19 +783,31 @@ def update_test_transform_args_configs(config):
 def update_root_prefix(config):
     # Go through test datasets, and train dataset. If root_prefix specified, then prepend that
     # to the root.
-    def apply_root_prefix(dataset_config, root_prefix):
+    def apply_root_prefix(dataset_config, root_prefix, test_root_prefix):
         for key in ['root', 'cache_path', 'pickle_file_path']:
             if key in dataset_config['args']:
                 orig_path = dataset_config['args'][key]
                 logging.info('orig_path %s', orig_path)
-                dataset_config['args'][key] = root_prefix + '/' + orig_path
+                if orig_path.find('{root_prefix}') != -1:
+                    new_path = orig_path.replace('{root_prefix}', root_prefix)
+                elif orig_path.find('{test_root_prefix}') != -1:
+                    new_path = orig_path.replace('{test_root_prefix}', test_root_prefix)
+                else:
+                    new_path = root_prefix + '/' + orig_path
+                dataset_config['args'][key] = new_path
 
     if 'root_prefix' in config:
         root_prefix = config['root_prefix']
-        logging.info("Adding root prefix %s to all roots.", root_prefix)
-        apply_root_prefix(config['train_dataset'], root_prefix)
+        # There needs to be a root prefix to use test root prefix.
+        if 'test_root_prefix' in config:
+            test_root_prefix = config['test_root_prefix']
+        else:
+            test_root_prefix = root_prefix
+        logging.info("Adding root prefix %s, test root prefix %s to all roots.",
+            root_prefix, test_root_prefix)
+        apply_root_prefix(config['train_dataset'], root_prefix, test_root_prefix)
         for test_dataset_config in config['test_datasets']:
-            apply_root_prefix(test_dataset_config, root_prefix)
+            apply_root_prefix(test_dataset_config, root_prefix, test_root_prefix)
 
 
 def update_net_eval_mode(config):
