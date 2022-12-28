@@ -1536,7 +1536,7 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         # Use the best hyperparameter for fmow and camelyon17.
         if 'fmow' in args.datasets[0] and args.optimizer is None:
             adapt_name += '_best_'
-            hyperparams_list = range_hyper('optimizer.args.lr', [0.01])
+            hyperparams_list = range_hyper('optimizer.args.lr', [0.0003])
         elif 'camelyon17' in args.datasets[0] and args.optimizer is None:
             adapt_name += '_best_'
             hyperparams_list = range_hyper('optimizer.args.lr', [0.0003]) 
