@@ -3,6 +3,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
+#SBATCH --account=nlp
 #SBATCH --partition=sphinx
 #SBATCH -t 2-0:00
 
