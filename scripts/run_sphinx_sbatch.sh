@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --partition=sphinx
-#SBATCH --exclude=sphinx[3]
+#SBATCH --exclude=sphinx[3-8]
 #SBATCH --account=nlp
 
 # Print execute commands in the log.

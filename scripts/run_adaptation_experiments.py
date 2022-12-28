@@ -1431,6 +1431,8 @@ def fine_tuning_celeba_single_experiment(args, attribute_name, num_replications=
         hyperparams_list = append_to_each(hyperparams_list, {'scheduler.args.T_max': args.epochs})
     if args.save_no_checkpoints:
         hyperparams_list = append_to_each(hyperparams_list, {'save_no_checkpoints': True})
+    else:
+        hyperparams_list = append_to_each(hyperparams_list, {'save_no_checkpoints': False})
     hyperparams_list = append_to_each(hyperparams_list, {'default_test_args.target_attribute': attribute_name})
     hyperparams_list = append_to_each(hyperparams_list, {'train_dataset.args.target_attribute': attribute_name})
     if args.no_replications:
@@ -1537,9 +1539,15 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         if 'fmow' in args.datasets[0] and args.optimizer is None:
             adapt_name += '_best_'
             hyperparams_list = range_hyper('optimizer.args.lr', [0.0003])
+        elif 'fmow' in args.datasets[0] and args.optimizer is not None:
+            adapt_name += '_best_'
+            hyperparams_list = range_hyper('optimizer.args.lr', [1e-5])
         elif 'camelyon17' in args.datasets[0] and args.optimizer is None:
             adapt_name += '_best_'
             hyperparams_list = range_hyper('optimizer.args.lr', [0.0003]) 
+        elif 'camelyon17' in args.datasets[0] and args.optimizer is not None:
+            adapt_name += '_best_'
+            hyperparams_list = range_hyper('optimizer.args.lr', [1e-6])
     elif mixup_sweep:
         lr_hypers = range_hyper('optimizer.args.lr', sweep_lrs)
         # TODO: add 1.0 to this as well.
@@ -1609,6 +1617,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
         hyperparams_list = append_to_each(hyperparams_list, {'scheduler.args.T_max': args.epochs})
     if args.save_no_checkpoints:
         hyperparams_list = append_to_each(hyperparams_list, {'save_no_checkpoints': True})
+    else:
+        hyperparams_list = append_to_each(hyperparams_list, {'save_no_checkpoints': False})
     if imagenet_lp_ft_phase2:
         if 'imagenet_augs' in args.datasets:
             hyperparams_list = append_to_each(hyperparams_list,
@@ -1809,6 +1819,8 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
         hyperparams_list = append_to_each(hyperparams_list, {'l2sp_weight': 0.01})
     if args.save_no_checkpoints:
         hyperparams_list = append_to_each(hyperparams_list, {'save_no_checkpoints': True})
+    else:
+        hyperparams_list = append_to_each(hyperparams_list, {'save_no_checkpoints': False})
     for dataset in datasets:
         cur_hyperparams_list = deepcopy(hyperparams_list)
         linprobe_group_path = get_group_dir_path(linprobe_adapt_name, dataset.name, args.model_name, args)
@@ -2027,7 +2039,6 @@ if __name__ == "__main__":
                         help='What amulet cluster to run on? Only relevant if amulet_option is not None. Options:'
                              '(sing/amlk8s/sing_basic)')
     parser.add_argument('--print_command', action='store_true', help='only print the python commands (dont run anything).')
-    parser.add_argument('--save_no_checkpoints', action='store_true', help='run on CodaLab not slurm')
     parser.add_argument('--partition', type=str, required=False, default='jag-standard',
                         help='(Slurm only) What priority to use.')
     parser.add_argument('--mail_user', type=str, required=False,
@@ -2083,7 +2094,10 @@ if __name__ == "__main__":
                         help='Gradually unfreeze layers, multiply by cosine lr', required=False)
     parser.add_argument('--warmup_epochs', type=int, required=False, default=None,
                         help='Number of epochs to run linear probe for.')
-    
+    parser.add_argument('--save_no_checkpoints', action='store_true')
+    parser.add_argument('--save_checkpoints', dest='save_no_checkpoints', action='store_false')
+    parser.set_defaults(save_no_checkpoints=True)
+
     args, unparsed = parser.parse_known_args()
     fill_platform_specific_default_args(args)
     options_dict = get_unparsed_options_dict(unparsed)
