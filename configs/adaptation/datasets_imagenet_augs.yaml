@@ -1,12 +1,13 @@
 
-root_prefix: ''
+root_prefix: '/scr/biggest/'
+test_root_prefix: '/u/scr/nlp/'
 
 # The train and test transforms are taken from the Swav fine-tuning script.
 train_dataset:
     name: 'train'
     classname: datasets.imagenet.ImageNet
     args:
-        root: '/scr/biggest/imagenet/'
+        root: '{root_prefix}/imagenet/'
         split: 'train'
     transforms:
         - classname: torchvision.transforms.RandomResizedCrop
@@ -29,27 +30,27 @@ test_datasets:
     - name: 'val'
       classname: datasets.imagenet.ImageNet
       args:
-          root: '/scr/biggest/imagenet/'
+          root: '{root_prefix}/imagenet/'
           split: 'val'
     - name: 'renditions'
       classname: datasets.imagenet.ImageNet
       args:
-          root: '/u/scr/nlp/imagenet/'
+          root: '{test_root_prefix}/imagenet/'
           split: 'imagenet-r'
     - name: 'imagenet-a'
       classname: datasets.imagenet.ImageNet
       args:
-          root: '/u/scr/nlp/imagenet/'
+          root: '{test_root_prefix}/imagenet/'
           split: 'imagenet-a'
     - name: 'v2'
       classname: datasets.imagenet.ImageNet
       args:
-          root: '/u/scr/nlp/imagenet/'
+          root: '{test_root_prefix}/imagenet/'
           split: 'imagenetv2-matched-frequency-format-val'
     - name: 'sketch'
       classname: datasets.imagenet.ImageNet
       args:
-          root: '/u/scr/nlp/imagenet/'
+          root: '{test_root_prefix}/imagenet/'
           split: 'sketch'
 
 early_stop_dataset_names:

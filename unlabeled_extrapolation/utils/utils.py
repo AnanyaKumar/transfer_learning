@@ -1,4 +1,4 @@
-# Thanks to Michael Xie for these utilities.
+# Thanks to Michael Xie for inital version of these utilities.
 
 import ast
 from copy import deepcopy
@@ -8,6 +8,11 @@ import importlib
 import inspect
 import torch
 from torchvision import transforms
+
+
+def count_parameters(model, trainable):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad == trainable)
+
 
 def save_json(save_path, save_dict):
     with open(save_path, 'w') as outfile:
@@ -100,10 +105,15 @@ def load_ckp(checkpoint_fpath, model, optimizer=None, scheduler=None, reset_opti
 
 
 def setup_logging(log_dir, level=logging.DEBUG):
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    logging.getLogger().setLevel(logging.INFO)
+    logger = logging.getLogger('')
+    logger.handlers = []
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
         datefmt='%Y-%m-%d:%H:%M:%S', level=level,
-        filename=log_dir+'/logs.txt', force=True)
+        filename=log_dir+'/logs.txt')
 
 
 def update_config(unparsed, config):
@@ -159,4 +169,9 @@ def to_device(obj, device):
         return res
     else:
         return obj.to(device)
+
+
+def set_requires_grad(component, val):
+    for param in component.parameters():
+        param.requires_grad = val
 

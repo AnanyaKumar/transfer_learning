@@ -1,4 +1,4 @@
-
+# Note: this model does normalization.
 import clip
 from collections import OrderedDict
 import torchvision.models as models
@@ -99,37 +99,83 @@ class ClipModel(nn.Module):
             for param in self._classifier.parameters():
                 param.requires_grad = val
 
-    def freeze_bottom_k(self, k):
+    def get_layers(self):
+        visual = self._model.visual
         if self._model_name in {'ViT-B/32', 'ViT-B/16',
                                 'ViT-L/14', 'ViT-L/14@336px'}:
-            if k > 0:
-                set_requires_grad(self._model.visual.conv1, False)
-            if k > 1:
-                set_requires_grad(self._model.visual.ln_pre, False)
-            if k > 2:
-                resblocks = self._model.visual.transformer.resblocks
-                n_freeze_transformers = min(k-2, len(resblocks))
-                for i in range(n_freeze_transformers):
-                    set_requires_grad(resblocks[i], False)
-                if k-2 > len(resblocks):
-                    set_requires_grad(self._model.visual.ln_post, False)
+            layers = [
+                ('patch_embed', visual.conv1),
+                ('ln_pre', visual.ln_pre),  # To streamline number of layers with CLIP.
+                ('pos_embed', model_utils.ParamWrapperModule(visual.positional_embedding)),
+                ('cls_token', model_utils.ParamWrapperModule(visual.class_embedding)),
+            ]
+            blocks = visual.transformer.resblocks
+            for i, block in zip(range(len(blocks)), blocks):
+                layers += [
+                    ('trans' + str(i) + '_norm1', block.ln_1),
+                    ('trans' + str(i) + '_attn', block.attn),
+                    ('trans' + str(i) + '_norm2', block.ln_2),
+                    ('trans' + str(i) + '_mlp', block.mlp),
+                ]
+            layers += [('post_norm', visual.ln_post)]
+            layers += [('head', self.get_last_layer())]
         elif self._model_name in {'RN50'}:
-            visual = self._model.visual
-            if k > 0:
-                set_requires_grad(visual.conv1, False)
-                set_requires_grad(visual.conv2, False)
-                set_requires_grad(visual.conv3, False)
-                set_requires_grad(visual.bn1, False)
-                set_requires_grad(visual.bn2, False)
-                set_requires_grad(visual.bn3, False)
-            layers = [visual.layer1, visual.layer2, visual.layer3, visual.layer3,
-                      visual.attnpool]
-            if k > 1:
-                n_freeze_upper = min(k-1, len(layers))
-                for i in range(n_freeze_upper):
-                    set_requires_grad(layers[i], False)
+            layers = [
+                ('conv1', visual.conv1),
+                ('bn1', visual.bn1),
+                ('conv2', visual.conv2),
+                ('bn2', visual.bn2),
+                ('conv3', visual.conv3),
+                ('bn3', visual.bn3),
+                ('layer1', visual.layer1),
+                ('layer2', visual.layer2),
+                ('layer3', visual.layer3),
+                ('attnpool', visual.attnpool)]
+            if self._classifier is not None:
+                layers = layers + [('head', self._classifier)]
         else:
             raise NotImplementedError
+        return layers
+
+    def get_num_trans_layers(self):
+        visual = self._model.visual
+        return len(visual.transformer.resblocks)
+
+    def freeze_bottom_trans(self, num_trans_freeze, freeze_embed):
+        num_trans_layers = self.get_num_trans_layers()
+        if num_trans_freeze == num_trans_layers:
+            # If we are tuning the head, don't tune the post layer norm.
+            num_layers_freeze = num_trans_freeze * 4 + 5
+        elif num_trans_freeze == 0:
+            if freeze_embed:
+                num_layers_freeze = 2
+            else:
+                num_layers_freeze = 0
+        else:
+            num_layers_freeze = num_trans_freeze * 4 + 4
+        # Set all grads to True.
+        set_requires_grad(self, True)
+        # Call freeze.
+        # TODO: Q: should we freeze pos embedding and cls token?
+        self.freeze_bottom_k(num_layers_freeze)
+
+    def tune_bottom_k(self, k):
+        layers = [layer for name, layer in self.get_layers()]
+        if k > len(layers):
+            raise ValueError(f"k {k} should be less than number of layers {len(layers)}")
+        set_requires_grad(self._model, False)
+        for i in range(k):
+            set_requires_grad(layers[i], True)
+        # Also need to tune the prediction head because the fine-tuning task is different
+        # from pretraining.
+        set_requires_grad(layers[-1], True)
+
+    def freeze_bottom_k(self, k):
+        layers = [layer for name, layer in self.get_layers()]
+        if k > len(layers):
+            raise ValueError(f"k {k} should be less than number of layers {len(layers)}")
+        for i in range(k):
+            set_requires_grad(layers[i], False)
 
     def new_last_layer(self, num_classes):
         num_in_features = self._model.visual.output_dim
@@ -147,6 +193,6 @@ class ClipModel(nn.Module):
 
     def get_feature_extractor(self):
         raise NotImplementedError('Be careful, we need to normalize image first before encoding it.')
-    
+
     def get_features(self, x):
         return self._model.encode_image(normalize_transform(x))

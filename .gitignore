@@ -1,3 +1,7 @@
+**amlt_configs/**
+.amltconfig
+**amlt_scripts**
+
 **tmp.tsv**
 **slurm_outputs**
 **outdated**

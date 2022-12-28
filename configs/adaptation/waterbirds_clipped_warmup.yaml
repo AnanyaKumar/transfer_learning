@@ -1,0 +1,21 @@
+
+inherit:
+  - resnet50_transfer.yaml 
+  - datasets_waterbirds.yaml
+
+num_classes: 2
+epochs: &epochs 100
+batch_size: 32
+save_no_checkpoints: True
+
+model:
+  classname: models.clip_model.ClipModel
+  args:
+    model_name: 'ViT-B/16'
+
+max_grad_norm: 1.0
+
+batch_scheduler:
+  classname: unlabeled_extrapolation.utils.schedulers.CosineScheduleWithWarmup
+  args: {}
+

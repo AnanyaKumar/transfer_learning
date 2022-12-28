@@ -5,11 +5,13 @@
 #SBATCH --mem=24G
 #SBATCH --account=nlp
 #SBATCH --partition=sphinx
-#SBATCH -t 2-0:00
+#SBATCH --exclude=sphinx[3-8]
+#SBATCH --account=nlp
 
 # Print execute commands in the log.
 set -x
-conda_env=`whoami`-ue
+# conda_env=unlabeled_extrapolation
+conda_env=`whoami`-ue-new
 
 # source scripts/copy_imagenet_local.sh
 source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh

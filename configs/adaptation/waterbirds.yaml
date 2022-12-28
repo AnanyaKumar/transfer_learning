@@ -4,14 +4,14 @@ inherit:
   - datasets_waterbirds.yaml
 
 num_classes: 2
-epochs: &epochs 100
-batch_size: 64
+epochs: &epochs 20
+batch_size: 32
+batch_splits: 2
 save_no_checkpoints: True
 
 model:
   classname: models.clip_model.ClipModel
-  args:
-    model_name: 'ViT-B/16'
+  args: {}
 
 scheduler:
   classname: torch.optim.lr_scheduler.CosineAnnealingLR

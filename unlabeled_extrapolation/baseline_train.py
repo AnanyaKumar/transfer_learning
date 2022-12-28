@@ -25,10 +25,16 @@ import numpy as np
 from unlabeled_extrapolation.models import resnet
 from unlabeled_extrapolation.utils.accumulator import Accumulator
 import unlabeled_extrapolation.utils.utils as utils
+import unlabeled_extrapolation.utils.schedulers as schedulers
+import unlabeled_extrapolation.utils.layer_wise_tuner as layer_wise_tuner
 from timm.data.mixup import Mixup
 
 log_level = logging.INFO
 
+non_sgd_optimizer_names = [
+    'torch.optim.Adam', 'torch.optim.AdamW', 'torch.optim.RMSprop', 'torch_optimizer.Lamb',
+    'torch_optimizer.lamb.Lamb'
+]
 
 def reset_state(model, training):
     if training:
@@ -58,7 +64,11 @@ def get_test_stats(config, net, test_loader, criterion, device, epoch, loader_na
     training_state = net.training
     net.eval()
     num_examples = 0
-    if 'save_model_preds' in config and config.save_model_preds:
+    save_model_preds = False
+    if (check_exists_value(config, 'save_wilds_model_preds', True) or
+        check_exists_value(config, 'save_model_preds', True)):
+        save_model_preds = True
+    if save_model_preds:
         predicted_list = []
         labels_list = []
     with torch.no_grad():
@@ -75,19 +85,41 @@ def get_test_stats(config, net, test_loader, criterion, device, epoch, loader_na
             else:
                 _, predicted = torch.max(outputs.data, dim=1)
                 predicted = predicted.detach().cpu().numpy()
-            if 'save_model_preds' in config and config.save_model_preds:
+            if save_model_preds:
                 predicted_list.append(predicted)
                 labels_list.append(labels.detach().cpu().numpy())
             correct = (predicted == labels.detach().cpu().numpy())
             val_acc.add_values(correct.tolist())
             loss = criterion(outputs, labels).cpu()
-            loss_list = loss.tolist()
-            val_loss.add_value(loss_list)
+            val_loss.add_values([float(loss.detach().cpu())] * len(images))
             num_examples += len(images)
             if num_examples >= max_examples:
                 logging.info("Breaking after %d examples.", num_examples)
                 break
-    if 'save_model_preds' in config and config.save_model_preds:
+    if check_exists_value(config, 'save_wilds_model_preds', True):
+        preds = np.concatenate(predicted_list)
+        pred_strings = [str(p) for p in preds]
+        pred_string = '\n'.join(pred_strings)
+        if config['train_dataset']['classname'] == 'datasets.fmow.Fmow':
+            dataset_name = 'fmow'
+        elif (config['train_dataset']['classname'] == 'datasets.wilds.WILDS' and
+              config['train_dataset']['args']['dataset_name'] == 'camelyon17'):
+            dataset_name = 'camelyon17'
+        logging.info('dataset_name: ' + dataset_name)
+        split_name = loader_name
+        if split_name == 'ood_val':
+            split_name = 'val'
+        elif split_name == 'ood_test':
+            split_name = 'test'
+        logging.info('split_name: ' + split_name)
+        seed = config['seed']
+        file_name = '{dataset}_split:{split}_seed:{seed}_epoch:{epoch}_pred.csv'.format(
+            dataset=dataset_name, split=split_name, seed=seed, epoch=epoch)
+        logging.info('file_name: ' + file_name)
+        file_path = log_dir + '/model_preds/' + file_name
+        with open(file_path, "w") as f:
+            f.write(pred_string)
+    elif check_exists_value(config, 'save_model_preds', True):
         preds = np.concatenate(predicted_list)
         labels = np.concatenate(labels_list)
         pickle_name = log_dir+'/model_preds/'+loader_name+'_'+str(epoch)+'_preds.pkl'
@@ -154,9 +186,10 @@ def build_model(config):
     finetune = 'finetune' in config and config['finetune']
     linear_probe = 'linear_probe' in config and config['linear_probe']
     freeze_bottom_k = 'freeze_bottom_k' in config
+    tune_bottom_k = check_exists_not_none(config, 'tune_bottom_k')
     batch_norm = 'batchnorm_ft' in config and config['batchnorm_ft']
     side_tune = 'side_tune' in config and config['side_tune']
-    if finetune or linear_probe or batch_norm or side_tune:
+    if finetune or linear_probe or batch_norm or side_tune: 
         if freeze_bottom_k:
             # Currently only implemented for some models (including CLIP ViTs).
            net.freeze_bottom_k(config['freeze_bottom_k']) 
@@ -181,6 +214,10 @@ def build_model(config):
             net.add_probe(probe_net)
         else:
             net.new_last_layer(config['num_classes'])
+        if tune_bottom_k:
+            if freeze_bottom_k:
+                raise ValueError("Cannot have tune bottom k and freeze bottom k simultaneously.")
+            net.tune_bottom_k(config['tune_bottom_k'])
         if side_tune:
             # This is currently only supported for some networks like ResNet-50,
             # would need to add support for other networks.
@@ -256,12 +293,63 @@ def set_requires_grad(component, val):
         param.requires_grad = val
 
 
+_grad_layer_name = 'train/grad_layer_'
+_normalized_grad_layer_name = 'train/normalized_grad_layer_'
+
+
+def add_layer_grad_stats(net, loss_dict, config):
+    if getattr(net, 'get_layers', None) is None or 'no_log_grads' in config:
+        return
+    layers = net.get_layers()
+    for i in range(len(layers)):
+    # Add norm of the weights.
+        if len(layers[i]) == 1:
+            # In the older version of model code, we just return a list of layers without names.
+            layer_name = 'train/grad_' + str(i)
+            normalized_layer_name = 'train/param_normalized_grad_' + str(i)
+            norm_name = 'train/norm_' + str(i)
+            cur_layer = list(layers[i].parameters())
+        else:
+            # In newer version of model code, we have a (name, layer) tuple.
+            layer_name = 'train/grad_' + layers[i][0]
+            normalized_layer_name = 'train/param_normalized_grad_' + layers[i][0]
+            norm_name = 'train/norm_' + layers[i][0]
+            cur_layer = list(layers[i][1].parameters())
+        if len(cur_layer) == 0 or not cur_layer[0].requires_grad:
+            continue
+        if layer_name not in loss_dict:
+            loss_dict[layer_name] = Accumulator()
+        if normalized_layer_name not in loss_dict:
+            loss_dict[normalized_layer_name] = Accumulator()
+        if norm_name not in loss_dict:
+            loss_dict[norm_name] = Accumulator()
+        grads = [p.grad.detach().cpu().numpy() for p in cur_layer]
+        grad_norms_squared = [np.linalg.norm(g) ** 2 for g in grads]
+        # Don't divide by batch size, because the loss is already the mean over the batch.
+        grad_norm = np.sqrt(np.sum(grad_norms_squared))
+        loss_dict[layer_name].add_value(grad_norm)
+        norms_squared = [np.linalg.norm(p.data.detach().cpu().numpy()) ** 2 for p in cur_layer]
+        norm = np.sqrt(np.sum(norms_squared))
+        loss_dict[norm_name].add_value(norm)
+        num_params = np.sum([p.numel() for p in cur_layer])
+        if num_params == 0:
+            assert np.isclose(grad_norm, 0.0)
+            normalized_grad_norm = grad_norm
+        else:
+            normalized_grad_norm = grad_norm / np.sqrt(num_params)
+        loss_dict[normalized_layer_name].add_value(normalized_grad_norm)
+
+
 def train(epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
-          test_loaders, max_test_examples, weight_dict_initial):
+          test_loaders, max_test_examples, weight_dict_initial, batch_scheduler=None,
+          batch_lw_tuner=None):
     # Returns a dictionary with epoch, train/loss and train/acc.
     # Train model.
     training_state = net.training
-    logging.info("\nEpoch #{}".format(epoch))
+    if 'use_net_val_mode' in config and config['use_net_val_mode']:
+        net.eval()
+    else:
+        net.train()
     loss_dict = {
         'train/loss': Accumulator(),
         'train/acc': Accumulator(),
@@ -279,48 +367,75 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
             mixup = Mixup(num_classes=config['num_classes'], mixup_alpha=config['mixup_alpha'])
         else:
             mixup = Mixup(num_classes=config['num_classes'])
+    # Should we split each batch into multiple parts so we don't run out of GPU memory.
+    batch_splits = 1
+    if check_exists_not_none(config, 'batch_splits'):
+        batch_splits = config['batch_splits']
     for i, data in enumerate(train_loader, 0):
-        if 'use_net_val_mode' in config and config['use_net_val_mode']:
-            net.eval()
-        else:
-            net.train()
-        # get the inputs; data is a list of [inputs, labels]
-        if config['use_cuda']:
-            data = utils.to_device(data, device)
-        inputs, labels = data
-        if 'use_mixup' in config and config['use_mixup']:
-            inputs, labels = mixup(inputs, labels)
         optimizer.zero_grad()
-        outputs = net(inputs)
-        loss = criterion(outputs, labels)
+        all_inputs, all_labels = data
+        if 'use_mixup' in config and config['use_mixup']:
+            all_inputs, all_labels = mixup(all_inputs, all_labels)
         if 'l2sp_weight' in config:
             weight_dict, _ = get_param_weights_counts(net, detach=False)
             l2sp_loss = config['l2sp_weight'] * get_l2_dist(weight_dict_initial, weight_dict)
             loss_dict['train/l2sp_loss'].add_value(l2sp_loss.tolist())
-            loss += l2sp_loss
-        _, train_preds = torch.max(outputs.data, axis=1)
-        loss_dict['train/loss'].add_value(loss.tolist())
-        if 'use_mixup' in config and config['use_mixup']:
-            _, max_labels = torch.max(labels.data, axis=1)
-            loss_dict['train/acc'].add_values((train_preds == max_labels).tolist())
-        else:
-            loss_dict['train/acc'].add_values((train_preds == labels).tolist())
-        if 'model_loss' in config:
-            opt_loss = model_loss(net, inputs, labels)
-            opt_loss.backward()
-            loss_dict['train/model_loss'].add_value(opt_loss.tolist())
-        else:
-            loss.backward()
-        optimizer.step() 
-        num_examples += len(labels)
+            l2sp_loss.backward()
+            del l2sp_loss
+        # Split up the batch so we can do the backward pass on a GPU, accumulate gradients
+        # across the split.
+        split_size = int(np.ceil(len(all_inputs) / batch_splits))
+        split_inputs = torch.split(
+            all_inputs, split_size_or_sections=split_size)
+        split_labels = torch.split(
+            all_labels, split_size_or_sections=split_size)
+        for j in range(len(split_inputs)):
+            inputs, labels = split_inputs[j], split_labels[j]
+            if config['use_cuda']:
+                inputs, labels = inputs.to(device), labels.to(device)
+            outputs = net(inputs)
+            loss = criterion(outputs, labels)
+            # Important: nede to adjust the loss. This assumes the reduction operation is
+            # mean.
+            if config["criterion"]["args"]["reduction"] != 'sum':
+                loss = loss * len(inputs) / len(all_inputs)
+            _, train_preds = torch.max(outputs.data, axis=1)
+            assert len(loss.shape) == 0
+            loss_dict['train/loss'].add_values([float(loss.detach().cpu())] * len(inputs))
+            if 'use_mixup' in config and config['use_mixup']:
+                _, max_labels = torch.max(labels.data, axis=1)
+                loss_dict['train/acc'].add_values((train_preds == max_labels).tolist())
+            else:
+                loss_dict['train/acc'].add_values((train_preds == labels).tolist())
+            if 'model_loss' in config:
+                opt_loss = model_loss(net, inputs, labels)
+                opt_loss.backward()
+                assert len(opt_loss.shape) == 0
+                loss_dict['train/model_loss'].add_value(float(opt_loss.detach().cpu()))
+                del opt_loss
+            else:
+                loss.backward()
+            del inputs, labels, loss
+        # Collect the gradients at each layer.
+        add_layer_grad_stats(net, loss_dict, config)
+        if check_exists_not_none(config, 'max_grad_norm'):
+            torch.nn.utils.clip_grad_norm_(net.parameters(), config['max_grad_norm'])
+        if not check_exists_value(config, 'no_train', True):
+            optimizer.step()
+        if batch_scheduler is not None:
+            batch_scheduler.step()
+        if batch_lw_tuner is not None:
+            batch_lw_tuner.step()
+        num_examples += len(all_labels)
         outputs, loss, train_preds = None, None, None  # Try to force garbage collection.
         def should_log(log_interval):
-            return num_examples // log_interval > (num_examples - len(labels)) // log_interval
+            return num_examples // log_interval > (num_examples - len(all_labels)) // log_interval
         if should_log(config['log_interval']):
             for k in loss_dict:
-                logging.info(
-                    '[%d, %5d] %s: %.3f' %
-                    (epoch + 1, num_examples, k, loss_dict[k].get_mean()))
+                if 'grad' not in k and 'norm' not in k:
+                    logging.info(
+                        '[%d, %5d] %s: %.3f' %
+                        (epoch + 1, num_examples, k, loss_dict[k].get_mean()))
         # Sometimes we want to log the test loss more often to track things better.
         if 'test_interval' in config and should_log(config['test_interval']):
             stats = get_all_test_stats(
@@ -330,6 +445,12 @@ def train(epoch, config, train_loader, net, device, optimizer, criterion, model_
                 wandb.log(stats)
     reset_state(net, training_state)
     train_stats = {'epoch': epoch}
+    lr = 0.0
+    for param_group in optimizer.param_groups:
+        lr = max(lr, param_group['lr'])
+    train_stats['lr'] = lr
+    if batch_scheduler is not None:
+        train_stats['train/batch_scheduler_lr'] = batch_scheduler.get_lr()
     for key in loss_dict:
         train_stats[key] = loss_dict[key].get_mean()
     return train_stats
@@ -360,11 +481,26 @@ def get_params(layers):
     return params
 
 
+def check_exists_not_none(d, k):
+    return k in d and d[k] != None
+
+
+def get_or_default(d, k, default):
+    if k in d and d[k] != None:
+        return d[k]
+    return default
+
+
+def check_exists_value(d, k, v):
+    return k in d and d[k] == v
+
+
 def main(config, log_dir, checkpoints_dir):
     # Set up datasets and loaders.
     logging.info("Entering main.")
     train_loader = get_train_loader(config)  
     # Set up test loaders.
+    # shuffle is always False so test examples are in the order they're presented.
     test_loaders, max_test_examples = get_test_loaders(config)
     # Create model.
     net = build_model(config)
@@ -397,11 +533,78 @@ def main(config, log_dir, checkpoints_dir):
         ]
         optimizer = utils.initialize(
             config['optimizer'], update_args={'params': param_groups})
+    elif 'embed_layer_lr_multiplier' in config:
+        layers = [l for n, l in net.get_layers()]
+        embed_params = get_params(layers[:2])
+        other_params = get_params(layers[2:])
+        # count number of params, check that it's same as model.
+        net_count = count_parameters(net, trainable=True)
+        embed_count = sum([p.numel() for p in embed_params])
+        other_count = sum([p.numel() for p in other_params])
+        logging.info('total params: %d, opt params: %d', net_count, embed_count + other_count)
+        # Set different lr for embedding layer.
+        other_lr = config['optimizer']['args']['lr']
+        embed_lr = config['embed_layer_lr_multiplier'] * other_lr
+        logging.info('Using lr %f for embed layer, %d params', embed_lr, len(embed_params))
+        param_groups = [
+            {'params': other_params},
+            {'params': embed_params, 'lr': embed_lr}
+        ]
+        optimizer = utils.initialize(
+            config['optimizer'], update_args={'params': param_groups})
     else:
         optimizer = utils.initialize(
-            config['optimizer'], update_args={'params': net.parameters()})
-    scheduler = utils.initialize(
-        config['scheduler'], update_args={'optimizer': optimizer})
+            config['optimizer'], update_args={'params': net.parameters()}) 
+    # If batch scheduler is specified, then use a batch scheduler that updates the learning
+    # rate every step. Otherwise, update the learning rate every epoch.
+    batch_scheduler = None
+    batch_lw_tuner = None
+    scheduler = None
+    decay_exp = get_or_default(config, 'decay_exp', 3.73)
+    warmup_epochs = get_or_default(config, 'warmup_epochs', 0)
+    cooldown_epochs = get_or_default(config, 'cooldown_epochs', 0)
+    if check_exists_value(config, 'batch-layer-wise-tune', True):
+        num_batches = len(train_loader)
+        num_training_steps  = num_batches * config['epochs']
+        num_warmup_steps = int(num_batches * warmup_epochs)
+        num_cooldown_steps = int(num_batches * cooldown_epochs)
+        freeze_embed = not(config['optimizer']['classname'] in non_sgd_optimizer_names)
+        batch_lw_tuner = layer_wise_tuner.LayerWiseTuner(net, num_training_steps, num_warmup_steps, num_cooldown_steps, freeze_embed)
+        logging.info('Batch layer-wise tuning.')
+        batch_scheduler = schedulers.LayerWiseSchedule(optimizer, num_training_steps, warmup_epochs=num_warmup_steps,
+                                                       cooldown_epochs=num_cooldown_steps, decay_exp=decay_exp)
+    elif check_exists_value(config, 'layer-wise-tune', True) or check_exists_value(config, 'layer-wise-tune-cosine', True):
+        num_epochs = config['epochs']
+        freeze_embed = not(config['optimizer']['classname'] in non_sgd_optimizer_names)
+        lw_tuner = layer_wise_tuner.LayerWiseTuner(net, num_epochs, warmup_epochs, cooldown_epochs, freeze_embed)
+        if check_exists_value(config, 'layer-wise-tune', True):
+            logging.info('Layer-wise tuning.')
+            scheduler = schedulers.LayerWiseSchedule(optimizer, num_epochs, warmup_epochs=warmup_epochs,
+                                                     cooldown_epochs=cooldown_epochs, decay_exp=decay_exp)
+        else:
+            logging.info('Layer-wise tuning with cosine decay.')
+            scheduler = schedulers.LayerWiseSchedule(optimizer, num_epochs, warmup_epochs=warmup_epochs,
+                                                     cooldown_epochs=cooldown_epochs, decay_exp=decay_exp,
+                                                     cosine=True)
+    elif check_exists_not_none(config, 'batch_scheduler'):
+        # TODO: add batch scheduler.
+        num_batches = len(train_loader)
+        num_training_steps  = num_batches * config['epochs']
+        if check_exists_not_none(config, 'warmup_frac'):
+            num_warmup_steps = int(config['warmup_frac'] * num_training_steps)
+        else:
+            num_warmup_steps = int(0.1 * num_training_steps)
+        logging.info("Warming up for %d steps", num_warmup_steps)
+        batch_scheduler = utils.initialize(
+            config['batch_scheduler'], update_args={
+                'optimizer': optimizer,
+                'num_warmup_steps': num_warmup_steps,
+                'num_training_steps': num_training_steps,
+        })
+    else:
+        # TODO: does this update number of epochs?
+        scheduler = utils.initialize(
+            config['scheduler'], update_args={'optimizer': optimizer})
     # Training loop.
     best_stats = {}
     best_accs = {}  # Used to save checkpoints of best models on some datasets.
@@ -423,11 +626,18 @@ def main(config, log_dir, checkpoints_dir):
     if 'l2sp_weight' in config:
         weight_dict_initial, _ = get_param_weights_counts(net, detach=True)
 
-    for epoch in range(config['epochs']):
+    num_epochs = config['epochs']
+    for epoch in range(num_epochs): 
+        logging.info("\nEpoch #{}".format(epoch))
+        if (check_exists_value(config, 'layer-wise-tune', True) or
+            check_exists_value(config, 'layer-wise-tune-cosine', True)):
+            # Get number of transformer layers.
+            lw_tuner.step()
         # Save checkpoint once in a while.
         if epoch % config['save_freq'] == 0 and (
             'save_no_checkpoints' not in config or not config['save_no_checkpoints']):
             cur_ckp_filename = 'ckp_' + str(epoch)
+            # TODO: update to save batch scheduler if specified?
             utils.save_ckp(epoch, net, optimizer, scheduler, checkpoints_dir, cur_ckp_filename)
             if (prev_ckp_path is not None and not(config['save_all_checkpoints'])):
                 os.remove(prev_ckp_path)
@@ -436,15 +646,18 @@ def main(config, log_dir, checkpoints_dir):
         if "full_ft_epoch" in config and config["full_ft_epoch"] is not None:
             if epoch == config["full_ft_epoch"]:
                 set_requires_grad(net, True) 
-                num_trainable_params = count_parameters(net, True)
-                num_params = count_parameters(net, False) + num_trainable_params
-                assert(num_trainable_params == num_params)
-                logging.info(f'Full FT {num_trainable_params} of {num_params} parameters.')
+                logging.info(f'Full FT.')
+        num_trainable_params = count_parameters(net, True)
+        num_params = count_parameters(net, False) + num_trainable_params
+        logging.info(f'Fine-tuning {num_trainable_params} of {num_params} parameters.')
         # One epoch of model training.
         train_stats = train(
            epoch, config, train_loader, net, device, optimizer, criterion, model_loss,
-           test_loaders, max_test_examples, weight_dict_initial) 
-        scheduler.step()
+           test_loaders, max_test_examples, weight_dict_initial, batch_scheduler, batch_lw_tuner) 
+        # Call scheduler to update learning rate, unless we have a batch scheduler, in which
+        # case we will update the learning rate every step.
+        if batch_scheduler is None:
+            scheduler.step()
         # Get test stats across all test sets.
         test_stats = get_all_test_stats(
             epoch, test_loaders, max_test_examples, config, net, criterion, device,
@@ -570,19 +783,31 @@ def update_test_transform_args_configs(config):
 def update_root_prefix(config):
     # Go through test datasets, and train dataset. If root_prefix specified, then prepend that
     # to the root.
-    def apply_root_prefix(dataset_config, root_prefix):
+    def apply_root_prefix(dataset_config, root_prefix, test_root_prefix):
         for key in ['root', 'cache_path', 'pickle_file_path']:
             if key in dataset_config['args']:
                 orig_path = dataset_config['args'][key]
                 logging.info('orig_path %s', orig_path)
-                dataset_config['args'][key] = root_prefix + '/' + orig_path
+                if orig_path.find('{root_prefix}') != -1:
+                    new_path = orig_path.replace('{root_prefix}', root_prefix)
+                elif orig_path.find('{test_root_prefix}') != -1:
+                    new_path = orig_path.replace('{test_root_prefix}', test_root_prefix)
+                else:
+                    new_path = root_prefix + '/' + orig_path
+                dataset_config['args'][key] = new_path
 
     if 'root_prefix' in config:
         root_prefix = config['root_prefix']
-        logging.info("Adding root prefix %s to all roots.", root_prefix)
-        apply_root_prefix(config['train_dataset'], root_prefix)
+        # There needs to be a root prefix to use test root prefix.
+        if 'test_root_prefix' in config:
+            test_root_prefix = config['test_root_prefix']
+        else:
+            test_root_prefix = root_prefix
+        logging.info("Adding root prefix %s, test root prefix %s to all roots.",
+            root_prefix, test_root_prefix)
+        apply_root_prefix(config['train_dataset'], root_prefix, test_root_prefix)
         for test_dataset_config in config['test_datasets']:
-            apply_root_prefix(test_dataset_config, root_prefix)
+            apply_root_prefix(test_dataset_config, root_prefix, test_root_prefix)
 
 
 def update_net_eval_mode(config):
@@ -595,10 +820,26 @@ def update_net_eval_mode(config):
             logging.warning('Linear probing, so setting unspecified use_net_val_mode to True')
 
 
+def update_dataset_names(config):
+    if 'overwrite_dataset_name' in config and config['overwrite_dataset_name'] is not None:
+        new_dataset_name = config['overwrite_dataset_name']
+        for test_dataset_config in config['test_datasets']:
+            test_dataset_config['args']['dataset_name'] = new_dataset_name
+        config['train_dataset']['args']['dataset_name'] = new_dataset_name
+
+
 def set_random_seed(seed):
     if seed is not None:
         torch.manual_seed(seed)
         np.random.seed(seed + 111)
+
+
+def update_optimizer_args(config):
+    if config['optimizer']['classname'] in non_sgd_optimizer_names: 
+        # These optimizers don't have a momentum term.
+        # A bit of a hack so we can just pass in torch.optim.Adam as a command line arg,
+        # without having to rework the config.
+        del config['optimizer']['args']['momentum']
 
 
 def preprocess_config(config, config_path):
@@ -620,6 +861,12 @@ def preprocess_config(config, config_path):
         # shutil.copy(args.config, log_dir+'/original_config.yaml')
         # If no_augmentation option in config, then use test_transforms for training.
         update_train_transform(config)
+        # Update dataset names, if overwrite_dataset_name is specified. This is useful
+        # if we want to run the same experiments on variants of a dataset (e.g., 
+        # waterbirds-background (vs. original waterbirds experiment which uses foreground).
+        update_dataset_names(config)
+        # Update optimizer arguments.
+        update_optimizer_args(config)
 
 
 def setup():
@@ -635,7 +882,7 @@ def setup():
     parser.add_argument('--copy_all_folders', action='store_true',
                         help='Copy all folders (e.g. code, utils) for reproducibility.')
     parser.add_argument('--project_name', type=str,
-                        help='Name of the wandb project', required=True)
+                        help='Name of the wandb project')
     parser.add_argument('--group_name', default=None, help='Name of the wandb group (a group of runs)')
     parser.add_argument('--run_name', default=None, help='Name of the wandb run')
     parser.add_argument('--entity_name', default='p-lambda', help='Name of the team')
@@ -673,7 +920,8 @@ def setup():
     # transform for every test datset.
     preprocess_config(config, args.config) 
     # If we should save model preds, then save them.
-    if 'save_model_preds' in config and config.save_model_preds:
+    if (('save_model_preds' in config and config.save_model_preds) or
+        ('save_wilds_model_preds' in config and config.save_wilds_model_preds)):
         os.makedirs(log_dir + '/model_preds/')
     # Setup wandb.
     setup_wandb(args, config)

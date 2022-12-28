@@ -40,13 +40,8 @@ test_datasets:
       args:
           root: 'stl10_dataset/'
           split: 'test'
-    - name: 'imnet-n-cifar'
-      classname: datasets.imnet_intersect_c10.ImNetnC10
-      args:
-          root: 'balanced_imnet_intersect_c10_val/'
 
 early_stop_dataset_names:
     - 'cifar10-test'
     - 'stl-test'
-    - 'imnet-n-cifar'
 

@@ -5,11 +5,12 @@
 #SBATCH --partition=jag-standard
 #SBATCH --mem=16G
 #SBATCH --account=nlp
-#SBATCH --exclude=jagupard[14,15,18]
+#SBATCH --exclude=jagupard[13,14,15,17,18]
 # #SBATCH --exclude=jagupard[14,17,18,20]
 
 # Print execute commands in the log.
 set -x
+# conda_env=unlabeled_extrapolation
 conda_env=`whoami`-ue-new
 
 # source scripts/copy_imagenet_local.sh
