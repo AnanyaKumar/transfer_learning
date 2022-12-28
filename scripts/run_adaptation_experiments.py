@@ -911,6 +911,7 @@ fmow_all = Dataset(
     bundles=['fmow_v1.1'],
     slurm_data_cmd=None,
     slurm_data_dir='/self/scr-sync/nlp/wilds/data/',
+    slurm_data_dir='/u/scr/nlp/',
     eval_config_rel_path='adaptation/fmow_all_eval.yaml')
 
 fmow_all_nonorm = Dataset(
