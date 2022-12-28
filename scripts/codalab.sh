@@ -32,6 +32,4 @@ for dataset in "${datasets[@]}"; do
 
 done
 
-# ImageNet.
-
 
