@@ -4,6 +4,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=jag-standard
 #SBATCH --mem=16G
+#SBATCH --account=nlp
 #SBATCH --exclude=jagupard[14,15,18]
 # #SBATCH --exclude=jagupard[14,17,18,20]
 

@@ -680,7 +680,7 @@ fmow = Dataset(
     config_rel_path='adaptation/fmow.yaml',
     bundles=['fmow'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/u/scr/nlp/',
     eval_config_rel_path='adaptation/fmow_eval.yaml')
 
 fmow_all = Dataset(
@@ -695,7 +695,7 @@ fmow_all = Dataset(
     config_rel_path='adaptation/fmow_all.yaml',
     bundles=['fmow'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/u/scr/nlp/',
     eval_config_rel_path='adaptation/fmow_all_eval.yaml')
 
 landcover = Dataset(
