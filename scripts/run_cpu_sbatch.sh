@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
+#SBATCH --account=nlp
 #SBATCH --mem=16G
 
 # Print execute commands in the log.
