@@ -2,6 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:0
 #SBATCH --cpus-per-task=2
+#SBATCH --account=nlp
 #SBATCH --mem=2G
 #SBATCH --exclude=jagupard[10-11,17]
 
