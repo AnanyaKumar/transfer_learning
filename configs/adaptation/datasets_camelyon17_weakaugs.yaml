@@ -1,5 +1,5 @@
 
-root_prefix: '/u/scr/nlp/'
+root_prefix: '/u/scr/nlp/wilds/data/'
 
 train_dataset:
     name: 'train'
@@ -7,7 +7,7 @@ train_dataset:
     args:
         dataset_name: 'camelyon17'
         split: 'train'
-        root: 'wilds/data'
+        root: ''
     transforms:
         - classname: torchvision.transforms.Resize
           args:
@@ -27,19 +27,19 @@ test_datasets:
       args:
           dataset_name: 'camelyon17'
           split: 'id_val'
-          root: 'wilds/data'
+          root: ''
     - name: 'ood_val'
       classname: datasets.wilds.WILDS
       args:
           dataset_name: 'camelyon17'
           split: 'val'
-          root: 'wilds/data'
+          root: ''
     - name: 'ood_test'
       classname: datasets.wilds.WILDS
       args:
           dataset_name: 'camelyon17'
           split: 'test'
-          root: 'wilds/data'
+          root: ''
 
 early_stop_dataset_names:
     - 'id_val'

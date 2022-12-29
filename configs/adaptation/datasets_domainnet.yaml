@@ -1,5 +1,5 @@
 
-root_prefix: '/scr/biggest/'
+root_prefix: '/u/scr/nlp/domainnet'
 
 # The train and test transforms are taken from Sentry.
 # Except the normalization and the bicubic resampling, taken from CLIP.
@@ -9,7 +9,7 @@ train_dataset:
     args:
         domain: 'sketch'
         split: 'train'
-        root: 'domainnet/'
+        root: ''
         version: 'sentry'
         verbose: False
     transforms:
@@ -36,7 +36,7 @@ test_datasets:
       args:
           domain: 'sketch'
           split: 'test'
-          root: 'domainnet/'
+          root: ''
           version: 'sentry'
           verbose: False
     - name: 'real_val'
@@ -44,7 +44,7 @@ test_datasets:
       args:
           domain: 'real'
           split: 'test'
-          root: 'domainnet/'
+          root: ''
           version: 'sentry'
           verbose: False
     - name: 'painting_val'
@@ -52,7 +52,7 @@ test_datasets:
       args:
           domain: 'painting'
           split: 'test'
-          root: 'domainnet/'
+          root: ''
           version: 'sentry'
           verbose: False
     - name: 'clipart_val'
@@ -60,7 +60,7 @@ test_datasets:
       args:
           domain: 'clipart'
           split: 'test'
-          root: 'domainnet/'
+          root: ''
           version: 'sentry'
           verbose: False
 
