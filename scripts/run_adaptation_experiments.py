@@ -575,7 +575,7 @@ living17 = Dataset(
     config_rel_path='adaptation/living17.yaml',
     bundles=['imagenet'],
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     eval_config_rel_path='adaptation/living17_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
@@ -591,7 +591,7 @@ living17_mixup = Dataset(
     config_rel_path='adaptation/living17_mixup.yaml',
     bundles=['imagenet'],
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     eval_config_rel_path='adaptation/living17_mixup_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
@@ -625,7 +625,7 @@ waterbirds = Dataset(
     config_rel_path='adaptation/waterbirds.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_eval.yaml')
 
 waterbirds_large_batch = Dataset(
@@ -643,7 +643,7 @@ waterbirds_large_batch = Dataset(
     config_rel_path='adaptation/waterbirds_large_batch.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_large_batch_eval.yaml')
 
 
@@ -662,7 +662,7 @@ waterbirds_clipped_warmup = Dataset(
     config_rel_path='adaptation/waterbirds_clipped_warmup.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_clipped_warmup_eval.yaml')
 
 waterbirds_label_balanced = Dataset(
@@ -680,7 +680,7 @@ waterbirds_label_balanced = Dataset(
     config_rel_path='adaptation/waterbirds_label_balanced.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_label_balanced_eval.yaml')
 
 waterbirds_group_balanced = Dataset(
@@ -698,7 +698,7 @@ waterbirds_group_balanced = Dataset(
     config_rel_path='adaptation/waterbirds_group_balanced.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_group_balanced_eval.yaml')
 
 waterbirds_background = Dataset(
@@ -717,7 +717,7 @@ waterbirds_background = Dataset(
     config_rel_path='adaptation/waterbirds.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_eval.yaml')
 
 waterbirds_norm = Dataset(
@@ -735,7 +735,7 @@ waterbirds_norm = Dataset(
     config_rel_path='adaptation/waterbirds_norm.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_norm_eval.yaml')
 
 waterbirds_augs = Dataset(
@@ -753,7 +753,7 @@ waterbirds_augs = Dataset(
     config_rel_path='adaptation/waterbirds_augs.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_augs_eval.yaml')
 
 
@@ -769,7 +769,7 @@ living17_noaugs = Dataset(
     config_rel_path='adaptation/living17_noaugs.yaml',
     bundles=['imagenet'],
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     eval_config_rel_path='adaptation/living17_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
@@ -785,7 +785,7 @@ living17_nonorm = Dataset(
     config_rel_path='adaptation/living17_nonorm.yaml',
     bundles=['imagenet'],
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     eval_config_rel_path='adaptation/living17_nonorm_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
@@ -800,7 +800,7 @@ entity30 = Dataset(
         'test_acc/target_val_entity'],
     config_rel_path='adaptation/entity30.yaml',
     bundles=['imagenet'],
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     eval_config_rel_path='adaptation/entity30_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
@@ -816,7 +816,7 @@ imagenet = Dataset(
         'test_acc/renditions'],
     config_rel_path='adaptation/imagenet.yaml',
     bundles=['imagenet'],
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     eval_config_rel_path='adaptation/imagenet_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
@@ -832,7 +832,7 @@ imagenet_augs = Dataset(
         'test_acc/renditions'],
     config_rel_path='adaptation/imagenet_augs.yaml',
     bundles=['imagenet'],
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
     eval_config_rel_path='adaptation/imagenet_augs_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
@@ -879,7 +879,7 @@ domainnet = Dataset(
     config_rel_path='adaptation/domainnet.yaml',
     bundles=['domainnet'],
     slurm_data_cmd='source {scripts_dir}/copy_dataset.sh domainnet',
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/domainnet/domainnet_sentry/',
     eval_config_rel_path='adaptation/domainnet_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_domainnet.sh')
 
@@ -970,7 +970,7 @@ camelyon17_weakaugs = Dataset(
     config_rel_path='adaptation/camelyon17_weakaugs.yaml',
     bundles=['camelyon17'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/',
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',
     eval_config_rel_path='adaptation/camelyon17_weakaugs_eval.yaml')
 
 camelyon17_weakaugs_highres = Dataset(
@@ -985,7 +985,7 @@ camelyon17_weakaugs_highres = Dataset(
     config_rel_path='adaptation/camelyon17_weakaugs_highres.yaml',
     bundles=['camelyon17'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/',
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',
     eval_config_rel_path='adaptation/camelyon17_weakaugs_highres_eval.yaml')
 
 landcover = Dataset(
