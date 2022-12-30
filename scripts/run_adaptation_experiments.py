@@ -911,7 +911,6 @@ fmow_all = Dataset(
     bundles=['fmow_v1.1'],
     slurm_data_cmd=None,
     slurm_data_dir='/self/scr-sync/nlp/wilds/data/',
-    slurm_data_dir='/u/scr/nlp/',
     eval_config_rel_path='adaptation/fmow_all_eval.yaml')
 
 fmow_all_nonorm = Dataset(
@@ -1376,7 +1375,9 @@ def append_to_each(hyperparams_list, more_hyperparams):
 ## Main experiments.
 ############################################
 
-SWEEP_LRS = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
+SWEEP_LRS = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
+# We used more LRs for codalab.
+# SWEEP_LRS = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
 
 def get_datasets(args):
     print(args.datasets)
