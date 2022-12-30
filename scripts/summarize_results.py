@@ -60,8 +60,8 @@ def get_result(file_path, val_metric, output_metrics, take_max=True):
     # Get run-name and wandb from config file.
     parent_dir = Path(file_path).parent.absolute()
     config_path = parent_dir / 'config.json'
-    print(parent_dir, config_path)
-    print(Path(file_path).parent.name)
+    # print(parent_dir, config_path)
+    # print(Path(file_path).parent.name)
     if Path(file_path).parent.name == 'logs':
         # Codalab.
         grandparent_dir = Path(file_path).parent.parent
