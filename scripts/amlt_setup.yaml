@@ -1,7 +1,0 @@
-  setup:
-    - set -x
-    - apt-get update
-    - apt-get install git
-    - pip install ./CLIP
-    - pip install -e .
-    - echo "$SHELL"

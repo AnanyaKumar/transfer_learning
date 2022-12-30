@@ -574,7 +574,7 @@ living17 = Dataset(
         'test_acc/target_val_living'],
     config_rel_path='adaptation/living17.yaml',
     bundles=['imagenet'],
-    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
+    slurm_data_cmd=None,
     slurm_data_dir='/self/scr-sync/nlp/',
     eval_config_rel_path='adaptation/living17_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
@@ -590,7 +590,7 @@ living17_mixup = Dataset(
         'test_acc/target_val_living'],
     config_rel_path='adaptation/living17_mixup.yaml',
     bundles=['imagenet'],
-    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
+    slurm_data_cmd=None,
     slurm_data_dir='/self/scr-sync/nlp/',
     eval_config_rel_path='adaptation/living17_mixup_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
@@ -768,7 +768,7 @@ living17_noaugs = Dataset(
         'test_acc/target_val_living'],
     config_rel_path='adaptation/living17_noaugs.yaml',
     bundles=['imagenet'],
-    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
+    slurm_data_cmd=None,
     slurm_data_dir='/self/scr-sync/nlp/',
     eval_config_rel_path='adaptation/living17_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
@@ -784,7 +784,7 @@ living17_nonorm = Dataset(
         'test_acc/target_val_living'],
     config_rel_path='adaptation/living17_nonorm.yaml',
     bundles=['imagenet'],
-    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
+    slurm_data_cmd=None,
     slurm_data_dir='/self/scr-sync/nlp/',
     eval_config_rel_path='adaptation/living17_nonorm_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
@@ -801,7 +801,7 @@ entity30 = Dataset(
     config_rel_path='adaptation/entity30.yaml',
     bundles=['imagenet'],
     slurm_data_dir='/self/scr-sync/nlp/',
-    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
+    slurm_data_cmd=None,
     eval_config_rel_path='adaptation/entity30_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
@@ -817,7 +817,7 @@ imagenet = Dataset(
     config_rel_path='adaptation/imagenet.yaml',
     bundles=['imagenet'],
     slurm_data_dir='/self/scr-sync/nlp/',
-    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
+    slurm_data_cmd=None,
     eval_config_rel_path='adaptation/imagenet_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
@@ -833,7 +833,7 @@ imagenet_augs = Dataset(
     config_rel_path='adaptation/imagenet_augs.yaml',
     bundles=['imagenet'],
     slurm_data_dir='/self/scr-sync/nlp/',
-    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh imagenet',
+    slurm_data_cmd=None,
     eval_config_rel_path='adaptation/imagenet_augs_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
@@ -878,7 +878,7 @@ domainnet = Dataset(
         'test_acc/real_val', 'test_acc/painting_val', 'test_acc/clipart_val'],
     config_rel_path='adaptation/domainnet.yaml',
     bundles=['domainnet'],
-    slurm_data_cmd='source {scripts_dir}/copy_dataset.sh domainnet',
+    slurm_data_cmd=None,
     slurm_data_dir='/self/scr-sync/nlp/domainnet/domainnet_sentry/',
     eval_config_rel_path='adaptation/domainnet_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_domainnet.sh')
