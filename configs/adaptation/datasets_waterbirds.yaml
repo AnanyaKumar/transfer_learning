@@ -6,7 +6,7 @@ train_dataset:
     name: 'train'
     classname: datasets.wilds.WILDS
     args:
-        root: 'wilds/data/'
+        root: ''
         dataset_name: 'waterbirds'
         split: 'train'
     transforms:
@@ -33,34 +33,34 @@ test_datasets:
     - name: 'val'
       classname: datasets.wilds.WILDS
       args:
-          root: '/wilds/data/'
+          root: ''
           dataset_name: 'waterbirds'
           split: 'val'
     - name: 'landbg-landbird-test'
       classname: datasets.wilds.WILDS
       args:
-          root: '/wilds/data/'
+          root: ''
           dataset_name: 'waterbirds'
           split: 'test'
           meta_selector: [0, 0, 0]
     - name: 'landbg-waterbird-test'
       classname: datasets.wilds.WILDS
       args:
-          root: '/wilds/data/'
+          root: ''
           dataset_name: 'waterbirds'
           split: 'test'
           meta_selector: [0, 1, 0]
     - name: 'waterbg-landbird-test'
       classname: datasets.wilds.WILDS
       args:
-          root: '/wilds/data/'
+          root: ''
           dataset_name: 'waterbirds'
           split: 'test'
           meta_selector: [1, 0, 0]   
     - name: 'waterbg-waterbird-test'
       classname: datasets.wilds.WILDS
       args:
-          root: '/wilds/data/'
+          root: ''
           dataset_name: 'waterbirds'
           split: 'test'
           meta_selector: [1, 1, 0]
