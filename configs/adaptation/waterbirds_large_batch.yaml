@@ -11,8 +11,7 @@ save_no_checkpoints: True
 
 model:
   classname: models.clip_model.ClipModel
-  args:
-    model_name: 'ViT-B/16'
+  args: {}
 
 scheduler:
   classname: torch.optim.lr_scheduler.CosineAnnealingLR

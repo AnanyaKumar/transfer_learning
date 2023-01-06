@@ -10,8 +10,7 @@ save_no_checkpoints: True
 
 model:
   classname: models.clip_model.ClipModel
-  args:
-    model_name: 'ViT-B/16'
+  args: {}
 
 max_grad_norm: 1.0
 
