@@ -19,6 +19,7 @@ def print_os_system(cmd, args):
 
 def run_sbatch(cmd, job_name, args, exclude=None, deps=[]):
     output_path = args.output_dir + '/' + job_name
+    print('Slurm output: ', output_path)
     sbatch_script_path = args.scripts_dir + '/' + args.sbatch_script_name
     slurm_cmd = f'sbatch --partition={args.partition} --job-name={job_name} --output={output_path} ' +\
                 f'--mail-type=END,FAIL --mail-user={args.mail_user} '
@@ -125,7 +126,7 @@ def get_baseline_experiment_cmd(config_path, run_name, group_name, project_name,
         kwargs['log_dir'] = group_run_to_log_path(group_name, run_name, args)
         # On slurm, we need to save locally to avoid overloading the distributed file system.
         kwargs['tmp_par_ckp_dir'] = args.tmp_dir + '/' + group_name + '_' + run_name
-        
+    print('log_dir: ', kwargs['log_dir'])
     kwargs['project_name'] = project_name
     kwargs['group_name'] = group_name
     kwargs['run_name'] = run_name
@@ -575,7 +576,7 @@ living17 = Dataset(
     config_rel_path='adaptation/living17.yaml',
     bundles=['imagenet'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     eval_config_rel_path='adaptation/living17_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
@@ -591,7 +592,7 @@ living17_mixup = Dataset(
     config_rel_path='adaptation/living17_mixup.yaml',
     bundles=['imagenet'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     eval_config_rel_path='adaptation/living17_mixup_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
@@ -625,7 +626,7 @@ waterbirds = Dataset(
     config_rel_path='adaptation/waterbirds.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_eval.yaml')
 
 waterbirds_large_batch = Dataset(
@@ -643,7 +644,7 @@ waterbirds_large_batch = Dataset(
     config_rel_path='adaptation/waterbirds_large_batch.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_large_batch_eval.yaml')
 
 
@@ -662,7 +663,7 @@ waterbirds_clipped_warmup = Dataset(
     config_rel_path='adaptation/waterbirds_clipped_warmup.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_clipped_warmup_eval.yaml')
 
 waterbirds_label_balanced = Dataset(
@@ -680,7 +681,7 @@ waterbirds_label_balanced = Dataset(
     config_rel_path='adaptation/waterbirds_label_balanced.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_label_balanced_eval.yaml')
 
 waterbirds_group_balanced = Dataset(
@@ -698,7 +699,7 @@ waterbirds_group_balanced = Dataset(
     config_rel_path='adaptation/waterbirds_group_balanced.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_group_balanced_eval.yaml')
 
 waterbirds_background = Dataset(
@@ -717,7 +718,7 @@ waterbirds_background = Dataset(
     config_rel_path='adaptation/waterbirds.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_eval.yaml')
 
 waterbirds_norm = Dataset(
@@ -735,7 +736,7 @@ waterbirds_norm = Dataset(
     config_rel_path='adaptation/waterbirds_norm.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_norm_eval.yaml')
 
 waterbirds_augs = Dataset(
@@ -753,7 +754,7 @@ waterbirds_augs = Dataset(
     config_rel_path='adaptation/waterbirds_augs.yaml',
     bundles=['waterbirds_pickle'],
     slurm_data_cmd=None,
-    slurm_data_dir='/u/scr/nlp/',  # corresponds to root_prefix.
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',  # corresponds to root_prefix.
     eval_config_rel_path='adaptation/waterbirds_augs_eval.yaml')
 
 
@@ -769,7 +770,7 @@ living17_noaugs = Dataset(
     config_rel_path='adaptation/living17_noaugs.yaml',
     bundles=['imagenet'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     eval_config_rel_path='adaptation/living17_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
@@ -785,7 +786,7 @@ living17_nonorm = Dataset(
     config_rel_path='adaptation/living17_nonorm.yaml',
     bundles=['imagenet'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     eval_config_rel_path='adaptation/living17_nonorm_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
 
@@ -800,7 +801,7 @@ entity30 = Dataset(
         'test_acc/target_val_entity'],
     config_rel_path='adaptation/entity30.yaml',
     bundles=['imagenet'],
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     slurm_data_cmd=None,
     eval_config_rel_path='adaptation/entity30_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
@@ -816,7 +817,7 @@ imagenet = Dataset(
         'test_acc/renditions'],
     config_rel_path='adaptation/imagenet.yaml',
     bundles=['imagenet'],
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     slurm_data_cmd=None,
     eval_config_rel_path='adaptation/imagenet_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
@@ -832,7 +833,7 @@ imagenet_augs = Dataset(
         'test_acc/renditions'],
     config_rel_path='adaptation/imagenet_augs.yaml',
     bundles=['imagenet'],
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/',
     slurm_data_cmd=None,
     eval_config_rel_path='adaptation/imagenet_augs_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_imagenet.sh')
@@ -879,7 +880,7 @@ domainnet = Dataset(
     config_rel_path='adaptation/domainnet.yaml',
     bundles=['domainnet'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/',
+    slurm_data_dir='/self/scr-sync/nlp/domainnet/domainnet_sentry/',
     eval_config_rel_path='adaptation/domainnet_eval.yaml',
     amlt_data_cmd='. {scripts_dir}/amlt_copy_domainnet.sh')
 
@@ -911,7 +912,6 @@ fmow_all = Dataset(
     bundles=['fmow_v1.1'],
     slurm_data_cmd=None,
     slurm_data_dir='/self/scr-sync/nlp/wilds/data/',
-    slurm_data_dir='/u/scr/nlp/',
     eval_config_rel_path='adaptation/fmow_all_eval.yaml')
 
 fmow_all_nonorm = Dataset(
@@ -971,7 +971,7 @@ camelyon17_weakaugs = Dataset(
     config_rel_path='adaptation/camelyon17_weakaugs.yaml',
     bundles=['camelyon17'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/',
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',
     eval_config_rel_path='adaptation/camelyon17_weakaugs_eval.yaml')
 
 camelyon17_weakaugs_highres = Dataset(
@@ -986,7 +986,7 @@ camelyon17_weakaugs_highres = Dataset(
     config_rel_path='adaptation/camelyon17_weakaugs_highres.yaml',
     bundles=['camelyon17'],
     slurm_data_cmd=None,
-    slurm_data_dir='/scr/biggest/ue_datasets/',
+    slurm_data_dir='/self/scr-sync/nlp/wilds/data/',
     eval_config_rel_path='adaptation/camelyon17_weakaugs_highres_eval.yaml')
 
 landcover = Dataset(
@@ -1340,10 +1340,40 @@ names_to_model = {
     'landcover_auxin': landcover_auxin,
 }
 
+# Add variants of BitResNet that Suriya pretrained in different ways.
+def get_suriya_checkpoint(norm, patchify, is_sgd):
+    opt_flag = '' if is_sgd else '_opt_adamw'
+    patchify_flag = '_patchify' if patchify else ''
+    norm_flag = norm
+    lr = 0.1 if is_sgd else 0.001
+    wd = 0.0001 if is_sgd else 0.1
+    folder_name = f'imagenet_BiT_R50x1{patchify_flag}_b256x16m{opt_flag}_aug_sa_cg_1_ep_90_lr_{lr}_norm_{norm}_se_1857_wd_{wd}'
+    checkpoint_rel_path = folder_name + '/lastepoch.pt'
+    return checkpoint_rel_path
+
+def get_suriya_model_name(norm, patchify, is_sgd):
+    opt_flag = '' if is_sgd else '_opt_adamw'
+    patchify_flag = '_patchify' if patchify else ''
+    return 'bitresnet_' + norm + opt_flag + patchify_flag
+
+for patchify in [False, True]:
+    for norm in ['gn', 'bn']:
+        for is_sgd in [False, True]:
+            checkpoint_rel_path = get_suriya_checkpoint(norm, patchify, is_sgd)
+            model_name = get_suriya_model_name(norm, patchify, is_sgd)
+            names_to_model[model_name] = Model(
+                kwargs={
+                    'classname': 'models.suriya_bit_resnet.BitResNet',
+                    'checkpoint_rel_path': checkpoint_rel_path
+                },
+                bundles=[]
+            ) 
+
+
 ############################################
 ## Functions to specify hyperparameter sweeps.
 ############################################
-
+ 
 def union_dicts(d1, d2):
     return dict(d1, **d2)
 
@@ -1376,7 +1406,9 @@ def append_to_each(hyperparams_list, more_hyperparams):
 ## Main experiments.
 ############################################
 
-SWEEP_LRS = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
+SWEEP_LRS = [3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
+# For Codalab
+# SWEEP_LRS = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
 
 def get_datasets(args):
     print(args.datasets)
@@ -1442,7 +1474,7 @@ def fine_tuning_celeba_single_experiment(args, attribute_name, num_replications=
     for dataset in datasets:
         all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
-            num_replications=num_replications, args=args, ignore_name_hypers={'checkpoint_path', 'default_test_args.target_attribute', 'train_dataset.args.target_attribute'})
+            num_replications=num_replications, args=args, ignore_name_hypers={'checkpoint_path', 'default_test_args.target_attribute', 'train_dataset.args.target_attribute', 'save_no_checkpoints'})
         if all_ids is not None:
             print('Job IDs: ' + ' '.join([str(id) for id in all_ids]))
 
@@ -1638,7 +1670,8 @@ def fine_tuning_experiments(args, num_replications=3, linear_probe=False, batchn
                     'T_max-5_seed-0_run0/checkpoints/ckp_best_val'})
     for dataset in datasets:
         ignore_name_hypers=set(options_dict.keys()).union({'batch-layer-wise-tune',
-            'full_ft_epoch', 'linear_probe_checkpoint_path', 'optimizer.classname'})
+            'full_ft_epoch', 'linear_probe_checkpoint_path', 'optimizer.classname',
+            'save_no_checkpoints'})
         all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model, hyperparams_list=hyperparams_list,
             num_replications=num_replications, args=args,
@@ -1841,7 +1874,7 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
                 replication_hyperparams_list.append({
                     'linear_probe_checkpoint_path': linprobe_group_path + '/weights_' + str(i) + '.pkl'})
         ignore_name_hypers=set(options_dict.keys()).union({'batch-layer-wise-tune',
-                'full_ft_epoch', 'linear_probe_checkpoint_path', 'optimizer.classname'})
+                'full_ft_epoch', 'linear_probe_checkpoint_path', 'optimizer.classname', 'save_no_checkpoints'})
         all_ids = replicated_sweep(
             adapt_name=adapt_name, dataset=dataset, model=model,
             hyperparams_list=cur_hyperparams_list, num_replications=num_replications,
