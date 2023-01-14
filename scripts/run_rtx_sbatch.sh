@@ -13,10 +13,12 @@ set -x
 conda_env=`whoami`-ue-new
 
 # source scripts/copy_imagenet_local.sh
+# source ~/.bashrc
 source /u/nlp/anaconda/main/anaconda3/etc/profile.d/conda.sh
 conda deactivate
-# source ~/.bashrc
 conda activate $conda_env
+# alias python=python3.8
+python --version
 cd $PWD
 
 eval $1

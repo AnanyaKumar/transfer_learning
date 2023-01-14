@@ -5,7 +5,7 @@
 #SBATCH --mem=24G
 #SBATCH --account=nlp
 #SBATCH --partition=sphinx
-#SBATCH --exclude=sphinx[3-8]
+#SBATCH --exclude=sphinx[1,3-8]
 #SBATCH --account=nlp
 
 # Print execute commands in the log.

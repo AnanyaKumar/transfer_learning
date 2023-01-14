@@ -72,14 +72,15 @@ def get_result(file_path, val_metric, output_metrics, take_max=True):
             config = json.load(f)
         run_name = [('name', config['run_name'])]
         wandb_url = [('wandb_url', config['wandb_url'])]
-        best_res = run_name + best_res + wandb_url
+        lr = [('lr', config['optimizer']['args']['lr'])]
+        best_res = run_name + lr + best_res + wandb_url
     else:
         run_name = [('name', file_path[file_path.rfind('/')+1:-4])]
         best_res = run_name + best_res
     # len(df) is the number of epochs
     if 'epoch' in df:
         assert len(df) == df['epoch'].max() + 1
-    return best_res, best_value, len(df)
+    return best_res, lr, best_value, len(df)
 
 def summarize_results(results_dir, val_metric, output_metrics, max_num=None):
     # Get results for all runs in an experiment.
@@ -97,7 +98,7 @@ def summarize_results(results_dir, val_metric, output_metrics, max_num=None):
     for file_path in file_paths:
         if max_num is not None and int(file_path[-5]) >= max_num:
             continue
-        res_row, val_value, num_epochs = get_result(file_path, val_metric, output_metrics)
+        res_row, lr, val_value, num_epochs = get_result(file_path, val_metric, output_metrics)
         results_list.append(OrderedDict(res_row))
         val_values_list.append(val_value)
         num_epochs_list.append(num_epochs)
@@ -107,7 +108,7 @@ def summarize_results(results_dir, val_metric, output_metrics, max_num=None):
             res = res.astype({col: 'int32'})
         if 'acc' in col:
             res[col] = res[col] * 100
-    res = res.round(4)
+    # res = res.round(4)
     return res, val_values_list, file_paths, num_epochs_list
 
 if __name__ == '__main__':

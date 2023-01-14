@@ -285,7 +285,7 @@ class BitResNet(nn.Module):
         else:
             raise ValueError('checkpoint path should have _bn_, _gn_, or _ln_ in name')
         if 'patchify' in checkpoint_path:
-            model_cgf['patchify'] = True
+            model_cfg['patchify'] = True
         self._model = BiT_ResNet(model_cfg=model_cfg)
         pretrained_data = torch.load(checkpoint_path)
         self._model.load_state_dict(pretrained_data['model_state_dict'])

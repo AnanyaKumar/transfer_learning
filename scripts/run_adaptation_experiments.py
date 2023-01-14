@@ -75,7 +75,7 @@ def format_key_value(k, v):
     return f'--{k}=' + str(v)
 
 
-def get_python_cmd(code_path, python_path='python', kwargs=None, args=None, overwrite_options=None):
+def get_python_cmd(code_path, python_path='python3.8', kwargs=None, args=None, overwrite_options=None):
     if kwargs is not None:
         # Make sure to keep the space at the end.
         opts = ''.join([f"{format_key_value(k, v)} " for k, v in kwargs.items()])
@@ -1264,6 +1264,14 @@ convnext_vit_b = Model(
     bundles=[]
 )
 
+convnext_vit_l = Model(
+    kwargs={
+        'classname': 'models.timm_model.TimmModel',
+        'args.model_name': 'convnext_large_in22k',
+    },
+    bundles=[]
+)
+
 bit_resnet_50 = Model(
     kwargs={
         'classname': 'models.bit_resnet.BitResNet',
@@ -1331,6 +1339,7 @@ names_to_model = {
     'timm_clip_vit_h14': timm_clip_vit_h14,
     'timm_clip_vit_g14': timm_clip_vit_g14,
     'convnext_vit_b': convnext_vit_b,
+    'convnext_vit_l': convnext_vit_l,
     'scratch_vit_b16_clipstyle': scratch_vit_b16_clipstyle,
     'dino_vit_b16': dino_vit_b16,
     'bit_resnet_50': bit_resnet_50,
@@ -1776,7 +1785,8 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
     if args.epochs is not None:
         raise ValueError('Does not support epochs yet.')
     adapt_name = 'lp_then_ft'
-    sweep_lrs = SWEEP_LRS
+    # For the LP-FT paper we divided by 100
+    sweep_lrs = [lr / 10.0 for lr in SWEEP_LRS]
     if val_mode:
         adapt_name += '_valmode'
         # sweep_lrs = [1e-4, 3e-5, 1e-5, 3e-6, 1e-6, 3e-7]
@@ -1784,9 +1794,9 @@ def lp_then_ft_experiments(args, num_replications=3, val_mode=False, train_mode=
     datasets = get_datasets(args)
     model = names_to_model[args.model_name]
     if args.optimizer is not None:
-        sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
+        sweep_lrs = [lr / 10.0 for lr in [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]]
     elif args.layer_wise_tune or args.layer_wise_tune_cosine or args.batch_layer_wise_tune:
-        sweep_lrs = [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
+        sweep_lrs = [lr / 10.0 for lr in [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]]
     if args.only_one_run or args.no_replications:
         num_replications = 1
     if args.no_train:
@@ -2092,7 +2102,7 @@ if __name__ == "__main__":
                         help='Directory where config files are stored.')
     parser.add_argument('--code_dir', type=str, required=False, default='unlabeled_extrapolation/',
                         help='Path to directory where code files are located.')
-    parser.add_argument('--python_path', type=str, required=False, default='python',
+    parser.add_argument('--python_path', type=str, required=False, default='python3.8',
                         help='Path or alias to Python interpreter')
     parser.add_argument('--tmp_dir', type=str, required=False, default='/scr/biggest/ue/',
                         help='(Slurm only) Directory where tmp files are stored.')
